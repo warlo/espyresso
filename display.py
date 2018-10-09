@@ -31,7 +31,8 @@ class Display():
         self.GREEN = (  0, 255,   0)
         self.BLUE  = (  0,   0, 255)
 
-        self.queue = deque(maxlen=100)
+        pygame.draw.line(self.screen, self.RED, (0, 123.69), (320, 123.69))
+        self.queue = deque(maxlen=320)
 
     def draw(self, degrees = 0):
         self.queue.append(degrees)
@@ -48,11 +49,10 @@ class Display():
 
     def draw_waveform(self):
         points = generate_coordinates(list(self.queue))
-        print(points)
+        pygame.draw.line(self.screen, self.RED, (0, 123.69), (320, 123.69))
 
         previous_point = (0, 240)
         for point in points:
-            print('1,2', previous_point, point)
             pygame.draw.line(self.screen, self.GREEN, previous_point, point)
             previous_point = point
 
