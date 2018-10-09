@@ -36,7 +36,7 @@ class Display():
 
     def draw(self, degrees = 0):
         self.queue.popleft()
-        self.queue.append(generate_coordinate(degrees))
+        self.queue.append(degrees)
 
         self.draw_degrees(degrees)
         self.draw_waveform()
@@ -44,7 +44,7 @@ class Display():
     def draw_degrees(self, degrees = 0):
         self.screen.fill(self.BLACK)
         myfont = pygame.font.Font('monospace.ttf', 50)
-        label = myfont.render(u"{}\u00B0C".format(degrees), 1, self.WHITE)
+        label = myfont.render(u"{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
         self.screen.blit(label, (0, 0))
         pygame.display.update()
 
