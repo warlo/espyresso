@@ -53,6 +53,7 @@ class Espyresso():
                     print(pid_value)
                     print('{:.1f}C'.format(self.temp))
 
-espyresso = Espyresso()
-espyresso.update()
 
+if __name__ == '__main__':
+    espyresso = Espyresso()
+    espyresso.update()
