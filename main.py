@@ -38,10 +38,11 @@ class Espyresso():
         self.boiler = Boiler(self.gpio, PWM_GPIO)
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
         self.temp = 0
+        self.running = True
 
     def update(self):
         with self.tsic:
-            while True:
+            while self.running:
                 time.sleep(0.2)
                 latest_temp = self.tsic.measurement
                 print('test', latest_temp)
@@ -57,6 +58,7 @@ class Espyresso():
 
     def signal_handler(self, sig, frame):
         print('You pressed CTRL-C!')
+        self.running = False
         self.gpio.stop()
         sys.exit(0)
 
