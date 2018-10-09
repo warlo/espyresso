@@ -8,12 +8,11 @@ class PWM():
         self.enabled = False
         pass
 
+    def set_pwm(self, value=0):
+        self.gpio.hardware_PWM(self.pwm_gpio, 2, value)
+
     def set_value(self, value):
-        
-        if value > 0:
-            self.enable()
-        else:
-            self.disable()
+        self.gpio.hardware_PWM(self.pwm_gpio, 2, int(value*(10**6)))
 
     def enable(self):
         if not self.enabled:

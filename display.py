@@ -1,59 +1,48 @@
-import os
-import pygame
-import time
-import random
+import pygame, sys, os
+from pygame.locals import *
 
 class Display():
-    screen = None
-    
     def __init__(self):
-        "Ininitializes a new pygame screen using the framebuffer"
-        # Based on "Python GUI in Linux frame buffer"
-        # http://www.karoltomala.com/blog/?p=679
-        display = os.getenv("DISPLAY")
-        if display:
-            print("I'm running under X display = {0}".format(disp_no))
-        
-        # Check which frame buffer drivers are available
-        # Start with fbcon since directfb hangs with composite output
-        drivers = ['fbcon', 'directfb', 'svgalib']
-        found = False
-        for driver in drivers:
-            # Make sure that SDL_VIDEODRIVER is set
-            if not os.getenv('SDL_VIDEODRIVER'):
-                os.putenv('SDL_VIDEODRIVER', driver)
-            try:
-                pygame.display.init()
-            except pygame.error:
-                print('Driver: {0} failed.'.format(driver))
-                continue
-            found = True
-            break
-    
-        if not found:
-            raise Exception('No suitable video driver found!')
-        
-        size = (pygame.display.Info().current_w, pygame.display.Info().current_h)
-        print("Framebuffer size: %d x %d" % (size[0], size[1]))
-        self.screen = pygame.display.set_mode(size, pygame.FULLSCREEN)
-        # Clear the screen to start
-        self.screen.fill((0, 0, 0))        
-        # Initialise font support
+        os.environ["SDL_FBDEV"] = "/dev/fb1"
+        # Uncomment if you have a touch panel and find the X value for your device
+        #os.environ["SDL_MOUSEDRV"] = "TSLIB"
+        #os.environ["SDL_MOUSEDEV"] = "/dev/input/eventX"
+
+        pygame.display.init()
+        pygame.mouse.set_visible(False)
         pygame.font.init()
-        # Render the screen
+
+        # set up the window
+        self.screen = pygame.display.set_mode((320, 240))
+
+        # set up the colors
+        self.BLACK = (  0,   0,   0)
+        self.WHITE = (255, 255, 255)
+        self.RED   = (255,   0,   0)
+        self.GREEN = (  0, 255,   0)
+        self.BLUE  = (  0,   0, 255)
+
+    def draw_degrees(self, degrees = 0):
+        # draw on the surface object
+        self.screen.fill(self.BLACK)
+        myfont = pygame.font.Font('monospace.ttf', 50)
+        label = myfont.render(u"{}\u00B0C".format(degrees), 1, self.WHITE)
+        self.screen.blit(label, (0, 0))
         pygame.display.update()
 
-    def __del__(self):
-        "Destructor to make sure pygame shuts down, etc."
 
-    def test(self):
-        # Fill the screen with red (255, 0, 0)
-        red = (255, 0, 0)
-        self.screen.fill(red)
-        # Update the display
-        pygame.display.update()
+    def main(self):
+        # run the game loop
+        while True:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    print("Pos: %sx%s\n" % pygame.mouse.get_pos())
+            self.draw_degrees()
+            pygame.display.update()
 
-# Create an instance of the PyScope class
-display = Display()
-display.test()
-time.sleep(10)
+if __name__ == '__main__':
+    dis = Display()
+    dis.main()
