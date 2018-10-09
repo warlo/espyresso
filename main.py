@@ -55,12 +55,13 @@ class Espyresso():
                     self.display.draw_degrees('{:.1f}'.format(self.temp))
                     #print(pid_value)
                     print('{:.1f}C'.format(self.temp))
+            self.boiler.set_value(0)
+            self.gpio.stop()
 
     def signal_handler(self, sig, frame):
         print('You pressed CTRL-C!')
         self.running = False
-        time.sleep(0.2)
-        self.gpio.stop()
+        time.sleep(1)
         sys.exit(0)
 
 if __name__ == '__main__':
