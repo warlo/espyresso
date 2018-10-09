@@ -58,6 +58,11 @@ class Espyresso():
             self.boiler.set_value(0)
             self.gpio.stop()
 
+    def quit(self):
+        self.boiler.set_value(0)
+        self.gpio.stop()
+        self.display.stop()
+
     def signal_handler(self, sig, frame):
         print('You pressed CTRL-C!')
         self.running = False

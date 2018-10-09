@@ -30,6 +30,8 @@ class Display():
         self.screen.blit(label, (0, 0))
         pygame.display.update()
 
+    def stop(self):
+        pygame.quit()
 
     def main(self):
         # run the game loop
