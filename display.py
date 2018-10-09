@@ -5,10 +5,10 @@ from pygame.locals import *
 WIDTH = 320
 HEIGHT = 240
 
-def generate_coordinate():
+def generate_coordinates(temperatures):
 
-    point = (x, HEIGHT - (y * 1.33))
-    return point
+    points = [(x, HEIGHT - (y * 1.33)) for x, y in enumerate(temperatures)]
+    return points
 
 class Display():
     def __init__(self):
@@ -47,9 +47,8 @@ class Display():
         pygame.display.update()
 
     def draw_waveform(self):
-        print(self.queue)
-        pass
-
+        points = generate_coordinates(list(self.queue))
+        print(points)
 
     def stop(self):
         pygame.quit()
