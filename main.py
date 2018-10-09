@@ -8,7 +8,6 @@ on a Raspberry PI.
 import pigpio
 import signal
 import time
-import sys
 from tsic import TsicInputChannel, Measurement
 from pid import PID
 from boiler import Boiler
@@ -60,7 +59,6 @@ class Espyresso():
         print('You pressed CTRL-C!')
         self.running = False
         self.gpio.stop()
-        sys.exit(0)
 
 if __name__ == '__main__':
     espyresso = Espyresso()
