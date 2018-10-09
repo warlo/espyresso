@@ -2,9 +2,8 @@
 from pwm import PWM
 
 class Boiler():
-    def __init__(self, pwm_gpio):
-        self.pwm = PWM(pwm_gpio)
-        pass
+    def __init__(self, pi, pwm_gpio):
+        self.pwm = PWM(pi, pwm_gpio)
 
     def set_value(self, value):
         if value < 0.0:

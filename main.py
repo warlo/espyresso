@@ -6,11 +6,12 @@ on a Raspberry PI.
 """
 
 import pigpio
+import signal
+import time
 from tsic import TsicInputChannel, Measurement
 from pid import PID
 from boiler import Boiler
 from display import Display
-import time
 
 TSIC_GPIO = 24
 PWM_GPIO = 13
@@ -25,7 +26,7 @@ IMAX = 1.0
 
 class Espyresso():
     def __init__(self):
-        pi = pigpio.pi()
+        self.gpio = pigpio.pi()
 
         self.pid = PID()
         self.pid.set_pid_gains(KP, KI, KD)
@@ -33,8 +34,8 @@ class Espyresso():
 
         self.display = Display()
 
-        self.boiler = Boiler(PWM_GPIO)
-        self.tsic = TsicInputChannel(pigpio_pi=pi, gpio=TSIC_GPIO)
+        self.boiler = Boiler(self.gpio, PWM_GPIO)
+        self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
         self.temp = 0
 
     def update(self):
@@ -50,10 +51,15 @@ class Espyresso():
                     pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
                     self.boiler.set_value(pid_value)
                     self.display.draw_degrees('{:.1f}'.format(self.temp))
-                    print(pid_value)
+                    #print(pid_value)
                     print('{:.1f}C'.format(self.temp))
 
+    def signal_handler(self, sig, frame):
+        print('You pressed CTRL-C!')
+        self.gpio.stop()
+        sys.exit(0)
 
 if __name__ == '__main__':
     espyresso = Espyresso()
+    signal.signal(signal.SIGINT, espyresso.signal_handler)
     espyresso.update()

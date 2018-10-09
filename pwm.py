@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-import pigpio
 
 class PWM():
-    def __init__(self, pwm_gpio):
-        self.gpio = pigpio.pi()
+    def __init__(self, gpio, pwm_gpio):
+        self.gpio = gpio
         self.pwm_gpio = pwm_gpio
         self.enabled = False
-        pass
 
     def set_pwm(self, value=0):
         self.gpio.hardware_PWM(self.pwm_gpio, 2, value)
