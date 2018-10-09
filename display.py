@@ -31,11 +31,9 @@ class Display():
         self.GREEN = (  0, 255,   0)
         self.BLUE  = (  0,   0, 255)
 
-        self.queue = deque()
-        self.queue.append(0)
+        self.queue = deque(maxlen=100)
 
     def draw(self, degrees = 0):
-        self.queue.popleft()
         self.queue.append(degrees)
 
         self.draw_degrees(degrees)
