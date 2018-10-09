@@ -8,6 +8,7 @@ on a Raspberry PI.
 import pigpio
 import signal
 import time
+import sys
 from tsic import TsicInputChannel, Measurement
 from pid import PID
 from boiler import Boiler
