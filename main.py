@@ -52,7 +52,7 @@ class Espyresso():
                     self.temp = latest_temp.degree_celsius
                     pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
                     self.boiler.set_value(pid_value)
-                    self.display.draw_degrees('{:.1f}'.format(self.temp))
+                    self.display.draw(self.temp)
                     #print(pid_value)
                     print('{:.1f}C'.format(self.temp))
 
