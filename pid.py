@@ -2,12 +2,14 @@
 
 class PID():
     def __init__(self):
-        self.d_state = 0.0
         self.i_state = 0.0
+        self.d_state = 0.0
+
         self.i_min = -1.0
         self.i_max = 1.0
-        self.i_gain = 0.0
+
         self.p_gain = 1.0
+        self.i_gain = 0.0
         self.d_gain = 0.0
 
     def set_pid_gains(self, p_gain, i_gain, d_gain):
