@@ -18,9 +18,8 @@ TSIC_GPIO = 24
 PWM_GPIO = 13
 
 TARGET_TEMP = 93.0
-#TARGET_TEMP = 50
-KP = 0.08
-KI = 0.05
+KP = 0.07
+KI = 0.06
 KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
@@ -45,16 +44,15 @@ class Espyresso():
             while self.running:
                 time.sleep(0.2)
                 latest_temp = self.tsic.measurement
-                print('test', latest_temp)
                 if latest_temp == Measurement.UNDEF:
+                    print('UNDEF TEMP!')
                     pass
                 else:
                     self.temp = latest_temp.degree_celsius
                     pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
                     self.boiler.set_value(pid_value)
                     self.display.draw(self.temp)
-                    #print(pid_value)
-                    print('{:.1f}C'.format(self.temp))
+                    print(f'Temp: {round(self.temp, 2)} - PID: {pid_value}')
 
     def signal_handler(self, sig, frame):
         print('You pressed CTRL-C!')
