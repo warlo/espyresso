@@ -58,16 +58,16 @@ class Display():
         self.queue.append(new_temp)
 
         if new_temp > self.high:
-            self.high = new_temp
+            self.high = int(new_temp)
         elif new_temp < self.low:
-            self.low = new_temp
+            self.low = int(new_temp)
 
         if not popped:
             return
         elif popped <= self.low:
-            self.low = min(self.queue)
+            self.low = int(min(self.queue))
         elif popped >= self.high:
-            self.high = max(self.queue)
+            self.high = int(max(self.queue))
 
     def draw(self, degrees = 0):
         self.add_to_queue(degrees)
