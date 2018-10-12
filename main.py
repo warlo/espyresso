@@ -19,7 +19,7 @@ PWM_GPIO = 13
 
 TARGET_TEMP = 93.0
 KP = 0.07
-KI = 0.06
+KI = 0.07
 KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
@@ -32,7 +32,7 @@ class Espyresso():
         self.pid.set_pid_gains(KP, KI, KD)
         self.pid.set_integrator_limits(IMIN, IMAX)
 
-        self.display = Display()
+        self.display = Display(TARGET_TEMP)
 
         self.boiler = Boiler(self.gpio, PWM_GPIO)
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
