@@ -14,10 +14,10 @@ class Buttons:
         self.gpio.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
         self.callback_one = self.gpio.callback(self.button_one, pigpio.RISING_EDGE, self.callback_button_one)
-        self.reset_one = self.gpio.callback(self.button_one, pigpio.FALLING_EDGE, self.reset_button_one)
+        #self.reset_one = self.gpio.callback(self.button_one, pigpio.FALLING_EDGE, self.reset_button_one)
 
         self.callback_two = self.gpio.callback(self.button_two, pigpio.RISING_EDGE, self.callback_button_one)
-        self.reset_two = self.gpio.callback(self.button_two, pigpio.FALLING_EDGE, self.reset_button_one)
+        #self.reset_two = self.gpio.callback(self.button_two, pigpio.FALLING_EDGE, self.reset_button_one)
 
         self.previous_tick = None
         self.time_called = None
@@ -30,16 +30,19 @@ class Buttons:
         self.boiler.toggle_boiler()
 
     def callback_button_one(self, gpio, level, tick):
-        self.time_called = time.time()
+        seconds = 0
+        while True:
+            print('seconds', seconds)
+            if seconds > 5:
+                self.turn_off_system()
+            if not self.gpio.read(self.button_one):
+                if seconds < 5:
+                    self.toggle_boiler()
+                return
+            time.sleep(1)
+            seconds += 1
     
     def reset_button_one(self, gpio, level, tick):
-        if not self.time_called:
-            return
-        diff = int(time.time() - self.time_called)
-        print('RESETTING', diff)
-        if diff < 5:
-            self.toggle_boiler()
-        else:
-            self.turn_off_system()
+        pass
 
 
