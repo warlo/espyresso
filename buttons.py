@@ -34,6 +34,7 @@ class Buttons:
 
         self.active = True
         seconds = 0
+        self.boiler.toggle_boiler()
         while self.active:
             print('seconds', seconds)
             time.sleep(1)
