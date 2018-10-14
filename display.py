@@ -28,26 +28,29 @@ class Display:
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
         # os.environ["SDL_MOUSEDEV"] = "/dev/input/eventX"
 
-        pygame.display.init()
-        pygame.mouse.set_visible(False)
-        pygame.font.init()
-
-        # set up the window
-        flags = FULLSCREEN | DOUBLEBUF
-        pygame.event.set_allowed(None)
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
-
-        self.big_font = pygame.font.Font("monospace.ttf", 50)
-        self.small_font = pygame.font.Font("monospace.ttf", 16)
-
         # set up the colors
         self.BLACK = (0, 0, 0)
         self.WHITE = (255, 255, 255)
+        self.GRAY = (100, 100, 100)
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
         self.BLUE = (0, 0, 255)
 
+        pygame.display.init()
+        pygame.mouse.set_visible(False)
+        pygame.font.init()
+        pygame.event.set_allowed(None)
+        self.big_font = pygame.font.Font("monospace.ttf", 50)
+        self.small_font = pygame.font.Font("monospace.ttf", 16)
+
+        # set up the window
+        flags = FULLSCREEN | DOUBLEBUF
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+        self.screen.fill(self.BLACK)
+        self.draw_y_axis()
+
         self.queue = deque()
+        self.y_points = deque()
         self.low = 80
         self.high = 100
         self.target_temp = target_temp
@@ -66,8 +69,10 @@ class Display:
         popped = None
         if len(self.queue) >= (WIDTH / 2) - 16:
             popped = self.queue.popleft()
+            self.y_points.popleft()
 
         self.queue.append(new_temp)
+        self.y_points.append(linear_transform(new_temp, self.low, self.high, HEIGHT, 50))
 
         if new_temp > self.high:
             self.high = int(new_temp)
@@ -92,7 +97,7 @@ class Display:
 
     def draw_notification(self):
         label = self.big_font.render("{}".format(self.notification), 1, self.WHITE)
-        self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
+        self.screen.blit(label, (WIDTH - 50, 0))
 
     def draw_y_axis(self):
         pygame.draw.line(self.screen, self.WHITE, (32, 240), (32, 50))
@@ -104,27 +109,32 @@ class Display:
             y_val = linear_transform(closest_ten, self.low, self.high, HEIGHT, 50)
             self.screen.blit(label, (4, y_val - (16 / 2)))
 
+            pygame.draw.line(self.screen, self.GRAY, (32, 240), (32, 50))
+            """
             # Transparent line
             horizontal_line = pygame.Surface((320, 1), pygame.SRCALPHA)
             horizontal_line.fill(
                 (255, 255, 255, 100)
             )  # You can change the 100 depending on what transparency it is.
             self.screen.blit(horizontal_line, (32, y_val))
+            """
 
     def draw_degrees(self, degrees=0):
+        #self.screen.fill(self.BLACK, pygame.Rect(0, 0, 320, 50))
         self.screen.fill(self.BLACK)
         label = self.big_font.render("{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
         self.screen.blit(label, (0, 0))
 
     def draw_waveform(self):
-        points = self.generate_coordinates(list(self.queue))
         target_y = linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50)
         pygame.draw.line(self.screen, self.RED, (32, target_y), (320, target_y))
 
-        previous_point = points[0]
-        for point in points[1:]:
-            pygame.draw.line(self.screen, self.GREEN, previous_point, point)
-            previous_point = point
+        #y_points = self.generate_coordinates(list(self.queue))
+        y_points = self.y_points
+        previous_y = y_points[0]
+        for i, y_point in enumerate(y_points[1:]):
+            pygame.draw.line(self.screen, self.GREEN, (32 + i * 2, previous_y), (32 + (i + 1) * 2, y_point))
+            previous_y = y_point
 
     def stop(self):
         pygame.quit()
