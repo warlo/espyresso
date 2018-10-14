@@ -34,7 +34,7 @@ class Buttons:
         seconds = 0
         while True:
             print('seconds', seconds)
-            self.display.draw_exit(seconds)
+            self.display.notification = str(seconds)
             if seconds > 5:
                 self.turn_off_system()
             if not self.gpio.read(self.button_one):
