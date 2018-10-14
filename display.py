@@ -33,7 +33,9 @@ class Display:
         pygame.font.init()
 
         # set up the window
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        flags = FULLSCREEN | DOUBLEBUF
+        pygame.event.set_allowed(None)
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
         # set up the colors
         self.BLACK = (0, 0, 0)
