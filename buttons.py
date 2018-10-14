@@ -26,6 +26,7 @@ class Buttons:
 
     def turn_off_system(self):
         self.quit()
+        print('asd')
         os.system("shutdown now -h")
 
     def toggle_boiler(self):

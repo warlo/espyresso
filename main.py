@@ -65,12 +65,9 @@ class Espyresso:
                 if DEBUG:
                     print(f"Temp: {round(self.temp, 2)} - PID: {pid_value}")
     def quit(self):
-        self.running = False
-        time.sleep(1)
         self.boiler.set_value(0)
+        self.running = False
         self.display.stop()
-        time.sleep(1)
-        sys.exit(0)
 
     def signal_handler(self, sig, frame):
         if sig == 2:
@@ -78,6 +75,7 @@ class Espyresso:
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
         self.quit()
+        sys.exit(0)
 
 
 def handler(signum, frame):
