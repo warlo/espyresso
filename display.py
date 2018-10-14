@@ -75,6 +75,13 @@ class Display:
         elif popped >= self.high:
             self.high = int(max(self.queue))
 
+    def draw_exit(self, seconds=0):
+        self.screen.fill(self.BLACK)
+        font = pygame.font.Font("monospace.ttf", 50)
+        label = font.render("{}".format(seconds), 1, self.WHITE)
+        self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
+        pygame.display.update()
+
     def draw(self, degrees=0):
         self.add_to_queue(degrees)
         self.draw_degrees(degrees)
@@ -94,7 +101,7 @@ class Display:
 
             label = font.render("{}".format(str(closest_ten)), 1, self.WHITE)
             y_val = linear_transform(closest_ten, self.low, self.high, HEIGHT, 50)
-            self.screen.blit(label, (0, y_val - (font_size / 2)))
+            self.screen.blit(label, (4, y_val - (font_size / 2)))
 
             # Transparent line
             horizontal_line = pygame.Surface((320, 1), pygame.SRCALPHA)
