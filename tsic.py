@@ -5,11 +5,17 @@ TSIC temperature sensor and ZACWire protocol support for Raspberry PI.
 May be used as a command line tool for testing TSIC input.
 """
 
-__all__ = [ 'ZacWireInputChannel', 'Measurement', 'TsicInputChannel', 'Error', 'PigpioNotConnectedError' ]
+__all__ = [
+    "ZacWireInputChannel",
+    "Measurement",
+    "TsicInputChannel",
+    "Error",
+    "PigpioNotConnectedError",
+]
 
-__author__ = 'Holger Fleischmann'
-__copyright__ = 'Copyright 2018, Holger Fleischmann, Bavaria/Germany'
-__license__ = 'Apache License 2.0'
+__author__ = "Holger Fleischmann"
+__copyright__ = "Copyright 2018, Holger Fleischmann, Bavaria/Germany"
+__license__ = "Apache License 2.0"
 
 from datetime import datetime
 import argparse
@@ -19,7 +25,7 @@ import pigpio
 import threading
 import time
 
-logger = logging.getLogger().getChild(__name__) 
+logger = logging.getLogger().getChild(__name__)
 
 
 class Error(Exception):
@@ -45,14 +51,14 @@ class ZacWireInputChannel(object):
     ZACWire protocol GPIO packet receiving handler. Receive packets
     of bytes consisting of 8 bits plus an even parity bit.
     """
-    
+
     STATUS_OK = 0
     """ Received data is valid. """
     STATUS_PARITY_ERROR = 1
     """ Received data has a parity error. """
     STATUS_BIT_COUNT_ERROR = 2
     """ Received data has a wrong bit count. """
-        
+
     def __init__(self, pigpio_pi, gpio):
         """
         Initialize ZACWire receiving channel on a GPIO.
@@ -69,7 +75,11 @@ class ZacWireInputChannel(object):
             self.pi.set_mode(self.gpio, pigpio.INPUT)
             self.pi.set_pull_up_down(self.gpio, pigpio.PUD_OFF)
         else:
-            raise PigpioNotConnectedError('pigpio.pi is not connected, input for gpio ' + str(gpio) + ' will not work')
+            raise PigpioNotConnectedError(
+                "pigpio.pi is not connected, input for gpio "
+                + str(gpio)
+                + " will not work"
+            )
 
     def start(self, callback):
         """
@@ -86,38 +96,44 @@ class ZacWireInputChannel(object):
             self.__pi_callback = self.pi.callback(
                 self.gpio,
                 pigpio.EITHER_EDGE,
-                lambda gpio, level, tick: self.__gpio_callback(gpio, level, tick))
+                lambda gpio, level, tick: self.__gpio_callback(gpio, level, tick),
+            )
 
     def stop(self):
         """
         Stop listening for data.
         """
         if self.__pi_callback is not None:
-            self.pi.set_watchdog(self.gpio, 0) 
+            self.pi.set_watchdog(self.gpio, 0)
             self.__pi_callback.cancel()
             self.__pi_callback = None
         self.__reset_packet()
         self.__last_low_tick = None
         self.__last_high_tick = None
-        
+
     def is_started(self):
         """
         Whether listening for data is running.
         """
         return self.__pi_callback is not None
-    
+
     def __enter__(self):
         self.start(None)
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
-        
+
     def __call_packet_callback(self, status, packet_bytes):
         try:
             self.packet_callback(status, packet_bytes)
         except:
-            logger.exception('Exception from callback' + str(self.packet_callback) + ' in ' + str(self))
-        
+            logger.exception(
+                "Exception from callback"
+                + str(self.packet_callback)
+                + " in "
+                + str(self)
+            )
+
     def __reset_packet(self):
         self.__bit_ticks = None
         self.__parity = 0
@@ -129,10 +145,10 @@ class ZacWireInputChannel(object):
             # print('====> RECEIVED {0} STATUS {1}'.format(self.__received_bytes, status))
             self.__call_packet_callback(status, self.__received_bytes)
             self.__received_bytes = None
-                        
+
     def __gpio_callback(self, gpio, level, tick):
         if level == pigpio.LOW:
-            
+
             if self.__last_high_tick is not None:
                 high_ticks = pigpio.tickDiff(self.__last_high_tick, tick)
 
@@ -144,7 +160,7 @@ class ZacWireInputChannel(object):
                     self.__parity = 0
                     self.__bit_count = 0
                     self.__bit_ticks = None
-                
+
                 elif self.__received_bytes is not None and high_ticks > 150:
                     # next byte in packet
                     # print('====> NEXT BYTE START')
@@ -156,15 +172,15 @@ class ZacWireInputChannel(object):
                     else:
                         self.__pass_any_packet_to_callback(self.STATUS_BIT_COUNT_ERROR)
                         self.__reset_packet()
-                        
+
             self.__last_low_tick = tick
-            
+
         elif level == pigpio.HIGH:
-            
+
             if self.__last_low_tick is not None:
                 low_ticks = pigpio.tickDiff(self.__last_low_tick, tick)
                 # print('{0} @ {1} -> {2}: {3}'.format(gpio, tick, level, low_ticks))
-            
+
                 if self.__received_bytes is not None:
                     if self.__bit_ticks is None:
                         # calibration T-strobe at begin of byte
@@ -174,31 +190,35 @@ class ZacWireInputChannel(object):
                         bit = 0 if low_ticks > self.__bit_ticks else 1
                         if self.__bit_count < 8:
                             # data bit received
-                            self.__received_bytes[-1] = self.__received_bytes[-1] * 2 + bit
+                            self.__received_bytes[-1] = (
+                                self.__received_bytes[-1] * 2 + bit
+                            )
                         self.__bit_count += 1
-                        
+
                         self.__parity += bit
                         if self.__bit_count == 9:
                             self.__check_parity()
                             self.pi.set_watchdog(self.gpio, 1)  # 1 ms
                         elif self.__bit_count > 9:
                             # more bits than expected (8 bits + 1 __parity)
-                            self.__pass_any_packet_to_callback(self.STATUS_BIT_COUNT_ERROR)
+                            self.__pass_any_packet_to_callback(
+                                self.STATUS_BIT_COUNT_ERROR
+                            )
                             self.__reset_packet()
-    
+
             self.__last_high_tick = tick
 
         elif level == pigpio.TIMEOUT:
             self.__pass_any_packet_to_callback(self.STATUS_OK)
             self.__reset_packet()
-            
+
     def __check_parity(self):
         if self.__parity % 2 != 0:
             self.__pass_any_packet_to_callback(self.STATUS_PARITY_ERROR)
             self.__reset_packet()
 
     def __repr__(self, *args, **kwargs):
-        return self.__class__.__name__ + ' for GPIO ' + str(self.gpio)
+        return self.__class__.__name__ + " for GPIO " + str(self.gpio)
 
 
 class Measurement(object):
@@ -206,27 +226,27 @@ class Measurement(object):
     Measurement consisting of the temperature degree_celsius and the timestamp
     seconds_since_epoch.
     """
-    
+
     def __init__(self, degree_celsius, seconds_since_epoch):
         self.degree_celsius = degree_celsius
         self.seconds_since_epoch = seconds_since_epoch
 
-    def __eq__(self, other): 
+    def __eq__(self, other):
         return self.__dict__ == other.__dict__
 
     def __repr__(self, *args, **kwargs):
         if self.degree_celsius is None:
-            return 'Undefined'
+            return "Undefined"
         else:
-            return (self.__class__.__name__ 
-                  + ' {:.2f}C at {}'
-                        .format(self.degree_celsius,
-                                datetime.fromtimestamp(self.seconds_since_epoch).isoformat(sep=' ')))
+            return self.__class__.__name__ + " {:.2f}C at {}".format(
+                self.degree_celsius,
+                datetime.fromtimestamp(self.seconds_since_epoch).isoformat(sep=" "),
+            )
 
 
 Measurement.UNDEF = Measurement(None, None)
 """ Undefined measurement """
-    
+
 
 class TsicInputChannel(object):
     """
@@ -259,8 +279,10 @@ class TsicInputChannel(object):
         """
         self.stop()
         self.__callback = callback
-        self.__zacwire_channel.start(lambda status, packet_bytes: self.__packet_received(status, packet_bytes))
-    
+        self.__zacwire_channel.start(
+            lambda status, packet_bytes: self.__packet_received(status, packet_bytes)
+        )
+
     def stop(self):
         """
         Stop reading temperatures.
@@ -273,13 +295,13 @@ class TsicInputChannel(object):
         Whether reading temperatures is currently running.
         """
         return self.__zacwire_channel.is_started()
-    
+
     def __enter__(self):
         self.start(None)
-        
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
-        
+
     def measure_once(self, timeout=None):
         """
         Wait up to optional timeout seconds for a measurement and 
@@ -291,54 +313,64 @@ class TsicInputChannel(object):
         was_started = self.is_started()
         if not was_started:
             self.start()
-            
+
         with self.__measure_waiting:
             self.__measure_waiting.wait(timeout)
-        
+
         if not was_started:
             self.stop()
-            
+
         measurement = self.measurement
         if last_timestamp != measurement.seconds_since_epoch:
             return measurement
         else:
             return Measurement.UNDEF
-    
-    @property    
+
+    @property
     def measurement(self):
         """
         The last received measurement as Measurement.
         """
         with self.__lock:
             return Measurement(self.__degree_celsius, self.__timestamp)
-                        
+
     def __packet_received(self, status, packet_bytes):
         if status == ZacWireInputChannel.STATUS_OK and len(packet_bytes) == 2:
-            
+
             with self.__lock:
-                self.__degree_celsius = ((packet_bytes[0] * 256 + packet_bytes[1]) / 2047. * (150 + 50) - 50)
+                self.__degree_celsius = (
+                    packet_bytes[0] * 256 + packet_bytes[1]
+                ) / 2047.0 * (150 + 50) - 50
                 self.__timestamp = time.time()
                 measurement = self.measurement
-            
+
             # print('====> Temperature {0}°C'.format(self.__degree_celsius))
             if self.__callback is not None:
                 self.__callback(measurement)
-                
+
             with self.__measure_waiting:
                 self.__measure_waiting.notifyAll()
 
     def __repr__(self, *args, **kwargs):
-        return self.__class__.__name__ + ' for GPIO ' + str(self.__zacwire_channel.gpio)
+        return self.__class__.__name__ + " for GPIO " + str(self.__zacwire_channel.gpio)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=
-        '''Read temperatures from a TSIC 206/306 sensor
-           connected to a Raspberry PI GPIO pin.''')
-    parser.add_argument('gpio', type=int, help='GPIO pin as Broadcom number')
-    parser.add_argument('--loop', dest='loop', action='store_const', const=True, default=False, help='print each received measurement until break')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="""Read temperatures from a TSIC 206/306 sensor
+           connected to a Raspberry PI GPIO pin."""
+    )
+    parser.add_argument("gpio", type=int, help="GPIO pin as Broadcom number")
+    parser.add_argument(
+        "--loop",
+        dest="loop",
+        action="store_const",
+        const=True,
+        default=False,
+        help="print each received measurement until break",
+    )
     args = parser.parse_args()
-    
+
     pi = pigpio.pi()
     tsic = TsicInputChannel(pi, args.gpio)
     try:
