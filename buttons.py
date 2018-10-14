@@ -20,8 +20,7 @@ class Buttons:
         self.reset_two = self.gpio.callback(self.button_two, pigpio.FALLING_EDGE, self.reset_button_one)
 
         self.previous_tick = None
-
-        self.time_called = False
+        self.time_called = None
 
     def turn_off_system(self):
         print('asd')
@@ -34,11 +33,11 @@ class Buttons:
         self.time_called = time.time()
     
     def reset_button_one(self, gpio, level, tick):
-        diff = int(self_time_called - time.time())
+        diff = int(time.time() - self.time_called)
         print('RESETTING', diff)
-        if diff > 1:
+        if diff < 5:
             self.toggle_boiler()
-        elif diff > 5:
+        else:
             self.turn_off_system()
 
 
