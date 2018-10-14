@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, pigpio
+import os, pigpio, time
 
 class Buttons:
     def __init__(self, gpio, boiler, button_one=20, button_two=21):
@@ -21,6 +21,8 @@ class Buttons:
 
         self.previous_tick = None
 
+        self.active = False
+
     def turn_off_system(self):
         os.system("shutdown now -h")
 
@@ -28,16 +30,18 @@ class Buttons:
         self.boiler.toggle_boiler()
 
     def callback_button_one(self, gpio, level, tick):
-        duration = 0
-        if self.previous_tick:
-            duration = self.gpio.tickDiff(self.previous_tick, tick)
-            self.previous_tick = tick
-        print('CALLBACK DURATION', duration)
-        if duration > 5000000:
-            self.turn_off_system()
+
+        self.active = True
+        seconds = 0
+        while self.active:
+            print('seconds', seconds)
+            time.sleep(1)
+            seconds += 1
+            if seconds > 5:
+                self.turn_off_system()
     
     def reset_button_one(self, gpio, level, tick):
         print('RESETTING')
-        self.callback_one.reset_tally()
+        self.active = False
 
 
