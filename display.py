@@ -40,8 +40,8 @@ class Display():
         self.BLUE  = (  0,   0, 255)
 
         self.queue = deque()
-        self.low = 120
-        self.high = 120
+        self.low = 80
+        self.high = 100
         self.target_temp = target_temp
 
     def generate_coordinates(self, temperatures):

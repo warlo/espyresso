@@ -1,9 +1,10 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 """
 Examples of how to use the TSIC 206/306 temperature reading class
 on a Raspberry PI.
 """
+import logging
 
 import pigpio
 import signal
@@ -14,12 +15,14 @@ from pid import PID
 from boiler import Boiler
 from display import Display
 
+DEBUG = False
+
 TSIC_GPIO = 24
 PWM_GPIO = 13
 
 TARGET_TEMP = 93.0
-KP = 0.07
-KI = 0.07
+KP = 0.075
+KI = 0.06
 KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
@@ -45,14 +48,15 @@ class Espyresso():
                 time.sleep(0.2)
                 latest_temp = self.tsic.measurement
                 if latest_temp == Measurement.UNDEF:
-                    print('UNDEF TEMP!')
-                    pass
+                    if DEBUG:
+                        print('UNDEF TEMP!')
                 else:
                     self.temp = latest_temp.degree_celsius
                     pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
                     self.boiler.set_value(pid_value)
                     self.display.draw(self.temp)
-                    print(f'Temp: {round(self.temp, 2)} - PID: {pid_value}')
+                    if DEBUG:
+                        print(f'Temp: {round(self.temp, 2)} - PID: {pid_value}')
 
     def signal_handler(self, sig, frame):
         print('You pressed CTRL-C!')
@@ -63,7 +67,18 @@ class Espyresso():
         time.sleep(1)
         sys.exit(0)
 
+def handler(signum, frame):
+    """Why is systemd sending sighups? I DON'T KNOW."""
+    logging.warning("Got a {} signal. Doing nothing".format(signum))
+
 if __name__ == '__main__':
-    espyresso = Espyresso()
-    signal.signal(signal.SIGINT, espyresso.signal_handler)
-    espyresso.update()
+    try:
+        signal.signal(signal.SIGHUP, handler)
+
+        espyresso = Espyresso()
+        signal.signal(signal.SIGINT, espyresso.signal_handler)
+        #signal.signal(signal.SIGTERM, espyresso.signal_handler)
+        #signal.signal(signal.SIGKILL, espyresso.signal_handler)
+        espyresso.update()
+    except Exception as e:
+        logging.warning(f'EXCEPTION:{e}')
