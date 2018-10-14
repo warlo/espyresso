@@ -43,7 +43,7 @@ class Espyresso:
 
         self.boiler = Boiler(self.gpio, PWM_GPIO)
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
-        self.buttons = Buttons(self.gpio, self.boiler, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO, self.quit)
+        self.buttons = Buttons(self.gpio, self.boiler, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO)
 
         self.temp = 0
         self.running = True
@@ -64,17 +64,16 @@ class Espyresso:
                 self.display.draw(self.temp)
                 if DEBUG:
                     print(f"Temp: {round(self.temp, 2)} - PID: {pid_value}")
-    def quit(self):
-        self.boiler.set_value(0)
-        self.running = False
-        self.display.stop()
 
     def signal_handler(self, sig, frame):
         if sig == 2:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
-        self.quit()
+        self.running = False
+        self.boiler.set_value(0)
+        time.sleep(1)
+        self.display.stop()
         sys.exit(0)
 
 

@@ -2,7 +2,7 @@
 import os, pigpio, time
 
 class Buttons:
-    def __init__(self, gpio, boiler, button_one, button_two, quit_func):
+    def __init__(self, gpio, boiler, button_one, button_two):
         self.gpio = gpio
         self.button_one = button_one
         self.button_two = button_two
@@ -22,10 +22,8 @@ class Buttons:
         self.previous_tick = None
 
         self.active = False
-        self.quit = quit_func
 
     def turn_off_system(self):
-        self.quit()
         print('asd')
         os.system("shutdown now -h")
 
