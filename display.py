@@ -46,6 +46,7 @@ class Display:
         self.low = 80
         self.high = 100
         self.target_temp = target_temp
+        self.notification = ''
 
     def generate_coordinates(self, temperatures):
 
@@ -75,19 +76,19 @@ class Display:
         elif popped >= self.high:
             self.high = int(max(self.queue))
 
-    def draw_exit(self, seconds=0):
-        self.screen.fill(self.BLACK)
-        font = pygame.font.Font("monospace.ttf", 50)
-        label = font.render("{}".format(seconds), 1, self.WHITE)
-        self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
-        pygame.display.update()
-
     def draw(self, degrees=0):
         self.add_to_queue(degrees)
         self.draw_degrees(degrees)
+        if self.notification:
+            self.draw_notification()
         self.draw_y_axis()
         self.draw_waveform()
         pygame.display.update()
+
+    def draw_notification(self):
+        font = pygame.font.Font("monospace.ttf", 50)
+        label = font.render("{}".format(self.notification), 1, self.WHITE)
+        self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
 
     def draw_y_axis(self):
         font_size = 16
