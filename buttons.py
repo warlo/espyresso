@@ -34,15 +34,16 @@ class Buttons:
         seconds = 0
         while True:
             print('seconds', seconds)
-            self.display.notification = str(seconds)
             if seconds > 5:
                 self.turn_off_system()
             if not self.gpio.read(self.button_one):
                 if seconds < 5:
                     self.toggle_boiler()
+                self.display.notification = ''
                 return
             time.sleep(1)
             seconds += 1
+            self.display.notification = str(seconds)
     
     def reset_button_one(self, gpio, level, tick):
         pass
