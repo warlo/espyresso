@@ -33,6 +33,8 @@ class Buttons:
         self.time_called = time.time()
     
     def reset_button_one(self, gpio, level, tick):
+        if not self.time_called:
+            return
         diff = int(time.time() - self.time_called)
         print('RESETTING', diff)
         if diff < 5:
