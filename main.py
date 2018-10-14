@@ -20,7 +20,7 @@ DEBUG = False
 TSIC_GPIO = 24
 PWM_GPIO = 13
 
-TARGET_TEMP = 93.0
+TARGET_TEMP = 95.0
 KP = 0.075
 KI = 0.06
 KD = 0.90
@@ -59,7 +59,10 @@ class Espyresso():
                         print(f'Temp: {round(self.temp, 2)} - PID: {pid_value}')
 
     def signal_handler(self, sig, frame):
-        print('You pressed CTRL-C!')
+        if sig == 2:
+            print('You pressed CTRL-C!', sig)
+        if sig == 15:
+            print('SIGTERM - Killing gracefully!')
         self.running = False
         time.sleep(1)
         self.boiler.set_value(0)
@@ -77,8 +80,7 @@ if __name__ == '__main__':
 
         espyresso = Espyresso()
         signal.signal(signal.SIGINT, espyresso.signal_handler)
-        #signal.signal(signal.SIGTERM, espyresso.signal_handler)
-        #signal.signal(signal.SIGKILL, espyresso.signal_handler)
+        signal.signal(signal.SIGTERM, espyresso.signal_handler)
         espyresso.update()
     except Exception as e:
         logging.warning(f'EXCEPTION:{e}')
