@@ -21,7 +21,7 @@ class Buttons:
 
         self.previous_tick = None
 
-        self.active = False
+        self.time_called = False
 
     def turn_off_system(self):
         print('asd')
@@ -31,19 +31,14 @@ class Buttons:
         self.boiler.toggle_boiler()
 
     def callback_button_one(self, gpio, level, tick):
-
-        self.active = True
-        seconds = 0
-        self.boiler.toggle_boiler()
-        while self.active:
-            print('seconds', seconds)
-            time.sleep(1)
-            seconds += 1
-            if seconds > 5:
-                self.turn_off_system()
+        self.time_called = time.time()
     
     def reset_button_one(self, gpio, level, tick):
-        print('RESETTING')
-        self.active = False
+        diff = int(self_time_called - time.time())
+        print('RESETTING', diff)
+        if diff > 1:
+            self.toggle_boiler()
+        elif diff > 5:
+            self.turn_off_system()
 
 
