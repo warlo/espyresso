@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#!/usr/bin/env python3
 
 """
 TSIC temperature sensor and ZACWire protocol support for Raspberry PI.
