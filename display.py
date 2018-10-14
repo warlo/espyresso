@@ -37,6 +37,9 @@ class Display:
         pygame.event.set_allowed(None)
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
+        self.big_font = pygame.font.Font("monospace.ttf", 50)
+        self.small_font = pygame.font.Font("monospace.ttf", 16)
+
         # set up the colors
         self.BLACK = (0, 0, 0)
         self.WHITE = (255, 255, 255)
@@ -88,23 +91,18 @@ class Display:
         pygame.display.update()
 
     def draw_notification(self):
-        font = pygame.font.Font("monospace.ttf", 50)
-        label = font.render("{}".format(self.notification), 1, self.WHITE)
+        label = self.big_font.render("{}".format(self.notification), 1, self.WHITE)
         self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
 
     def draw_y_axis(self):
-        font_size = 16
-        font = pygame.font.Font(
-            os.path.join(os.path.dirname(__file__), "monospace.ttf"), font_size
-        )
         pygame.draw.line(self.screen, self.WHITE, (32, 240), (32, 50))
         steps = 10
         for i in range(self.low, self.high, steps):
             closest_ten = int(math.ceil(i / steps)) * steps
 
-            label = font.render("{}".format(str(closest_ten)), 1, self.WHITE)
+            label = self.small_font.render("{}".format(str(closest_ten)), 1, self.WHITE)
             y_val = linear_transform(closest_ten, self.low, self.high, HEIGHT, 50)
-            self.screen.blit(label, (4, y_val - (font_size / 2)))
+            self.screen.blit(label, (4, y_val - (16 / 2)))
 
             # Transparent line
             horizontal_line = pygame.Surface((320, 1), pygame.SRCALPHA)
@@ -115,8 +113,7 @@ class Display:
 
     def draw_degrees(self, degrees=0):
         self.screen.fill(self.BLACK)
-        font = pygame.font.Font("monospace.ttf", 50)
-        label = font.render("{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
+        label = self.big_font.render("{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
         self.screen.blit(label, (0, 0))
 
     def draw_waveform(self):
