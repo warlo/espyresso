@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-class PID():
+
+class PID:
     def __init__(self):
         self.i_state = 0.0
         self.d_state = 0.0
@@ -40,4 +41,3 @@ class PID():
         self.d_state = position
 
         return p_term + d_term + i_term
-

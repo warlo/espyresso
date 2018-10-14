@@ -27,7 +27,8 @@ KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
 
-class Espyresso():
+
+class Espyresso:
     def __init__(self):
         self.gpio = pigpio.pi()
 
@@ -49,20 +50,20 @@ class Espyresso():
                 latest_temp = self.tsic.measurement
                 if latest_temp == Measurement.UNDEF:
                     if DEBUG:
-                        print('UNDEF TEMP!')
+                        print("UNDEF TEMP!")
                 else:
                     self.temp = latest_temp.degree_celsius
                     pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
                     self.boiler.set_value(pid_value)
                     self.display.draw(self.temp)
                     if DEBUG:
-                        print(f'Temp: {round(self.temp, 2)} - PID: {pid_value}')
+                        print(f"Temp: {round(self.temp, 2)} - PID: {pid_value}")
 
     def signal_handler(self, sig, frame):
         if sig == 2:
-            print('You pressed CTRL-C!', sig)
+            print("You pressed CTRL-C!", sig)
         if sig == 15:
-            print('SIGTERM - Killing gracefully!')
+            print("SIGTERM - Killing gracefully!")
         self.running = False
         time.sleep(1)
         self.boiler.set_value(0)
@@ -70,11 +71,13 @@ class Espyresso():
         time.sleep(1)
         sys.exit(0)
 
+
 def handler(signum, frame):
     """Why is systemd sending sighups? I DON'T KNOW."""
     logging.warning("Got a {} signal. Doing nothing".format(signum))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     try:
         signal.signal(signal.SIGHUP, handler)
 
@@ -83,4 +86,4 @@ if __name__ == '__main__':
         signal.signal(signal.SIGTERM, espyresso.signal_handler)
         espyresso.update()
     except Exception as e:
-        logging.warning(f'EXCEPTION:{e}')
+        logging.warning(f"EXCEPTION:{e}")
