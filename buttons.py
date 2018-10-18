@@ -15,27 +15,15 @@ class Buttons:
         self.gpio.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
         self.callback_one = self.gpio.callback(self.button_one, pigpio.RISING_EDGE, self.callback_button_one)
-        #self.reset_one = self.gpio.callback(self.button_one, pigpio.FALLING_EDGE, self.reset_button_one)
-
-        #self.callback_two = self.gpio.callback(self.button_two, pigpio.RISING_EDGE, self.callback_button_one)
-        #self.reset_two = self.gpio.callback(self.button_two, pigpio.FALLING_EDGE, self.reset_button_one)
-
-        self.previous_tick = None
-        self.time_called = None
 
     def turn_off_system(self):
-        print('asd')
         os.system("shutdown now -h")
-
-    def toggle_boiler(self):
-        self.boiler.toggle_boiler()
 
     def callback_button_one(self, gpio, level, tick):
         seconds = 0
         while True:
-            print('seconds', seconds)
             seconds += 0.01
-            if seconds % 1 == 0:
+            if int(seconds) % 1 == 0:
                 self.display.notification = str(seconds)
             if seconds > 5:
                 self.turn_off_system()

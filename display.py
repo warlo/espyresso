@@ -17,10 +17,6 @@ def linear_transform(x, a, b, c, d):
     return y
 
 
-def get_low_and_high(points):
-    pass
-
-
 class Display:
     def __init__(self, target_temp=95):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
