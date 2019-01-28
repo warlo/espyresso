@@ -33,7 +33,7 @@ class Display:
         pygame.event.set_allowed(None)
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
-        self.big_font = pygame.font.Font("monospace.ttf", 50)
+        self.big_font = pygame.font.Font("monospace.ttf", 75)
         self.small_font = pygame.font.Font("monospace.ttf", 16)
 
         # set up the colors
