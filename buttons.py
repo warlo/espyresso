@@ -22,17 +22,17 @@ class Buttons:
     def callback_button_one(self, gpio, level, tick):
         timestamp = datetime.datetime.now()
         while True:
-            time.sleep(0.2)
             seconds = (datetime.datetime.now() - timestamp).total_seconds()
             if int(seconds) % 1 == 0:
                 self.display.notification = str(int(seconds))
             if seconds >= 3:
                 self.turn_off_system()
             elif not self.gpio.read(self.button_one):
-                if seconds < 3:
+                if seconds > 0.25 and seconds < 3:
                     self.boiler.toggle_boiler()
                 self.display.notification = ''
                 return
+            time.sleep(0.2)
     
     def reset_button_one(self, gpio, level, tick):
         pass
