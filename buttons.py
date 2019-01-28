@@ -20,7 +20,7 @@ class Buttons:
         os.system("shutdown now -h")
 
     def callback_button_one(self, gpio, level, tick):
-        timestamp = datetime.now()
+        timestamp = datetime.datetime.now()
         while True:
             time.sleep(0.2)
             seconds = (datetime.datetime.now() - timestamp).total_seconds()
