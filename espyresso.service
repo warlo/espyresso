@@ -1,0 +1,15 @@
+
+[Unit]
+Description=Espyresso
+After=pigpiod.service
+#After=pigpiod.service systemd-logind.service systemd-user-sessions.service display-manager.service graphical.target
+
+[Service]
+User=root
+WorkingDirectory=/home/alarm/espyresso
+ExecStart=/usr/bin/stdbuf -oL /home/alarm/espyresso/main.py
+Type=idle
+SendSIGHUP=no
+
+[Install]
+WantedBy=multi-user.target
