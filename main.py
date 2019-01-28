@@ -26,7 +26,7 @@ BUTTON_TWO_GPIO = 21
 
 TARGET_TEMP = 95.0
 KP = 0.075
-KI = 0.061
+KI = 0.0608
 KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
@@ -54,10 +54,10 @@ class Espyresso:
             while self.running:
                 time.sleep(0.2)
                 latest_measurement = self.tsic.measurement
-                if latest_measurement == Measurement.UNDEF or not latest_measurement.degree_celsius:
+                if latest_measurement == Measurement.UNDEF:
                     if DEBUG:
                         print("UNDEF TEMP!")
-                        continue
+                    continue
 
                 temp = latest_measurement.degree_celsius
                 pid_value = self.pid.update(TARGET_TEMP - temp, temp)
