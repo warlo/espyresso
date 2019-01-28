@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import os, pigpio, time
+import os, pigpio, time, datetime
 
 class Buttons:
     def __init__(self, gpio, boiler, display, button_one, button_two):
@@ -20,19 +20,19 @@ class Buttons:
         os.system("shutdown now -h")
 
     def callback_button_one(self, gpio, level, tick):
-        seconds = 0
+        timestamp = datetime.now()
         while True:
-            seconds += 0.01
+            time.sleep(0.2)
+            seconds = (datetime.datetime.now() - timestamp).total_seconds()
             if int(seconds) % 1 == 0:
-                self.display.notification = str(seconds)
-            if seconds > 5:
+                self.display.notification = str(int(seconds))
+            if seconds >= 3:
                 self.turn_off_system()
-            if not self.gpio.read(self.button_one):
-                if seconds > 0.01 and seconds < 5:
+            elif not self.gpio.read(self.button_one):
+                if seconds < 3:
                     self.boiler.toggle_boiler()
                 self.display.notification = ''
                 return
-            time.sleep(0.01)
     
     def reset_button_one(self, gpio, level, tick):
         pass
