@@ -5,6 +5,7 @@ Examples of how to use the TSIC 206/306 temperature reading class
 on a Raspberry PI.
 """
 import logging
+import traceback
 
 import pigpio
 import signal
@@ -25,7 +26,7 @@ BUTTON_TWO_GPIO = 21
 
 TARGET_TEMP = 95.0
 KP = 0.075
-KI = 0.06
+KI = 0.061
 KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
@@ -45,25 +46,25 @@ class Espyresso:
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
         self.buttons = Buttons(self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO)
 
-        self.temp = 0
+        temp = 0
         self.running = True
 
     def run(self):
         with self.tsic:
             while self.running:
                 time.sleep(0.2)
-                latest_temp = self.tsic.measurement
-                if latest_temp == Measurement.UNDEF:
+                latest_measurement = self.tsic.measurement
+                if latest_measurement == Measurement.UNDEF or not latest_measurement.degree_celsius:
                     if DEBUG:
                         print("UNDEF TEMP!")
                         continue
 
-                self.temp = latest_temp.degree_celsius
-                pid_value = self.pid.update(TARGET_TEMP - self.temp, self.temp)
+                temp = latest_measurement.degree_celsius
+                pid_value = self.pid.update(TARGET_TEMP - temp, temp)
                 self.boiler.set_value(pid_value)
-                self.display.draw(self.temp)
+                self.display.draw(temp)
                 if DEBUG:
-                    print(f"Temp: {round(self.temp, 2)} - PID: {pid_value}")
+                    print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
 
     def signal_handler(self, sig, frame):
         if sig == 2:
@@ -92,3 +93,4 @@ if __name__ == "__main__":
         espyresso.run()
     except Exception as e:
         logging.warning(f"EXCEPTION:{e}")
+        logging.warning(traceback.format_exc())
