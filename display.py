@@ -29,8 +29,8 @@ class Display:
         pygame.font.init()
 
         # set up the window
-        flags = FULLSCREEN | DOUBLEBUF
         pygame.event.set_allowed(None)
+        flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
         self.big_font = pygame.font.Font("monospace.ttf", 75)
@@ -130,7 +130,7 @@ class Display:
         import random, time
 
         v = 25
-        while True:
+        while v < 1000:
             for event in pygame.event.get():
                 if event.type == QUIT:
                     pygame.quit()
