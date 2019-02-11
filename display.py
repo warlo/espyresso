@@ -49,13 +49,12 @@ class Display:
         self.target_temp = target_temp
         self.notification = ''
 
+    def generate_coordinate(self, temp, index):
+        return (32 + index * 2, linear_transform(temp, self.low, self.high, HEIGHT, 50))
+
     def generate_coordinates(self, temperatures):
 
-        points = [
-            (32 + index * 2, linear_transform(temp, self.low, self.high, HEIGHT, 50))
-            for index, temp in enumerate(temperatures)
-        ]
-        return points
+        return [self.generate_coordinate(temp, index) for index, temp in enumerate(temperatures)]
 
     def add_to_queue(self, new_temp):
 
