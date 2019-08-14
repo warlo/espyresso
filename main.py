@@ -35,6 +35,7 @@ IMAX = 1.0
 class Espyresso:
     def __init__(self):
         self.gpio = pigpio.pi()
+        self.boiler = Boiler(self.gpio, PWM_GPIO)
 
         self.pid = PID()
         self.pid.set_pid_gains(KP, KI, KD)
@@ -42,7 +43,6 @@ class Espyresso:
 
         self.display = Display(TARGET_TEMP)
 
-        self.boiler = Boiler(self.gpio, PWM_GPIO)
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
         self.buttons = Buttons(
             self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO
