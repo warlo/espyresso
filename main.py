@@ -44,7 +44,9 @@ class Espyresso:
 
         self.boiler = Boiler(self.gpio, PWM_GPIO)
         self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
-        self.buttons = Buttons(self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO)
+        self.buttons = Buttons(
+            self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO
+        )
 
         temp = 0
         self.running = True

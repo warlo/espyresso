@@ -47,7 +47,7 @@ class Display:
         self.low = 80
         self.high = 100
         self.target_temp = target_temp
-        self.notification = ''
+        self.notification = ""
 
     def generate_coordinate(self, temp, index):
         return (32 + index * 2, linear_transform(temp, self.low, self.high, HEIGHT, 50))
