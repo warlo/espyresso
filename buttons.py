@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os, pigpio, time
 
+
 class Buttons:
     def __init__(self, gpio, boiler, display, button_one, button_two):
         self.gpio = gpio
@@ -14,7 +15,9 @@ class Buttons:
         self.gpio.set_pull_up_down(self.button_one, pigpio.PUD_DOWN)
         self.gpio.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
-        self.callback_one = self.gpio.callback(self.button_one, pigpio.RISING_EDGE, self.callback_button_one)
+        self.callback_one = self.gpio.callback(
+            self.button_one, pigpio.RISING_EDGE, self.callback_button_one
+        )
 
     def turn_off_system(self):
         os.system("shutdown now -h")
@@ -29,11 +32,9 @@ class Buttons:
             elif not self.gpio.read(self.button_one):
                 if seconds > 0.25 and seconds < 3:
                     self.boiler.toggle_boiler()
-                self.display.notification = ''
+                self.display.notification = ""
                 return
             time.sleep(0.2)
-    
+
     def reset_button_one(self, gpio, level, tick):
         pass
-
-
