@@ -6,6 +6,9 @@ class Boiler:
     def __init__(self, pi, pwm_gpio, boiling=True):
         self.pwm = PWM(pi, pwm_gpio)
         self.boiling = boiling
+        if self.boiling:
+            # Start boiling initially
+            self.pwn.set_value(1.0)
 
     def toggle_boiler(self):
         self.boiling = not self.boiling
