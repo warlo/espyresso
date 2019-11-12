@@ -8,7 +8,7 @@ class Boiler:
         self.boiling = boiling
         if self.boiling:
             # Start boiling initially
-            self.pwn.set_value(1.0)
+            self.pwm.set_value(1.0)
 
     def toggle_boiler(self):
         self.boiling = not self.boiling
