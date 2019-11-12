@@ -100,7 +100,7 @@ class Display:
             self.screen.blit(label, (4, y_val - (16 / 2)))
 
             # Transparent line
-            horizontal_line = pygame.Surface((320, 1), pygame.SRCALPHA)
+            horizontal_line = pygame.Surface((320, 1), flags=pygame.SRCALPHA)
             horizontal_line.fill(
                 (255, 255, 255, 100)
             )  # You can change the 100 depending on what transparency it is.
