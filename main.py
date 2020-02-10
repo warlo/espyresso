@@ -56,7 +56,7 @@ class Espyresso:
         with self.tsic:
             prev_timestamp = self.tsic.__timestmamp
             while self.running:
-                if time.time() - self.started > 300.0 and self.boiler.boiling:
+                if time.time() - self.started > 600.0 and self.boiler.boiling:
                     # Show something on display that boiler is soon shutting off
                     # Click button to add another 10 minutes to avoid issues while brewing
                     self.boiler.toggle_boiler()
