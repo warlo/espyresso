@@ -34,10 +34,10 @@ IMAX = 1.0
 
 class Espyresso:
     def __init__(self):
-        self.gpio = pigpio.pi()
-        self.boiler = Boiler(self.gpio, PWM_GPIO)
+        self.started_time = time.time()
 
-        self.started = time.time()
+        self.gpio = pigpio.pi()
+        self.boiler = Boiler(self.gpio, PWM_GPIO, self.reset_started_time)
 
         self.pid = PID()
         self.pid.set_pid_gains(KP, KI, KD)
@@ -52,11 +52,14 @@ class Espyresso:
 
         self.running = True
 
+    def reset_started_time(self):
+        self.started_time = time.time()
+
     def run(self):
         with self.tsic:
             prev_timestamp = self.tsic.__timestmamp
             while self.running:
-                if time.time() - self.started > 600.0 and self.boiler.boiling:
+                if time.time() - self.started_time > 600.0 and self.boiler.boiling:
                     # Show something on display that boiler is soon shutting off
                     # Click button to add another 10 minutes to avoid issues while brewing
                     self.boiler.toggle_boiler()
