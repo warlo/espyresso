@@ -77,10 +77,10 @@ class Display:
         elif int(popped) >= self.high:
             self.high = int(max(self.queue))
 
-    def draw(self, degrees=0, boiling=False):
+    def draw(self, degrees=0, boiling=False, time_left=0):
         self.add_to_queue(degrees)
         self.draw_degrees(degrees)
-        self.draw_boiling_label(boiling)
+        self.draw_boiling_label(boiling, time_left)
         if self.notification:
             self.draw_notification()
         self.draw_y_axis()
@@ -115,12 +115,14 @@ class Display:
         label = self.big_font.render("{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
         self.screen.blit(label, (0, 0))
 
-    def draw_boiling_label(self, boiling=False):
+    def draw_boiling_label(self, boiling=False, time_left=0):
         if boiling:
             label = self.small_font.render("ON", 1, self.RED)
         else:
             label = self.small_font.render("OFF", 1, self.RED)
-        self.screen.blit(label, (300 - (label.get_rect().width / 2), 24))
+        time_label = self.small_font.render(str(time_left), 1, self.WHITE)
+        self.screen.blit(time_label, (240 - int(time_label.get_rect().width / 2), 24))
+        self.screen.blit(label, (300 - int(label.get_rect().width / 2), 24))
         pygame.draw.circle(self.screen, self.RED if boiling else self.GREY, (300, 12), 10)
 
     def draw_waveform(self):

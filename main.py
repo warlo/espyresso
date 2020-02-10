@@ -74,7 +74,7 @@ class Espyresso:
                 temp = latest_measurement.degree_celsius
                 pid_value = self.pid.update(TARGET_TEMP - temp, temp)
                 self.boiler.set_value(pid_value)
-                self.display.draw(temp)
+                self.display.draw(temp, self.boiler.boiling, int(600.0 - (time.time() - self.started_time)))
 
                 if DEBUG:
                     print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
