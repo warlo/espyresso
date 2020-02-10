@@ -33,11 +33,12 @@ class Display:
         flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
-        self.big_font = pygame.font.Font("monospace.ttf", 75)
+        self.big_font = pygame.font.Font("monospace.ttf", 48)
         self.small_font = pygame.font.Font("monospace.ttf", 16)
 
         # set up the colors
         self.BLACK = (0, 0, 0)
+        self.GREY = (100, 100, 100)
         self.WHITE = (255, 255, 255)
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
@@ -50,7 +51,7 @@ class Display:
         self.notification = ""
 
     def generate_coordinate(self, temp, index):
-        return (32 + index * 2, linear_transform(temp, self.low, self.high, HEIGHT, 50))
+        return (32 + index * 2, round(linear_transform(temp, self.low, self.high, HEIGHT, 50)))
 
     def generate_coordinates(self, temperatures):
 
@@ -71,14 +72,15 @@ class Display:
 
         if not popped:
             return
-        elif popped <= self.low:
+        elif int(popped) >= self.low:
             self.low = int(min(self.queue))
-        elif popped >= self.high:
+        elif int(popped) >= self.high:
             self.high = int(max(self.queue))
 
-    def draw(self, degrees=0):
+    def draw(self, degrees=0, boiling=False):
         self.add_to_queue(degrees)
         self.draw_degrees(degrees)
+        self.draw_boiling_label(boiling)
         if self.notification:
             self.draw_notification()
         self.draw_y_axis()
@@ -96,24 +98,34 @@ class Display:
             closest_ten = int(math.ceil(i / steps)) * steps
 
             label = self.small_font.render("{}".format(str(closest_ten)), 1, self.WHITE)
-            y_val = linear_transform(closest_ten, self.low, self.high, HEIGHT, 50)
-            self.screen.blit(label, (4, y_val - (16 / 2)))
+            y_val = round(linear_transform(closest_ten, self.low, self.high, HEIGHT, 50))
+            if y_val < 50:
+                continue
+            self.screen.blit(label, (4, y_val - 8))  # Number on Y-axis step
 
             # Transparent line
             horizontal_line = pygame.Surface((320, 1), flags=pygame.SRCALPHA)
             horizontal_line.fill(
                 (255, 255, 255, 100)
             )  # You can change the 100 depending on what transparency it is.
-            self.screen.blit(horizontal_line, (32, y_val))
+            self.screen.blit(horizontal_line, (32, y_val))  # Line on Y-axis
 
     def draw_degrees(self, degrees=0):
         self.screen.fill(self.BLACK)
         label = self.big_font.render("{:.1f}\u00B0C".format(degrees), 1, self.WHITE)
         self.screen.blit(label, (0, 0))
 
+    def draw_boiling_label(self, boiling=False):
+        if boiling:
+            label = self.small_font.render("ON", 1, self.RED)
+        else:
+            label = self.small_font.render("OFF", 1, self.RED)
+        self.screen.blit(label, (300 - (label.get_rect().width / 2), 24))
+        pygame.draw.circle(self.screen, self.RED if boiling else self.GREY, (300, 12), 10)
+
     def draw_waveform(self):
         points = self.generate_coordinates(list(self.queue))
-        target_y = linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50)
+        target_y = round(linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50))
         pygame.draw.line(self.screen, self.RED, (32, target_y), (320, target_y))
 
         previous_point = points[0]
