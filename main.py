@@ -37,6 +37,8 @@ class Espyresso:
         self.gpio = pigpio.pi()
         self.boiler = Boiler(self.gpio, PWM_GPIO)
 
+        self.started = time.time()
+
         self.pid = PID()
         self.pid.set_pid_gains(KP, KI, KD)
         self.pid.set_integrator_limits(IMIN, IMAX)
@@ -48,23 +50,29 @@ class Espyresso:
             self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO
         )
 
-        temp = 0
         self.running = True
 
     def run(self):
         with self.tsic:
+            prev_timestamp = self.tsic.__timestmamp
             while self.running:
-                time.sleep(0.2)
+                if time.time() - self.started > 300.0 and self.boiler.boiling:
+                    # Show something on display that boiler is soon shutting off
+                    # Click button to add another 10 minutes to avoid issues while brewing
+                    self.boiler.toggle_boiler()
+
+                time.sleep(0.1)
                 latest_measurement = self.tsic.measurement
-                if latest_measurement == Measurement.UNDEF:
-                    if DEBUG:
-                        print("UNDEF TEMP!")
+                if prev_timestamp == latest_measurement.seconds_since_epoch or latest_measurement == Measurement.UNDEF:
                     continue
+
+                prev_timestamp = latest_measurement.seconds_since_epoch
 
                 temp = latest_measurement.degree_celsius
                 pid_value = self.pid.update(TARGET_TEMP - temp, temp)
                 self.boiler.set_value(pid_value)
                 self.display.draw(temp)
+
                 if DEBUG:
                     print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
 
