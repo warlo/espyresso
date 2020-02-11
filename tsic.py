@@ -265,7 +265,7 @@ class TsicInputChannel(object):
         self.__timestamp = None
         self.__zacwire_channel = ZacWireInputChannel(pigpio_pi, gpio)
         self.__lock = threading.RLock()
-        self.__measure_waiting = threading.Condition()
+        self._measure_waiting = threading.Condition()
 
     def start(self, callback=None):
         """
@@ -314,8 +314,8 @@ class TsicInputChannel(object):
         if not was_started:
             self.start()
 
-        with self.__measure_waiting:
-            self.__measure_waiting.wait(timeout)
+        with self._measure_waiting:
+            self._measure_waiting.wait(timeout)
 
         if not was_started:
             self.stop()
@@ -348,8 +348,8 @@ class TsicInputChannel(object):
             if self.__callback is not None:
                 self.__callback(measurement)
 
-            with self.__measure_waiting:
-                self.__measure_waiting.notifyAll()
+            with self._measure_waiting:
+                self._measure_waiting.notifyAll()
 
     def __repr__(self, *args, **kwargs):
         return self.__class__.__name__ + " for GPIO " + str(self.__zacwire_channel.gpio)
