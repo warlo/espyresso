@@ -66,6 +66,7 @@ class Espyresso:
 
                 time.sleep(0.1)
                 latest_measurement = self.tsic.measurement
+                print("running", latest_measurement)
                 if prev_timestamp == latest_measurement.seconds_since_epoch or latest_measurement == Measurement.UNDEF:
                     continue
 
