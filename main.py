@@ -64,8 +64,8 @@ class Espyresso:
                     # Click button to add another 10 minutes to avoid issues while brewing
                     self.boiler.toggle_boiler()
 
-                with self.tsic.__measure_waiting:
-                    self.tsic.__measure_waiting.wait(5)
+                with self.tsic._measure_waiting:
+                    self.tsic._measure_waiting.wait(5)
 
                 latest_measurement = self.tsic.measurement
                 if prev_timestamp == latest_measurement.seconds_since_epoch or latest_measurement == Measurement.UNDEF:
