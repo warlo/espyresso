@@ -45,7 +45,7 @@ class Display:
         self.BLUE = (0, 0, 255)
 
         self.queue = deque()
-        self.low = 80
+        self.low = 90
         self.high = 100
         self.target_temp = target_temp
         self.notification = ""
@@ -73,9 +73,9 @@ class Display:
         if not popped:
             return
         elif int(popped) >= self.low:
-            self.low = int(min(self.queue))
+            self.low = int(min(min(self.queue), 90))
         elif int(popped) >= self.high:
-            self.high = int(max(self.queue))
+            self.high = int(max(max(self.queue), 100))
 
     def draw(self, degrees=0, boiling=False, time_left=0):
         self.add_to_queue(degrees)
@@ -93,9 +93,9 @@ class Display:
 
     def draw_y_axis(self):
         pygame.draw.line(self.screen, self.WHITE, (32, 240), (32, 50))
-        steps = 10
+        steps = int((self.high - self.low) / 10)
         for i in range(self.low, self.high, steps):
-            closest_ten = int(math.ceil(i / steps)) * steps
+            closest_ten = int(round(i / steps)) * steps
 
             label = self.small_font.render("{}".format(str(closest_ten)), 1, self.WHITE)
             y_val = round(linear_transform(closest_ten, self.low, self.high, HEIGHT, 50))
