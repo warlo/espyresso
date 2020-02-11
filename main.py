@@ -57,7 +57,7 @@ class Espyresso:
 
     def run(self):
         with self.tsic:
-            prev_timestamp = self.tsic.__timestamp
+            prev_timestamp = None
             while self.running:
                 if time.time() - self.started_time > 600.0 and self.boiler.boiling:
                     # Show something on display that boiler is soon shutting off
