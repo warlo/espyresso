@@ -43,8 +43,11 @@ class Buttons:
         timestamp = time.time()
         while True:
             seconds = time.time() - timestamp
-            if seconds >= 0.25:
-                self.boiler.toggle_boiler()
+            if not self.gpio.read(self.button_two):
+                if seconds > 0.25:
+                    self.boiler.toggle_boiler()
+                self.display.notification = ""
+                return
             time.sleep(0.2)
 
     def reset_button_one(self, gpio, level, tick):
