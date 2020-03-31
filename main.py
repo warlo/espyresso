@@ -34,7 +34,7 @@ IMAX = 1.0
 
 class Espyresso:
     def __init__(self):
-        self.started_time = time.time()
+        self.started_time = 0
 
         self.gpio = pigpio.pi()
         self.boiler = Boiler(self.gpio, PWM_GPIO, self.reset_started_time)
@@ -57,6 +57,7 @@ class Espyresso:
 
     def run(self):
         with self.tsic:
+            self.started_time = time.time()
             prev_timestamp = None
             while self.running:
                 if time.time() - self.started_time > 600.0 and self.boiler.boiling:
