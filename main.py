@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-Examples of how to use the TSIC 206/306 temperature reading class
-on a Raspberry PI.
-"""
 import logging
 import traceback
 
@@ -20,9 +16,22 @@ from buttons import Buttons
 DEBUG = False
 
 TSIC_GPIO = 24
-PWM_GPIO = 13
+BOILER_PWM_GPIO = 12
+
+PUMP_OUT = 23
+PUMP_PWM_GPIO = 19
+
+BREW_IN_GPIO = 14
+FLOW_IN_GPIO = 5
+
+RANGER_ECHO_IN = 27
+RANGER_TRIGGER_OUT = 4
+
 BUTTON_ONE_GPIO = 20
 BUTTON_TWO_GPIO = 21
+
+SDA_GPIO = 2
+SCL_GPIO = 3
 
 TARGET_TEMP = 94.0
 KP = 0.075
@@ -31,13 +40,15 @@ KD = 0.90
 IMIN = 0.0
 IMAX = 1.0
 
+TURN_OFF_SECONDS = 600.0
+
 
 class Espyresso:
     def __init__(self):
         self.started_time = 0
 
         self.gpio = pigpio.pi()
-        self.boiler = Boiler(self.gpio, PWM_GPIO, self.reset_started_time)
+        self.boiler = Boiler(self.gpio, BOILER_PWM_GPIO, self.reset_started_time)
 
         self.pid = PID()
         self.pid.set_pid_gains(KP, KI, KD)
@@ -60,7 +71,10 @@ class Espyresso:
             self.started_time = time.time()
             prev_timestamp = None
             while self.running:
-                if time.time() - self.started_time > 600.0 and self.boiler.boiling:
+                if (
+                    time.time() - self.started_time > TURN_OFF_SECONDS
+                    and self.boiler.boiling
+                ):
                     # Show something on display that boiler is soon shutting off
                     # Click button to add another 10 minutes to avoid issues while brewing
                     self.boiler.toggle_boiler()
@@ -69,7 +83,10 @@ class Espyresso:
                     self.tsic._measure_waiting.wait(5)
 
                 latest_measurement = self.tsic.measurement
-                if prev_timestamp == latest_measurement.seconds_since_epoch or latest_measurement == Measurement.UNDEF:
+                if (
+                    prev_timestamp == latest_measurement.seconds_since_epoch
+                    or latest_measurement == Measurement.UNDEF
+                ):
                     print("UNDEF", latest_measurement)
                     continue
 
@@ -78,7 +95,11 @@ class Espyresso:
                 temp = latest_measurement.degree_celsius
                 pid_value = self.pid.update(TARGET_TEMP - temp, temp)
                 self.boiler.set_value(pid_value)
-                self.display.draw(temp, self.boiler.boiling, int(600.0 - (time.time() - self.started_time)))
+                self.display.draw(
+                    temp,
+                    self.boiler.boiling,
+                    int(TURN_OFF_SECONDS - (time.time() - self.started_time)),
+                )
 
                 if DEBUG:
                     print(f"Temp: {round(temp, 2)} - PID: {pid_value}")

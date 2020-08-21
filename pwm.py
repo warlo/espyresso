@@ -2,16 +2,17 @@
 
 
 class PWM:
-    def __init__(self, gpio, pwm_gpio):
+    def __init__(self, gpio, pwm_gpio, freq):
         self.gpio = gpio
         self.pwm_gpio = pwm_gpio
         self.enabled = False
+        self.freq = freq
 
     def set_pwm(self, value=0):
-        self.gpio.hardware_PWM(self.pwm_gpio, 2, value)
+        self.gpio.hardware_PWM(self.pwm_gpio, self.freq, value)
 
     def set_value(self, value):
-        self.gpio.hardware_PWM(self.pwm_gpio, 2, int(value * (10 ** 6)))
+        self.gpio.hardware_PWM(self.pwm_gpio, self.freq, int(value * (10 ** 6)))
 
     def enable(self):
         if not self.enabled:

@@ -4,7 +4,7 @@ from pwm import PWM
 
 class Boiler:
     def __init__(self, pi, pwm_gpio, reset_started_time, boiling=True):
-        self.pwm = PWM(pi, pwm_gpio)
+        self.pwm = PWM(pi, pwm_gpio, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
         if self.boiling:
