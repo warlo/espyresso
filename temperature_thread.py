@@ -13,7 +13,14 @@ from tsic import Measurement, TsicInputChannel
 
 class TemperatureThread(threading.Thread):
     def __init__(
-        self, *args, pigpio_pi=None, boiler=None, display=None, pid=None, started_time=None **kwargs
+        self,
+        *args,
+        pigpio_pi=None,
+        boiler=None,
+        display=None,
+        pid=None,
+        started_time=None,
+        **kwargs,
     ):
         self.started_time = started_time
 
