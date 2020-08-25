@@ -20,6 +20,7 @@ class Buttons:
         self.button_one = button_one
         self.button_two = button_two
         self.boiler = boiler
+        self.pump = pump
         self.display = display
 
         self.pigpio_pi.set_mode(self.button_one, pigpio.INPUT)
