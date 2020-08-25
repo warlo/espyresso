@@ -11,6 +11,7 @@ class Buttons:
         *,
         pigpio_pi=None,
         boiler=None,
+        pump=None,
         display=None,
         button_one=None,
         button_two=None
@@ -40,13 +41,9 @@ class Buttons:
         timestamp = time.time()
         while True:
             seconds = time.time() - timestamp
-            self.display.notification = str(int(seconds) + 1)
-            if seconds >= 2:
-                self.turn_off_system()
-            elif not self.pigpio_pi.read(self.button_one):
-                if seconds > 0.25 and seconds < 2:
-                    self.boiler.toggle_boiler()
-                self.display.notification = ""
+            if not self.pigpio_pi.read(self.button_one):
+                if seconds > 0.25:
+                    self.pump.brew_shot()
                 return
             time.sleep(0.2)
 
@@ -54,8 +51,11 @@ class Buttons:
         timestamp = time.time()
         while True:
             seconds = time.time() - timestamp
-            if not self.pigpio_pi.read(self.button_two):
-                if seconds > 0.25:
+            self.display.notification = str(int(seconds) + 1)
+            if seconds >= 2:
+                self.turn_off_system()
+            elif not self.pigpio_pi.read(self.button_one):
+                if seconds > 0.25 and seconds < 2:
                     self.boiler.toggle_boiler()
                 self.display.notification = ""
                 return
