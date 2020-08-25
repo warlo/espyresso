@@ -19,7 +19,7 @@ from pid import PID
 from temperature_thread import TemperatureThread
 
 
-class Espyresso(threading.Thread):
+class Espyresso:
     def __init__(self):
         self.started_time = 0
 
@@ -67,7 +67,7 @@ class Espyresso(threading.Thread):
     def reset_started_time(self):
         self.started_time = time.time()
 
-    def run(self):
+    def start(self):
         self.reset_started_time()
 
         self.display.start(args=(self.started_time,))

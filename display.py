@@ -24,7 +24,7 @@ def linear_transform(x, a, b, c, d):
 
 
 class Display(threading.Thread):
-    def __init__(self, *args, boiler=None, target_temp=95, started_time=0, **kwargs):
+    def __init__(self, started_time, *args, boiler=None, target_temp=95, **kwargs):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
