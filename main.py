@@ -15,7 +15,7 @@ from buttons import Buttons
 from display import Display
 from pid import PID
 
-# from pump import Pump
+from pump import Pump
 from temperature_thread import TemperatureThread
 
 
@@ -29,7 +29,7 @@ class Espyresso:
             if not config.DEBUG:
                 raise e
 
-        # self.pump = Pump(self.gpio, config.BOILER_PWM_GPIO, self.reset_started_time)
+        self.pump = Pump(pigpio_pi=self.pigpio_pi, pump_pwm_gpio=config.PUMP_PWM_GPIO, reset_started_time=self.reset_started_time)
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
             pwm_gpio=config.BOILER_PWM_GPIO,
@@ -58,6 +58,7 @@ class Espyresso:
         self.buttons = Buttons(
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
+            pump=self.pump,
             display=self.display,
             button_one=config.BUTTON_ONE_GPIO,
             button_two=config.BUTTON_TWO_GPIO,
@@ -79,8 +80,8 @@ class Espyresso:
     def stop(self):
         self.temperature_thread.stop()
         self.display.stop()
-        self.running = False
         self.boiler.set_value(0)
+        self.running = False
         time.sleep(1)
         self.pigpio_pi.stop()
         sys.exit(0)
