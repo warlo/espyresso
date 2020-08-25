@@ -35,8 +35,10 @@ class Espyresso:
             pwm_gpio=config.BOILER_PWM_GPIO,
             reset_started_time=self.reset_started_time,
         )
+        self.started_time = time.time()
 
         self.display = Display(
+            started_time=self.started_time,
             target_temp=config.TARGET_TEMP,
             boiler=self.boiler,
             started_time=self.started_time,
@@ -47,6 +49,7 @@ class Espyresso:
         self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
         self.temperature_thread = TemperatureThread(
+            started_time=self.started_time,
             pigpio_pi=self.pigpio_pi,
             display=self.display,
             boiler=self.boiler,
@@ -62,7 +65,6 @@ class Espyresso:
         )
 
         self.running = True
-        self.started_time = time.time()
 
     def reset_started_time(self):
         self.started_time = time.time()
@@ -70,8 +72,8 @@ class Espyresso:
     def start(self):
         self.reset_started_time()
 
-        self.display.start(args=(self.started_time,))
-        self.temperature_thread.start(args=(self.started_time,))
+        self.display.start()
+        self.temperature_thread.start()
 
         threading.Semaphore(0).acquire()
 
