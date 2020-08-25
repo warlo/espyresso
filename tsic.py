@@ -21,6 +21,7 @@ import argparse
 import logging
 import threading
 import time
+import pigpio
 from datetime import datetime
 
 
@@ -355,7 +356,6 @@ class TsicInputChannel(object):
 
 
 if __name__ == "__main__":
-    import pigpio
 
     parser = argparse.ArgumentParser(
         description="""Read temperatures from a TSIC 206/306 sensor
