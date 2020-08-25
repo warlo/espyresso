@@ -1,5 +1,11 @@
-import pygame, sys, os, math
+import os
+import sys
+import threading
+import time
 from collections import deque
+
+import config
+import pygame
 from pygame.locals import *
 
 WIDTH = 320
@@ -17,8 +23,8 @@ def linear_transform(x, a, b, c, d):
     return y
 
 
-class Display:
-    def __init__(self, target_temp=95):
+class Display(threading.Thread):
+    def __init__(self, *args, boiler=None, target_temp=95, started_time=0, **kwargs):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
@@ -50,12 +56,25 @@ class Display:
         self.target_temp = target_temp
         self.notification = ""
 
+        self.boiler = boiler
+        self.started_time = started_time
+
+        self.running = True
+
+        super().__init__(*args, **kwargs)
+
     def generate_coordinate(self, temp, index):
-        return (32 + index * 2, round(linear_transform(temp, self.low, self.high, HEIGHT, 50)))
+        return (
+            32 + index * 2,
+            round(linear_transform(temp, self.low, self.high, HEIGHT, 50)),
+        )
 
     def generate_coordinates(self, temperatures):
 
-        return [self.generate_coordinate(temp, index) for index, temp in enumerate(temperatures)]
+        return [
+            self.generate_coordinate(temp, index)
+            for index, temp in enumerate(temperatures)
+        ]
 
     def add_to_queue(self, new_temp):
 
@@ -77,16 +96,6 @@ class Display:
         elif int(popped) >= self.high:
             self.high = int(max(max(self.queue), 100))
 
-    def draw(self, degrees=0, boiling=False, time_left=0):
-        self.add_to_queue(degrees)
-        self.draw_degrees(degrees)
-        self.draw_boiling_label(boiling, time_left)
-        if self.notification:
-            self.draw_notification()
-        self.draw_y_axis()
-        self.draw_waveform()
-        pygame.display.update()
-
     def draw_notification(self):
         label = self.big_font.render("{}".format(self.notification), 1, self.WHITE)
         self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
@@ -98,7 +107,9 @@ class Display:
             closest_ten = int(round(i / steps)) * steps
 
             label = self.small_font.render("{}".format(str(closest_ten)), 1, self.WHITE)
-            y_val = round(linear_transform(closest_ten, self.low, self.high, HEIGHT, 50))
+            y_val = round(
+                linear_transform(closest_ten, self.low, self.high, HEIGHT, 50)
+            )
             if y_val < 50:
                 continue
             self.screen.blit(label, (4, y_val - 8))  # Number on Y-axis step
@@ -123,12 +134,19 @@ class Display:
         time_label = self.small_font.render(str(time_left), 1, self.WHITE)
         self.screen.blit(time_label, (240 - int(time_label.get_rect().width / 2), 24))
         self.screen.blit(label, (300 - int(label.get_rect().width / 2), 24))
-        pygame.draw.circle(self.screen, self.RED if boiling else self.GREY, (300, 12), 10)
+        pygame.draw.circle(
+            self.screen, self.RED if boiling else self.GREY, (300, 12), 10
+        )
 
     def draw_waveform(self):
-        points = self.generate_coordinates(list(self.queue))
-        target_y = round(linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50))
+        target_y = round(
+            linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50)
+        )
         pygame.draw.line(self.screen, self.RED, (32, target_y), (320, target_y))
+
+        points = self.generate_coordinates(list(self.queue))
+        if not points:
+            return
 
         previous_point = points[0]
         for point in points[1:]:
@@ -136,26 +154,46 @@ class Display:
             previous_point = point
 
     def stop(self):
+        self.running = False
         pygame.quit()
 
-    def main(self):
+    def run(self):
+        while self.running:
+            time_left = int(config.TURN_OFF_SECONDS - (time.time() - self.started_time))
+            self.draw_degrees(self.queue[-1] if self.queue else 0)
+            self.draw_boiling_label(self.boiler.boiling, time_left)
+            if self.notification:
+                self.draw_notification()
+            self.draw_y_axis()
+            self.draw_waveform()
+            pygame.display.update()
+            time.sleep(0.2)
+
+    def test_display(self):
         # run the game loop
-        import random, time
+        import random
+        import time
 
         v = 25
-        while v < 1000:
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    pygame.quit()
-                    sys.exit()
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    print("Pos: %sx%s\n" % pygame.mouse.get_pos())
-            v += 1
-            self.draw(random.randint(70, 120))
-            time.sleep(0.1)
-            pygame.display.update()
+        try:
+            while self.running and v < 1000:
+                for event in pygame.event.get():
+                    if event.type == QUIT:
+                        pygame.quit()
+                        sys.exit()
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        print("Pos: %sx%s\n" % pygame.mouse.get_pos())
+                v += 1
+                self.add_to_queue(random.randint(70, 120))
+                time.sleep(0.1)
+        except Exception:
+            self.stop()
 
 
 if __name__ == "__main__":
-    dis = Display()
-    dis.main()
+    from boiler import Boiler
+
+    boiler = Boiler(boiling=False)
+    dis = Display(boiler=boiler, started_time=time.time())
+    dis.start()
+    dis.test_display()
