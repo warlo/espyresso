@@ -1,119 +1,95 @@
 #!/usr/bin/env python3
 
 import logging
+import signal
+import sys
+import threading
+import time
 import traceback
 
 import pigpio
-import signal
-import time
-import sys
-from tsic import TsicInputChannel, Measurement
-from pid import PID
+
+import config
 from boiler import Boiler
-from display import Display
 from buttons import Buttons
+from display import Display
+from pid import PID
 
-DEBUG = False
-
-TSIC_GPIO = 24
-BOILER_PWM_GPIO = 12
-
-PUMP_OUT = 23
-PUMP_PWM_GPIO = 19
-
-BREW_IN_GPIO = 14
-FLOW_IN_GPIO = 5
-
-RANGER_ECHO_IN = 27
-RANGER_TRIGGER_OUT = 4
-
-BUTTON_ONE_GPIO = 20
-BUTTON_TWO_GPIO = 21
-
-SDA_GPIO = 2
-SCL_GPIO = 3
-
-TARGET_TEMP = 94.0
-KP = 0.075
-KI = 0.0608
-KD = 0.90
-IMIN = 0.0
-IMAX = 1.0
-
-TURN_OFF_SECONDS = 600.0
+# from pump import Pump
+from temperature_thread import TemperatureThread
 
 
-class Espyresso:
+class Espyresso(threading.Thread):
     def __init__(self):
         self.started_time = 0
 
-        self.gpio = pigpio.pi()
-        self.boiler = Boiler(self.gpio, BOILER_PWM_GPIO, self.reset_started_time)
+        try:
+            self.pigpio_pi = pigpio.pi()
+        except Exception as e:
+            if not config.DEBUG:
+                raise e
+
+        # self.pump = Pump(self.gpio, config.BOILER_PWM_GPIO, self.reset_started_time)
+        self.boiler = Boiler(
+            pigpio_pi=self.pigpio_pi,
+            pwm_gpio=config.BOILER_PWM_GPIO,
+            reset_started_time=self.reset_started_time,
+        )
+
+        self.display = Display(
+            target_temp=config.TARGET_TEMP,
+            boiler=self.boiler,
+            started_time=self.started_time,
+        )
 
         self.pid = PID()
-        self.pid.set_pid_gains(KP, KI, KD)
-        self.pid.set_integrator_limits(IMIN, IMAX)
+        self.pid.set_pid_gains(config.KP, config.KI, config.KD)
+        self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
-        self.display = Display(TARGET_TEMP)
+        self.temperature_thread = TemperatureThread(
+            pigpio_pi=self.pigpio_pi,
+            display=self.display,
+            boiler=self.boiler,
+            pid=self.pid,
+        )
 
-        self.tsic = TsicInputChannel(pigpio_pi=self.gpio, gpio=TSIC_GPIO)
         self.buttons = Buttons(
-            self.gpio, self.boiler, self.display, BUTTON_ONE_GPIO, BUTTON_TWO_GPIO
+            pigpio_pi=self.pigpio_pi,
+            boiler=self.boiler,
+            display=self.display,
+            button_one=config.BUTTON_ONE_GPIO,
+            button_two=config.BUTTON_TWO_GPIO,
         )
 
         self.running = True
+        self.started_time = time.time()
 
     def reset_started_time(self):
         self.started_time = time.time()
 
     def run(self):
-        with self.tsic:
-            self.started_time = time.time()
-            prev_timestamp = None
-            while self.running:
-                if (
-                    time.time() - self.started_time > TURN_OFF_SECONDS
-                    and self.boiler.boiling
-                ):
-                    # Show something on display that boiler is soon shutting off
-                    # Click button to add another 10 minutes to avoid issues while brewing
-                    self.boiler.toggle_boiler()
+        self.reset_started_time()
 
-                with self.tsic._measure_waiting:
-                    self.tsic._measure_waiting.wait(5)
+        self.display.start(args=(self.started_time,))
+        self.temperature_thread.start(args=(self.started_time,))
 
-                latest_measurement = self.tsic.measurement
-                if (
-                    prev_timestamp == latest_measurement.seconds_since_epoch
-                    or latest_measurement == Measurement.UNDEF
-                ):
-                    print("UNDEF", latest_measurement)
-                    continue
+        threading.Semaphore(0).acquire()
 
-                prev_timestamp = latest_measurement.seconds_since_epoch
-
-                temp = latest_measurement.degree_celsius
-                pid_value = self.pid.update(TARGET_TEMP - temp, temp)
-                self.boiler.set_value(pid_value)
-                self.display.draw(
-                    temp,
-                    self.boiler.boiling,
-                    int(TURN_OFF_SECONDS - (time.time() - self.started_time)),
-                )
-
-                if DEBUG:
-                    print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
+    def stop(self):
+        self.temperature_thread.stop()
+        self.display.stop()
+        self.running = False
+        self.boiler.set_value(0)
+        time.sleep(1)
+        self.pigpio_pi.stop()
+        sys.exit(0)
 
     def signal_handler(self, sig, frame):
         if sig == 2:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
-        self.running = False
-        self.boiler.set_value(0)
-        time.sleep(1)
-        self.display.stop()
-        sys.exit(0)
+        self.stop()
 
 
 def handler(signum, frame):
@@ -122,13 +98,13 @@ def handler(signum, frame):
 
 
 if __name__ == "__main__":
+    espyresso = Espyresso()
     try:
         signal.signal(signal.SIGHUP, handler)
-
-        espyresso = Espyresso()
         signal.signal(signal.SIGINT, espyresso.signal_handler)
         signal.signal(signal.SIGTERM, espyresso.signal_handler)
-        espyresso.run()
+        espyresso.start()
     except Exception as e:
         logging.warning(f"EXCEPTION:{e}")
         logging.warning(traceback.format_exc())
+        espyresso.stop()

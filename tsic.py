@@ -17,13 +17,12 @@ __author__ = "Holger Fleischmann"
 __copyright__ = "Copyright 2018, Holger Fleischmann, Bavaria/Germany"
 __license__ = "Apache License 2.0"
 
-from datetime import datetime
 import argparse
 import logging
-
-import pigpio
 import threading
 import time
+from datetime import datetime
+
 
 logger = logging.getLogger().getChild(__name__)
 
@@ -356,6 +355,8 @@ class TsicInputChannel(object):
 
 
 if __name__ == "__main__":
+    import pigpio
+
     parser = argparse.ArgumentParser(
         description="""Read temperatures from a TSIC 206/306 sensor
            connected to a Raspberry PI GPIO pin."""
