@@ -41,6 +41,7 @@ class Pump:
         if self.brew_thread.is_alive():
             self.stop_pump()
         else:
+            self.brew_thread = threading.Thread(target=self.brew_shot_routine)
             self.brew_thread.start()
 
     def brew_shot_routine(self):
