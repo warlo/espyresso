@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import pigpio
 import time
+import threading
 from pwm import PWM
 
 
@@ -22,6 +23,7 @@ class Pump:
         self.reset_started_time = reset_started_time
 
         self.pwm.set_value(1)
+        self.brew_thread = threading.Thread(target=self.brew_shot_routine)
 
     def toggle_pump(self):
         self.pumping = not self.pumping
@@ -32,6 +34,9 @@ class Pump:
             self.pigpio_pi.write(self.pump_out_gpio, 1)
 
     def brew_shot(self):
+        self.brew_thread.start()
+
+    def brew_shot_routine(self):
         if self.pumping:
             self.toggle_pump()
             self.set_pwm_value(1)
