@@ -53,13 +53,12 @@ class Pump:
         self.set_pwm_value(0.5)
 
         self.toggle_pump()
-        for i in range(50, 100):
-            if not self.pumping:
-                return
-            self.set_pwm_value(i / 100)
+        while self.pumping and (time.time() - started) < 5:
+            time_passed = time.time() - started
+            self.set_pwm_value(0.5 + 0.5 * time_passed)
             time.sleep(0.1)
 
-        while self.pumping and (started - time.time()) < 25:
+        while self.pumping and (time.time() - started) < 25:
             time.sleep(0.1)
 
         if self.pumping:

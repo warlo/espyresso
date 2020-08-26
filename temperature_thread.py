@@ -76,7 +76,8 @@ class TemperatureThread(threading.Thread):
                 lock.release()
 
                 if config.DEBUG:
-                    print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
+                    pass
+                    # print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
 
     def stop(self):
         self.running = False
