@@ -21,7 +21,7 @@ class Pump:
         self.pumping = pumping
         self.reset_started_time = reset_started_time
 
-        self.pwm.set_value(0)
+        self.pwm.set_value(1)
 
     def toggle_pump(self):
         self.pumping = not self.pumping
@@ -33,6 +33,8 @@ class Pump:
 
     def brew_shot(self):
         if self.pumping:
+            self.toggle_pump()
+            self.set_pwm_value(1)
             return
 
         started = time.time()
