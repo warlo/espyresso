@@ -29,15 +29,16 @@ class Espyresso:
             if not config.DEBUG:
                 raise e
 
-        self.pump = Pump(
-            pigpio_pi=self.pigpio_pi,
-            pump_pwm_gpio=config.PUMP_PWM_GPIO,
-            pump_out_gpio=config.PUMP_OUT_GPIO,
-            reset_started_time=self.reset_started_time,
-        )
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
             pwm_gpio=config.BOILER_PWM_GPIO,
+            reset_started_time=self.reset_started_time,
+        )
+        self.pump = Pump(
+            pigpio_pi=self.pigpio_pi,
+            boiler=self.boiler,
+            pump_pwm_gpio=config.PUMP_PWM_GPIO,
+            pump_out_gpio=config.PUMP_OUT_GPIO,
             reset_started_time=self.reset_started_time,
         )
         self.started_time = time.time()
@@ -85,6 +86,7 @@ class Espyresso:
     def stop(self):
         self.temperature_thread.stop()
         self.display.stop()
+        self.boiler.set_pwm_override(0)
         self.boiler.set_value(0)
         self.running = False
         time.sleep(1)

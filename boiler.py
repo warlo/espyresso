@@ -10,6 +10,9 @@ class Boiler:
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
+
+        self.pwm_override = None
+
         if self.boiling and not config.DEBUG:
             # Start boiling initially
             self.pwm.set_value(1.0)
@@ -21,8 +24,17 @@ class Boiler:
         else:
             self.reset_started_time()
 
+    def set_pwm_override(self, value):
+        self.pwm_override = value
+
+        if self.pwm_override:
+            self.pwm.set_value(self.pwm_override)
+
     def set_value(self, value):
         if not self.boiling:
+            return
+
+        if self.pwm_override:
             return
 
         if value < 0.0:

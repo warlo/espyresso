@@ -9,12 +9,14 @@ class Pump:
     def __init__(
         self,
         pigpio_pi=None,
+        boiler=None,
         pump_out_gpio=None,
         pump_pwm_gpio=None,
         reset_started_time=None,
         pumping=False,
     ):
         self.pigpio_pi = pigpio_pi
+        self.boiler = boiler
         self.pump_out_gpio = pump_out_gpio
         self.pigpio_pi.set_mode(self.pump_out_gpio, pigpio.OUTPUT)
 
@@ -58,6 +60,7 @@ class Pump:
             time.sleep(0.1)
 
         started_brew = time.time()
+        # self.boiler.set_pwm_override()
         while self.pumping and (time.time() - started_brew) < 25:
             time_passed = time.time() - started_brew
             if time_passed < 5:
