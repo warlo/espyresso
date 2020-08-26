@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import config
 
 class PWM:
     def __init__(self, pigpio_pi, pwm_gpio, freq):
@@ -12,6 +12,8 @@ class PWM:
         self.pigpio_pi.hardware_PWM(self.pwm_gpio, self.freq, value)
 
     def set_value(self, value):
+        if config.DEBUG:
+            print(f"Setting PWM {self.pwm_gpio} to {value}")
         self.pigpio_pi.hardware_PWM(self.pwm_gpio, self.freq, int(value * (10 ** 6)))
 
     def enable(self):

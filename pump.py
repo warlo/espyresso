@@ -33,8 +33,15 @@ class Pump:
             self.reset_started_time()
             self.pigpio_pi.write(self.pump_out_gpio, 1)
 
+    def stop_pump(self):
+        self.pigpio_pi.write(self.pump_out_gpio, 0)
+        self.pumping = False
+
     def brew_shot(self):
-        self.brew_thread.start()
+        if self.brew_thread.is_alive():
+            self.stop_pump()
+        else:
+            self.brew_thread.start()
 
     def brew_shot_routine(self):
         if self.pumping:
@@ -47,10 +54,12 @@ class Pump:
 
         self.toggle_pump()
         for i in range(50, 100):
+            if not self.pumping:
+                return
             self.set_pwm_value(i / 100)
             time.sleep(0.1)
 
-        while (started - time.time()) < 25:
+        while self.pumping and (started - time.time()) < 25:
             time.sleep(0.1)
 
         if self.pumping:
