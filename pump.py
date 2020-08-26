@@ -50,17 +50,18 @@ class Pump:
             self.set_pwm_value(1)
             return
 
-        started = time.time()
         self.set_pwm_value(0.5)
-
         self.toggle_pump()
-        while self.pumping and (time.time() - started) < 5:
+
+        started_preinfuse = time.time()
+        while self.pumping and (time.time() - started_preinfuse) < 5:
             time.sleep(0.1)
 
-        while self.pumping and (time.time() - started) < 25:
-            time_passed = time.time() - started
-            if time_passed < 10:
-                self.set_pwm_value(0.5 + 0.5 * (time_passed / 10))
+        started_brew = time.time()
+        while self.pumping and (time.time() - started_brew) < 25:
+            time_passed = time.time() - started_brew
+            if time_passed < 5:
+                self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
             time.sleep(0.1)
 
         if self.pumping:
