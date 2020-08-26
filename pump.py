@@ -59,8 +59,8 @@ class Pump:
 
         while self.pumping and (time.time() - started) < 25:
             time_passed = time.time() - started
-            if time_passed < 5:
-                self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
+            if time_passed < 10:
+                self.set_pwm_value(0.5 + 0.5 * (time_passed / 10))
             time.sleep(0.1)
 
         if self.pumping:
