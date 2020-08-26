@@ -44,6 +44,7 @@ class Pump:
             self.stop_pump()
         else:
             self.brew_thread = threading.Thread(target=self.brew_shot_routine)
+            self.reset_started_time()
             self.brew_thread.start()
 
     def brew_shot_routine(self):
