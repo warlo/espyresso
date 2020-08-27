@@ -17,7 +17,7 @@ class Flow:
         self.pulses_since = time.time()
         self.pulse_count = 0
 
-    def flow_pulse_callback(self):
+    def flow_pulse_callback(self, gpio, level, tick):
 
         if self.pulse_count == 0:
             self.flowing = True
