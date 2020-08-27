@@ -24,7 +24,9 @@ def linear_transform(x, a, b, c, d):
 
 
 class Display(threading.Thread):
-    def __init__(self, *args, boiler=None, target_temp=95, started_time=None, **kwargs):
+    def __init__(
+        self, *args, boiler=None, pump=None, target_temp=95, started_time=None, **kwargs
+    ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
@@ -40,6 +42,7 @@ class Display(threading.Thread):
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
 
         self.big_font = pygame.font.Font("monospace.ttf", 48)
+        self.medium_font = pygame.font.Font("monospace.ttf", 28)
         self.small_font = pygame.font.Font("monospace.ttf", 16)
 
         # set up the colors
@@ -57,6 +60,7 @@ class Display(threading.Thread):
         self.notification = ""
 
         self.boiler = boiler
+        self.pump = pump
         self.started_time = started_time
 
         self.running = True
@@ -132,11 +136,17 @@ class Display(threading.Thread):
         else:
             label = self.small_font.render("OFF", 1, self.RED)
         time_label = self.small_font.render(str(time_left), 1, self.WHITE)
-        self.screen.blit(time_label, (240 - int(time_label.get_rect().width / 2), 24))
+        self.screen.blit(time_label, (240 - int(time_label.get_rect().width / 2), 26))
         self.screen.blit(label, (300 - int(label.get_rect().width / 2), 24))
         pygame.draw.circle(
             self.screen, self.RED if boiling else self.GREY, (300, 12), 10
         )
+
+    def draw_brewing_timer(self, time_since_started=0):
+        label = self.medium_font.render(
+            str(round(time_since_started, 1)), 1, self.WHITE
+        )
+        self.screen.blit(label, (240 - int(label.get_rect().width / 2), 0))
 
     def draw_waveform(self):
         target_y = round(
@@ -162,6 +172,7 @@ class Display(threading.Thread):
             time_left = int(config.TURN_OFF_SECONDS - (time.time() - self.started_time))
             self.draw_degrees(self.queue[-1] if self.queue else 0)
             self.draw_boiling_label(self.boiler.boiling, time_left)
+            self.draw_brewing_timer(time_since_started=self.pump.get_time_since_started_brew())
             if self.notification:
                 self.draw_notification()
             self.draw_y_axis()
