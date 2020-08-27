@@ -25,7 +25,7 @@ def linear_transform(x, a, b, c, d):
 
 class Display(threading.Thread):
     def __init__(
-        self, *args, boiler=None, pump=None, target_temp=95, started_time=None, **kwargs
+        self, *args, boiler=None, pump=None, target_temp=95, get_started_time=None, **kwargs
     ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
@@ -61,7 +61,7 @@ class Display(threading.Thread):
 
         self.boiler = boiler
         self.pump = pump
-        self.started_time = started_time
+        self.get_started_time = get_started_time
 
         self.running = True
 
@@ -169,7 +169,7 @@ class Display(threading.Thread):
 
     def run(self):
         while self.running:
-            time_left = int(config.TURN_OFF_SECONDS - (time.time() - self.started_time))
+            time_left = int(config.TURN_OFF_SECONDS - (time.time() - self.get_started_time()))
             self.draw_degrees(self.queue[-1] if self.queue else 0)
             self.draw_boiling_label(self.boiler.boiling, time_left)
             self.draw_brewing_timer(time_since_started=self.pump.get_time_since_started_brew())

@@ -46,7 +46,7 @@ class Espyresso:
         self.started_time = time.time()
 
         self.display = Display(
-            started_time=self.started_time,
+            get_started_time=self.get_started_time,
             target_temp=config.TARGET_TEMP,
             boiler=self.boiler,
             pump=self.pump,
@@ -77,6 +77,9 @@ class Espyresso:
 
     def reset_started_time(self):
         self.started_time = time.time()
+
+    def get_started_time(self):
+        return self.started_time
 
     def start(self):
         self.reset_started_time()
