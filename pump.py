@@ -24,7 +24,10 @@ class Pump:
         self.pumping = pumping
         self.reset_started_time = reset_started_time
 
-        self.pwm.set_value(1)
+        self.started_brew = None
+        self.stopped_brew = None
+
+        self.set_pwm_value(1)
         self.brew_thread = threading.Thread(target=self.brew_shot_routine)
 
     def toggle_pump(self):
@@ -39,8 +42,16 @@ class Pump:
         self.pigpio_pi.write(self.pump_out_gpio, 0)
         self.pumping = False
 
+    def get_time_since_started_brew(self):
+        if self.stopped_brew and self.started_brew:
+            return self.stopped_brew - self.started_brew
+        if self.started_brew and self.pumping:
+            return time.time() - self.started_brew
+        return 0
+
     def brew_shot(self):
         if self.brew_thread.is_alive():
+            self.stopped_brew = time.time()
             self.stop_pump()
         else:
             self.brew_thread = threading.Thread(target=self.brew_shot_routine)
@@ -60,16 +71,17 @@ class Pump:
         while self.pumping and (time.time() - started_preinfuse) < 5:
             time.sleep(0.1)
 
-        started_brew = time.time()
+        self.started_brew = time.time()
         # self.boiler.set_pwm_override()
-        while self.pumping and (time.time() - started_brew) < 25:
-            time_passed = time.time() - started_brew
+        while self.pumping and (time.time() - self.started_brew) < 25:
+            time_passed = time.time() - self.started_brew
             if time_passed < 5:
                 self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
             time.sleep(0.1)
 
         if self.pumping:
             self.toggle_pump()
+            self.stopped_brew = time.time()
 
     def set_pwm_value(self, value):
         if value < 0.0:

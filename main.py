@@ -47,6 +47,7 @@ class Espyresso:
             started_time=self.started_time,
             target_temp=config.TARGET_TEMP,
             boiler=self.boiler,
+            pump=self.pump,
         )
 
         self.pid = PID()
