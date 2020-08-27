@@ -71,6 +71,7 @@ class Pump:
         while self.pumping and (time.time() - started_preinfuse) < 5:
             time.sleep(0.1)
 
+        self.stopped_brew = None
         self.started_brew = time.time()
         # self.boiler.set_pwm_override()
         while self.pumping and (time.time() - self.started_brew) < 25:
