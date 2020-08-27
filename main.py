@@ -10,6 +10,7 @@ import traceback
 import pigpio
 
 import config
+from flow import Flow
 from boiler import Boiler
 from buttons import Buttons
 from display import Display
@@ -29,6 +30,7 @@ class Espyresso:
             if not config.DEBUG:
                 raise e
 
+        self.flow = Flow(pigpio_pi=self.pigpio_pi, flow_in_gpio=config.FLOW_IN_GPIO)
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
             pwm_gpio=config.BOILER_PWM_GPIO,
