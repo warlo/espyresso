@@ -134,7 +134,7 @@ class Display(threading.Thread):
 
     def draw_degrees(self, degrees=0):
         label = self.big_font.render(f"{round(degrees, 1)}\u00B0C", 1, self.WHITE)
-        self.screen.blit(label, (0, 0))
+        self.screen.blit(label, (max(0, (100 - int(label.get_rect().width))), 0))
 
     def draw_boiling_label(self, boiling=False, time_left=0):
         time_label = self.small_font.render(f"Time:  {time_left}", 1, self.WHITE)
@@ -228,6 +228,11 @@ if __name__ == "__main__":
     boiler.pwm.get_display_value = lambda: 0
     pump = Mock()
     pump.get_time_since_started_brew = lambda: 0
-    dis = Display(boiler=boiler, pump=pump, get_started_time=lambda: time.time())
-    dis.start()
-    dis.test_display()
+    time_started = time.time()
+    dis = Display(boiler=boiler, pump=pump, get_started_time=lambda: time_started)
+    try:
+        dis.start()
+        dis.test_display()
+    except Exception:
+        print("EXCEPTIOON")
+        dis.stop()
