@@ -7,28 +7,24 @@ import threading
 import time
 import traceback
 
-import pigpio
-
 import config
-from flow import Flow
+import pigpio
 from boiler import Boiler
 from buttons import Buttons
 from display import Display
+from flow import Flow
 from pid import PID
-
 from pump import Pump
 from temperature_thread import TemperatureThread
 
 
 class Espyresso:
-    def __init__(self):
+    def __init__(self, pigpio_pi=None):
         self.started_time = 0
 
-        try:
+        self.pigpio_pi = pigpio_pi
+        if not self.pigpio_pi:
             self.pigpio_pi = pigpio.pi()
-        except Exception as e:
-            if not config.DEBUG:
-                raise e
 
         self.flow = Flow(pigpio_pi=self.pigpio_pi, flow_in_gpio=config.FLOW_IN_GPIO)
         self.boiler = Boiler(
@@ -113,7 +109,12 @@ def handler(signum, frame):
 
 
 if __name__ == "__main__":
-    espyresso = Espyresso()
+    if not config.DEBUG:
+        espyresso = Espyresso()
+    else:
+        from mock import Mock
+
+        espyresso = Espyresso(pigpio_pi=Mock())
     try:
         signal.signal(signal.SIGHUP, handler)
         signal.signal(signal.SIGINT, espyresso.signal_handler)
