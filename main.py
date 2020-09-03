@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import traceback
+import os
 
 import config
 import pigpio
@@ -67,6 +68,7 @@ class Espyresso:
             display=self.display,
             button_one=config.BUTTON_ONE_GPIO,
             button_two=config.BUTTON_TWO_GPIO,
+            turn_off_system=self.turn_off_system,
         )
 
         self.running = True
@@ -93,14 +95,21 @@ class Espyresso:
         self.running = False
         time.sleep(1)
         self.pigpio_pi.stop()
+
+    def exit(self):
+        self.stop()
         sys.exit(0)
+
+    def turn_off_system(self):
+        self.stop()
+        os.system("shutdown now -h")
 
     def signal_handler(self, sig, frame):
         if sig == 2:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
-        self.stop()
+        self.exit()
 
 
 def handler(signum, frame):
@@ -123,4 +132,4 @@ if __name__ == "__main__":
     except Exception as e:
         logging.warning(f"EXCEPTION:{e}")
         logging.warning(traceback.format_exc())
-        espyresso.stop()
+        espyresso.exit()
