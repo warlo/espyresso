@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import pigpio
 import time
+
+import pigpio
 
 
 class Flow:

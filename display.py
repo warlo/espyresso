@@ -4,9 +4,10 @@ import threading
 import time
 from collections import deque
 
-import config
 import pygame
 from pygame.locals import *
+
+import config
 
 WIDTH = 320
 HEIGHT = 240

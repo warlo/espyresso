@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-import pigpio
-import time
 import threading
+import time
+
+import pigpio
+
 from pwm import PWM
 
 
