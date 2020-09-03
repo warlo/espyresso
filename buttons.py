@@ -14,7 +14,8 @@ class Buttons:
         pump=None,
         display=None,
         button_one=None,
-        button_two=None
+        button_two=None,
+        turn_off_system=None
     ):
         self.pigpio_pi = pigpio_pi
         self.button_one = button_one
@@ -22,6 +23,7 @@ class Buttons:
         self.boiler = boiler
         self.pump = pump
         self.display = display
+        self.turn_off_system = turn_off_system
 
         self.pigpio_pi.set_mode(self.button_one, pigpio.INPUT)
         self.pigpio_pi.set_mode(self.button_two, pigpio.INPUT)
@@ -34,9 +36,6 @@ class Buttons:
         self.callback_two = self.pigpio_pi.callback(
             self.button_two, pigpio.RISING_EDGE, self.callback_button_two
         )
-
-    def turn_off_system(self):
-        os.system("shutdown now -h")
 
     def callback_button_one(self, gpio, level, tick):
         timestamp = time.time()
