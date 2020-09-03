@@ -21,9 +21,9 @@ import argparse
 import logging
 import threading
 import time
-import pigpio
 from datetime import datetime
 
+import pigpio
 
 logger = logging.getLogger().getChild(__name__)
 

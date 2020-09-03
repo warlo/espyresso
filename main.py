@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 
 import logging
+import os
 import signal
 import sys
 import threading
 import time
 import traceback
-import os
+
+import pigpio
 
 import config
-import pigpio
 from boiler import Boiler
 from buttons import Buttons
 from display import Display
