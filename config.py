@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-DEBUG = True
+DEBUG = False
 
 TSIC_GPIO = 24
 BOILER_PWM_GPIO = 12
