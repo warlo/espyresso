@@ -17,8 +17,11 @@ class Boiler:
             # Start boiling initially
             self.pwm.set_value(1.0)
 
+    def get_boiling(self):
+        return self.boiling
+
     def toggle_boiler(self):
-        self.boiling = not self.boiling
+        self.boiling = not self.get_boiling()
         if not self.boiling:
             self.pwm.set_value(0)
         else:
@@ -31,7 +34,7 @@ class Boiler:
             self.pwm.set_value(self.pwm_override)
 
     def set_value(self, value):
-        if not self.boiling:
+        if not self.get_boiling():
             return
 
         if self.pwm_override:
