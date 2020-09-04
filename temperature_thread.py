@@ -48,7 +48,7 @@ class TemperatureThread(threading.Thread):
             while self.running:
                 if (
                     time.time() - self.started_time > config.TURN_OFF_SECONDS
-                    and self.boiler.boiling
+                    and self.boiler.get_boiling()
                 ):
                     # Turn off boiler after 10 minutes
                     self.boiler.toggle_boiler()
