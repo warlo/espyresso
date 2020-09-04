@@ -18,8 +18,8 @@ class PWM:
 
     def set_value(self, value):
         if self.value != value and config.DEBUG:
-            self.value = value
             print(f"Setting PWM {self.pwm_gpio} to {value}")
+        self.value = value
         self.pigpio_pi.hardware_PWM(self.pwm_gpio, self.freq, int(value * (10 ** 6)))
 
     def enable(self):
