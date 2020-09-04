@@ -102,7 +102,6 @@ class Espyresso:
         sys.exit(0)
 
     def turn_off_system(self):
-        self.stop()
         os.system("shutdown now -h")
 
     def signal_handler(self, sig, frame):

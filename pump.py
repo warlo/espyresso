@@ -67,7 +67,7 @@ class Pump:
             return
 
         self.set_pwm_value(0.5)
-        self.boiler.set_pwm_override(0.20)
+        self.boiler.set_pwm_override(0.25)
         self.toggle_pump()
 
         started_preinfuse = time.time()
@@ -76,7 +76,7 @@ class Pump:
 
         self.stopped_brew = None
         self.started_brew = time.time()
-        self.boiler.set_pwm_override(0.25)
+        self.boiler.set_pwm_override(0.30)
         # self.boiler.set_pwm_override()
         while self.pumping and (time.time() - self.started_brew) < 25:
             time_passed = time.time() - self.started_brew
@@ -86,6 +86,7 @@ class Pump:
 
         if self.pumping:
             self.toggle_pump()
+            self.boiler.set_pwm_override(None)
             self.stopped_brew = time.time()
 
     def set_pwm_value(self, value):
