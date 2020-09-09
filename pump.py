@@ -67,7 +67,7 @@ class Pump:
             return
 
         self.set_pwm_value(0.5)
-        self.boiler.set_pwm_override(0.25)
+        self.boiler.set_pwm_override(0.30)
         self.toggle_pump()
 
         started_preinfuse = time.time()
