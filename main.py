@@ -17,6 +17,7 @@ from display import Display
 from flow import Flow
 from pid import PID
 from pump import Pump
+from ranger import Ranger
 from temperature_thread import TemperatureThread
 
 
@@ -34,6 +35,11 @@ class Espyresso:
             pwm_gpio=config.BOILER_PWM_GPIO,
             reset_started_time=self.reset_started_time,
         )
+        self.ranger = Ranger(
+            pigpio_pi=self.pigpio_pi,
+            ranger_echo_in_gpio=config.RANGER_ECHO_IN,
+            ranger_trigger_out_gpio=config.RANGER_TRIGGER_OUT,
+        )
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
@@ -48,6 +54,7 @@ class Espyresso:
             target_temp=config.TARGET_TEMP,
             boiler=self.boiler,
             pump=self.pump,
+            ranger=self.ranger,
         )
 
         self.pid = PID()

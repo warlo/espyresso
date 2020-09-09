@@ -30,6 +30,7 @@ class Display(threading.Thread):
         *args,
         boiler=None,
         pump=None,
+        ranger=None,
         target_temp=95,
         get_started_time=None,
         **kwargs,
@@ -69,6 +70,7 @@ class Display(threading.Thread):
 
         self.boiler = boiler
         self.pump = pump
+        self.ranger = ranger
         self.get_started_time = get_started_time
 
         self.running = True
@@ -143,7 +145,7 @@ class Display(threading.Thread):
             f"Power: {self.boiler.pwm.get_display_value()}%", 1, self.WHITE
         )
         water_label = self.small_font.render(
-            f"Water: {round(1.00*100, 1)}%", 1, self.WHITE
+            f"Water: {round(self.ranger.get_current_distance(), 1)}%", 1, self.WHITE
         )
         on_off_label = self.small_font.render("ON" if boiling else "OFF", 1, self.RED)
 
