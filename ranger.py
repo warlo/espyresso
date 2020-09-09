@@ -16,8 +16,10 @@ class Ranger:
         self.pigpio_pi.set_mode(self.ranger_echo_in_gpio, pigpio.INPUT)
         self.pigpio_pi.set_mode(self.ranger_trigger_out_gpio, pigpio.OUTPUT)
 
-        self.pigpio_pi.callback(self.ranger_echo_in_gpio, pigpio.RISING_EDGE, rise)
-        self.pigpio_pi.callback(self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, fall)
+        self.pigpio_pi.callback(self.ranger_echo_in_gpio, pigpio.RISING_EDGE, self.rise)
+        self.pigpio_pi.callback(
+            self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, self.fall
+        )
         self.done = threading.Event()
 
         self.current_distance = 0
