@@ -3,7 +3,7 @@ import sys
 import threading
 import time
 from collections import deque
-from utils import linear_transform
+from .utils import linear_transform
 
 import pygame
 from pygame.locals import *
