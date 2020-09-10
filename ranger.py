@@ -48,7 +48,7 @@ class Ranger(threading.Thread):
             self.done.clear()
             self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
             if self.done.wait(timeout=5):
-                distance = linear_transform(self.low, 290, 870, 100, 0)
+                distance = linear_transform(self.low, 180, 860, 100, 0)
                 self.history.append(distance)
 
                 print(distance, self.low, self.high)
