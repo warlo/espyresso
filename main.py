@@ -43,7 +43,6 @@ class Espyresso:
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
-            brew_in_gpio=config.BREW_IN_GPIO,
             pump_pwm_gpio=config.PUMP_PWM_GPIO,
             pump_out_gpio=config.PUMP_OUT_GPIO,
             reset_started_time=self.reset_started_time,
