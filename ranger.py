@@ -56,4 +56,4 @@ class Ranger(threading.Thread):
         self.running = False
 
     def get_current_distance(self):
-        return statistics.median(self.history)
+        return statistics.median(self.history) if self.history else 0
