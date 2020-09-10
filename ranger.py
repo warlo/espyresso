@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
+import collections
+import statistics
 import threading
 import time
 
 import pigpio
 
 
-class Ranger:
+class Ranger(threading.Thread):
     def __init__(
-        self, pigpio_pi=None, ranger_trigger_out_gpio=None, ranger_echo_in_gpio=None
+        self,
+        *args,
+        pigpio_pi=None,
+        ranger_trigger_out_gpio=None,
+        ranger_echo_in_gpio=None,
+        **kwargs
     ):
         self.pigpio_pi = pigpio_pi
         self.ranger_echo_in_gpio = ranger_echo_in_gpio
@@ -20,11 +27,13 @@ class Ranger:
         self.pigpio_pi.callback(
             self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, self.fall
         )
+        self.running = True
         self.done = threading.Event()
 
-        self.current_distance = 0
+        self.history = collections.deque(maxlen=10)
         self.high = 0
         self.low = 0
+        super().__init__(*args, **kwargs)
 
     def rise(self, gpio, level, tick):
         self.high = tick
@@ -33,12 +42,18 @@ class Ranger:
         self.low = tick - self.high
         self.done.set()
 
-    def read_distance(self):
-        self.done.clear()
-        self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
-        if self.done.wait(timeout=5):
-            distance = self.low / 58.0 / 100.0
-            self.current_distance = distance
+    def run(self):
+        while self.running:
+            self.done.clear()
+            self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
+            if self.done.wait(timeout=5):
+                distance = self.low / 58.0 / 100.0
+                self.history.append(distance)
+
+            time.sleep(0.5)
+
+    def stop(self):
+        self.running = False
 
     def get_current_distance(self):
-        return self.current_distance
+        return statistics.median(self.history)
