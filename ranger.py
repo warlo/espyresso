@@ -4,7 +4,7 @@ import statistics
 import threading
 import time
 
-from .utils import linear_transform
+from utils import linear_transform
 import pigpio
 
 
