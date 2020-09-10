@@ -134,8 +134,9 @@ class Display(threading.Thread):
         power_label = self.small_font.render(
             f"Power: {self.boiler.pwm.get_display_value()}%", 1, self.WHITE
         )
+        water_value = round(self.ranger.get_current_distance(), 1)
         water_label = self.small_font.render(
-            f"Water: {round(self.ranger.get_current_distance(), 1)}%", 1, self.WHITE
+            f"Water: {water_value}%", 1, self.WHITE if water_value > 10 else self.RED
         )
         on_off_label = self.small_font.render("ON" if boiling else "OFF", 1, self.RED)
 
