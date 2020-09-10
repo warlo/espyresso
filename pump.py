@@ -12,7 +12,6 @@ class Pump:
         self,
         pigpio_pi=None,
         boiler=None,
-        brew_in_gpio=None,
         pump_out_gpio=None,
         pump_pwm_gpio=None,
         reset_started_time=None,
@@ -21,16 +20,7 @@ class Pump:
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
         self.pump_out_gpio = pump_out_gpio
-        self.brew_in_gpio = brew_in_gpio
-
         self.pigpio_pi.set_mode(self.pump_out_gpio, pigpio.OUTPUT)
-        self.pigpio_pi.set_mode(self.brew_in_gpio, pigpio.INPUT)
-        self.pigpio_pi.callback(
-            self.brew_in_gpio, pigpio.RISING_EDGE, self.callback_brew_in_rise
-        )
-        self.pigpio_pi.callback(
-            self.brew_in_gpio, pigpio.FALLING_EDGE, self.callback_brew_in_fall
-        )
 
         self.pwm = PWM(pigpio_pi, pump_pwm_gpio, 1000)
         self.pumping = pumping
@@ -41,19 +31,6 @@ class Pump:
 
         self.set_pwm_value(1)
         self.brew_thread = threading.Thread(target=self.brew_shot_routine)
-
-    def callback_brew_in_rise(self, gpio, level, tick):
-        print("RISE")
-        if self.brew_thread.is_alive():
-            return
-        self.started_brew = time.time()
-        self.stopped_brew = None
-
-    def callback_brew_in_fall(self, gpio, level, tick):
-        print("FALL")
-        if self.brew_thread.is_alive():
-            return
-        self.stopped_brew = time.time()
 
     def toggle_pump(self):
         self.pumping = not self.pumping
@@ -100,6 +77,7 @@ class Pump:
         self.stopped_brew = None
         self.started_brew = time.time()
         self.boiler.set_pwm_override(0.275)
+        # self.boiler.set_pwm_override()
         while self.pumping and (time.time() - self.started_brew) < 25:
             time_passed = time.time() - self.started_brew
             if time_passed < 5:
