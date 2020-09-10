@@ -4,6 +4,7 @@ import statistics
 import threading
 import time
 
+from utils import linear_transform
 import pigpio
 
 
@@ -47,9 +48,10 @@ class Ranger(threading.Thread):
             self.done.clear()
             self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
             if self.done.wait(timeout=5):
-                distance = self.low / 58.0 / 100.0
+                distance = linear_transform(self.low, 290, 870, 0, 100)
                 self.history.append(distance)
 
+                print(distance, self.low, self.high)
             time.sleep(0.5)
 
     def stop(self):
