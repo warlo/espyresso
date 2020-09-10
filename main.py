@@ -92,6 +92,7 @@ class Espyresso:
 
         self.display.start()
         self.temperature_thread.start()
+        self.ranger.start()
 
         threading.Semaphore(0).acquire()
 
