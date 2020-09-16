@@ -183,6 +183,7 @@ class Display(threading.Thread):
             )
             self.screen.fill(self.BLACK)
             self.draw_degrees(self.queue[-1] if self.queue else 0)
+            print("ID DISPLAY", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling))
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
             self.draw_brewing_timer(
                 time_since_started=self.pump.get_time_since_started_brew()

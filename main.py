@@ -88,6 +88,7 @@ class Espyresso:
         return self.started_time
 
     def start(self):
+        print("ID MAIN", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling))
         self.reset_started_time()
 
         self.display.start()
