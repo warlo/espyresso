@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import config
-import threading
 from pwm import PWM
 
 
@@ -11,8 +10,6 @@ class Boiler:
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
-        self.event = threading.Event()
-        self.event.set()
 
         self.pwm_override = None
 
@@ -21,15 +18,10 @@ class Boiler:
             self.pwm.set_value(1.0)
 
     def get_boiling(self):
-        if self.event.wait(timeout=1):
-            return self.boiling
-        return False
+        return self.boiling
 
     def toggle_boiler(self):
-        boiling = self.get_boiling()
-        self.event.clear()
-        self.boiling = not boiling
-        self.event.set()
+        self.boiling = not self.get_boiling()
         if not self.boiling:
             self.pwm.set_value(0)
         else:
