@@ -54,7 +54,6 @@ class Buttons:
             if seconds >= 2:
                 self.turn_off_system()
             elif not self.pigpio_pi.read(self.button_two):
-                print("ID BUTTON", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling), self.boiler.boiling)
                 if seconds > 0.25 and seconds < 2:
                     self.boiler.toggle_boiler()
                 self.display.notification = ""

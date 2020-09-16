@@ -38,15 +38,10 @@ class TemperatureThread(threading.Thread):
         self.lock = threading.RLock()
         super().__init__(*args, **kwargs)
 
-    def reset_started_time(self):
-        self.started_time = time.time()
-
     def run(self):
         with self.tsic:
-            self.reset_started_time()
             prev_timestamp = None
             while self.running:
-                print("ID TEMP THREAD", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling), self.boiler.boiling)
                 if (
                     time.time() - self.started_time > config.TURN_OFF_SECONDS
                     and self.boiler.get_boiling()
