@@ -46,7 +46,7 @@ class TemperatureThread(threading.Thread):
             self.reset_started_time()
             prev_timestamp = None
             while self.running:
-                print("ID TEMP THREAD", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling))
+                print("ID TEMP THREAD", id(self.boiler), id(self.boiler.toggle_boiler), id(self.boiler.boiling), self.boiler.boiling)
                 if (
                     time.time() - self.started_time > config.TURN_OFF_SECONDS
                     and self.boiler.get_boiling()
