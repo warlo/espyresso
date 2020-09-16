@@ -10,6 +10,8 @@ class Boiler:
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
+        self.event = threading.Event()
+        self.event.set()
 
         self.pwm_override = None
 
@@ -18,10 +20,15 @@ class Boiler:
             self.pwm.set_value(1.0)
 
     def get_boiling(self):
-        return self.boiling
+        if self.event.wait(timeout=1):
+            return self.boiling
+        return False
 
     def toggle_boiler(self):
-        self.boiling = not self.get_boiling()
+        boiling = self.get_boiling()
+        self.event.clear()
+        self.boiling = not boiling
+        self.event.set()
         if not self.boiling:
             self.pwm.set_value(0)
         else:
