@@ -20,10 +20,10 @@ class TemperatureThread(threading.Thread):
         pump=None,
         display=None,
         pid=None,
-        started_time=None,
+        get_started_time=None,
         **kwargs,
     ):
-        self.started_time = started_time
+        self.get_started_time = get_started_time
 
         self.boiler = boiler
         self.pump = pump
@@ -43,7 +43,7 @@ class TemperatureThread(threading.Thread):
             prev_timestamp = None
             while self.running:
                 if (
-                    time.time() - self.started_time > config.TURN_OFF_SECONDS
+                    time.time() - self.get_started_time() > config.TURN_OFF_SECONDS
                     and self.boiler.get_boiling()
                 ):
                     # Turn off boiler after 10 minutes

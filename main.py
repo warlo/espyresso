@@ -62,7 +62,7 @@ class Espyresso:
         self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
         self.temperature_thread = TemperatureThread(
-            started_time=self.started_time,
+            get_started_time=self.get_started_time,
             pigpio_pi=self.pigpio_pi,
             display=self.display,
             boiler=self.boiler,
