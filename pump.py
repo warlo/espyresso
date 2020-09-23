@@ -42,6 +42,7 @@ class Pump:
 
     def stop_pump(self):
         self.pigpio_pi.write(self.pump_out_gpio, 0)
+        self.boiler.set_pwm_override(None)
         self.pumping = False
 
     def get_time_since_started_brew(self):
