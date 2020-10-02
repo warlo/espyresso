@@ -80,10 +80,6 @@ class Pump:
         self.started_brew = time.time()
         self.boiler.set_pwm_override(0.275)
 
-        if self.pumping:
-            self.toggle_pump()
-            self.boiler.set_pwm_override(None)
-            self.stopped_brew = time.time()
         while self.pumping and self.flow.get_millilitres() < 36:
             time_passed = time.time() - self.started_brew
             if time_passed < 5:
