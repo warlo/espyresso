@@ -21,6 +21,7 @@ class Display(threading.Thread):
         boiler=None,
         pump=None,
         ranger=None,
+        flow=None,
         target_temp=95,
         get_started_time=None,
         **kwargs,
@@ -61,6 +62,7 @@ class Display(threading.Thread):
         self.boiler = boiler
         self.pump = pump
         self.ranger = ranger
+        self.flow = flow
         self.get_started_time = get_started_time
 
         self.running = True
@@ -157,6 +159,10 @@ class Display(threading.Thread):
         )
         self.screen.blit(label, (140, 0))
 
+    def draw_flow(self, millilitres=0):
+        label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
+        self.screen.blit(label, (140, 30))
+
     def draw_waveform(self):
         target_y = round(
             linear_transform(self.target_temp, self.low, self.high, HEIGHT, 50)
@@ -187,6 +193,7 @@ class Display(threading.Thread):
             self.draw_brewing_timer(
                 time_since_started=self.pump.get_time_since_started_brew()
             )
+            self.draw_flow(millilitres=self.flow.get_millilitres())
             if self.notification:
                 self.draw_notification()
             self.draw_y_axis()
@@ -222,8 +229,18 @@ if __name__ == "__main__":
     boiler.pwm.get_display_value = lambda: 0
     pump = Mock()
     pump.get_time_since_started_brew = lambda: 0
+    ranger = Mock()
+    ranger.get_current_distance = lambda: 0
+    flow = Mock()
+    flow.get_millilitres = lambda: 10.0123
     time_started = time.time()
-    dis = Display(boiler=boiler, pump=pump, get_started_time=lambda: time_started)
+    dis = Display(
+        boiler=boiler,
+        pump=pump,
+        ranger=ranger,
+        flow=flow,
+        get_started_time=lambda: time_started,
+    )
     try:
         dis.start()
         dis.test_display()

@@ -10,7 +10,7 @@ class Flow:
         self.flow_in_gpio = flow_in_gpio
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
         self.callback_flow = self.pigpio_pi.callback(
-            self.flow_in_gpio, pigpio.RISING_EDGE, self.flow_pulse_callback
+            self.flow_in_gpio, pigpio.RISING_EDGE
         )
 
         self.flowing = False
@@ -18,28 +18,15 @@ class Flow:
         self.pulses_since = time.time()
         self.pulse_count = 0
 
-    def flow_pulse_callback(self, gpio, level, tick):
-
-        if self.pulse_count == 0:
-            self.flowing = True
-            self.pulses_since = time.time()
-        if (time.time() - self.pulses_since) > 0.250:
-            pass
-            # self.flowing = False
-
-        if self.flowing:
-            self.increment_pulse_count()
-        print("PULSE", self.pulse_count)
-
     def reset_pulse_count(self):
-        self.pulse_count = 0
-
-    def increment_pulse_count(self):
-        self.pulse_count += 1
+        self.callback_flow.reset_tally()
 
     def get_pulse_count(self):
-        return self.pulse_count
+        return self.callback_flow.tally()
 
     def get_litres(self):
         counts_per_liter = 4095
         return self.get_pulse_count() / counts_per_liter
+
+    def get_millilitres(self):
+        return self.get_litres * 1000

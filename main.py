@@ -55,6 +55,7 @@ class Espyresso:
             boiler=self.boiler,
             pump=self.pump,
             ranger=self.ranger,
+            flow=self.flow,
         )
 
         self.pid = PID()
