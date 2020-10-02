@@ -12,6 +12,7 @@ class Boiler:
         self.reset_started_time = reset_started_time
 
         self.pwm_override = None
+        self.boiler.set_pwm_override(None)
 
         if self.boiling and not config.DEBUG:
             # Start boiling initially
