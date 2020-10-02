@@ -104,8 +104,8 @@ class Display(threading.Thread):
         self.BLUE = (0, 0, 255)
 
         self.temp_queue = Queue(90, 100, TEMP_X_MAX - TEMP_X_MIN)
-        self.flow_queue = Queue(90, 100, FLOW_X_MAX - FLOW_X_MIN)
-        self.pressure_queue = Queue(90, 100, PRESSURE_X_MAX - PRESSURE_X_MIN)
+        self.flow_queue = Queue(0, 2, FLOW_X_MAX - FLOW_X_MIN)
+        self.pressure_queue = Queue(8, 10, PRESSURE_X_MAX - PRESSURE_X_MIN)
 
         self.target_temp = target_temp
         self.notification = ""
@@ -152,17 +152,31 @@ class Display(threading.Thread):
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
         self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
 
-    def draw_y_axis(self, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high, steps):
+    def draw_y_axis(self, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high, number_of_steps):
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MAX, Y_MAX))
-        steps = int((high - low) / steps)
-        for i in range(low, high, steps):
-            closest_ten = int(round(i / steps)) * steps
+        range_steps = int(
+            (high * number_of_steps - low * number_of_steps) / number_of_steps
+        )
 
-            label = self.small_font.render("{}".format(str(closest_ten)), 1, self.WHITE)
-            y_val = round(linear_transform(closest_ten, low, high, Y_MAX, Y_MIN))
+        steps = []
+        rounded = True
+        for i in range(low * number_of_steps, high * number_of_steps, range_steps):
+            closest_step = i / number_of_steps
+
+            y_val = round(linear_transform(closest_step, low, high, Y_MAX, Y_MIN))
             if y_val < Y_MIN:
                 continue
+
+            steps.append((closest_step, y_val))
+
+            if not closest_step.is_integer():
+                rounded = False
+
+        for (step, y_val) in steps:
+            if rounded:
+                step = round(step)
+            label = self.small_font.render("{}".format(str(step)), 1, self.WHITE)
             self.screen.blit(label, (X_MIN - 24, y_val - 8))  # Number on Y-axis step
 
             # Transparent line
@@ -214,7 +228,6 @@ class Display(threading.Thread):
 
     def draw_coordinates(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
         points = self.generate_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high)
-        print("Points", len(points), queue.length)
         if not points:
             return
 
@@ -284,8 +297,8 @@ class Display(threading.Thread):
                         print("Pos: %sx%s\n" % pygame.mouse.get_pos())
                 v += 1
                 self.add_to_temp_queue(random.randint(94, 96))
-                self.add_to_flow_queue(random.randint(70, 90))
-                self.add_to_pressure_queue(random.randint(90, 100))
+                self.add_to_flow_queue(random.randint(1, 2))
+                self.add_to_pressure_queue(random.randint(8, 10))
                 time.sleep(0.1)
         except Exception as e:
             print(e)

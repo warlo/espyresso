@@ -20,6 +20,7 @@ class Flow:
 
     def reset_pulse_count(self):
         self.callback_flow.reset_tally()
+        self.pulses_since = time.time()
 
     def get_pulse_count(self):
         return self.callback_flow.tally()
@@ -30,3 +31,7 @@ class Flow:
 
     def get_millilitres(self):
         return self.get_litres() * 1000
+
+    def get_millilitres_per_sec(self):
+        time_since_started = time.time() - self.pulses_since()
+        return self.get_millilitres() / time_since_started
