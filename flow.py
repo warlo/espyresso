@@ -25,7 +25,7 @@ class Flow:
         return self.callback_flow.tally()
 
     def get_litres(self):
-        counts_per_liter = 4095
+        counts_per_liter = 1925
         return self.get_pulse_count() / counts_per_liter
 
     def get_millilitres(self):
