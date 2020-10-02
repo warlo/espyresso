@@ -87,7 +87,7 @@ class Pump:
             if time_passed > 45:
                 return self.reset_routine()
 
-            time.sleep(0.1)
+            time.sleep(0.05)
 
         return self.reset_routine()
 
