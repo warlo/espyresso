@@ -68,7 +68,7 @@ class TemperatureThread(threading.Thread):
 
                 lock = threading.RLock()
                 lock.acquire()
-                self.display.add_to_queue(latest_measurement.degree_celsius)
+                self.display.add_to_temp_queue(latest_measurement.degree_celsius)
                 lock.release()
 
                 if config.DEBUG:
