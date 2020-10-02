@@ -12,6 +12,7 @@ class Pump:
         self,
         pigpio_pi=None,
         boiler=None,
+        flow=None,
         pump_out_gpio=None,
         pump_pwm_gpio=None,
         reset_started_time=None,
@@ -19,6 +20,7 @@ class Pump:
     ):
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
+        self.flow = flow
         self.pump_out_gpio = pump_out_gpio
         self.pigpio_pi.set_mode(self.pump_out_gpio, pigpio.OUTPUT)
 
@@ -63,10 +65,9 @@ class Pump:
 
     def brew_shot_routine(self):
         if self.pumping:
-            self.toggle_pump()
-            self.set_pwm_value(1)
-            return
+            return self.reset_routine()
 
+        self.flow.reset_pulse_count()
         self.set_pwm_value(0.5)
         self.boiler.set_pwm_override(0.30)
         self.toggle_pump()
@@ -79,14 +80,26 @@ class Pump:
         self.started_brew = time.time()
         self.boiler.set_pwm_override(0.275)
         # self.boiler.set_pwm_override()
-        while self.pumping and (time.time() - self.started_brew) < 25:
-            time_passed = time.time() - self.started_brew
-            if time_passed < 5:
-                self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
-            time.sleep(0.1)
 
         if self.pumping:
             self.toggle_pump()
+            self.boiler.set_pwm_override(None)
+            self.stopped_brew = time.time()
+        while self.pumping and self.flow.get_millilitres() < 36:
+            time_passed = time.time() - self.started_brew
+            if time_passed < 5:
+                self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
+            if time_passed > 45:
+                return self.reset_routine()
+
+            time.sleep(0.1)
+
+        return self.reset_routine()
+
+    def reset_routine(self):
+        if self.pumping:
+            self.toggle_pump()
+            self.set_pwm_value(1)
             self.boiler.set_pwm_override(None)
             self.stopped_brew = time.time()
 
