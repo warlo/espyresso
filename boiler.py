@@ -12,7 +12,7 @@ class Boiler:
         self.reset_started_time = reset_started_time
 
         self.pwm_override = None
-        self.boiler.set_pwm_override(None)
+        self.set_pwm_override(None)
 
         if self.boiling and not config.DEBUG:
             # Start boiling initially
@@ -33,6 +33,8 @@ class Boiler:
 
         if self.pwm_override:
             self.pwm.set_value(self.pwm_override)
+        else:
+            self.pwm.set_value(0)
 
     def set_value(self, value):
         if not self.get_boiling():
