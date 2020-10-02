@@ -94,9 +94,9 @@ class Pump:
     def reset_routine(self):
         if self.pumping:
             self.toggle_pump()
-            self.set_pwm_value(1)
-            self.boiler.set_pwm_override(None)
-            self.stopped_brew = time.time()
+        self.set_pwm_value(1)
+        self.boiler.set_pwm_override(None)
+        self.stopped_brew = time.time()
 
     def set_pwm_value(self, value):
         if value < 0.0:
