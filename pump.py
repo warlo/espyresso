@@ -79,7 +79,6 @@ class Pump:
         self.stopped_brew = None
         self.started_brew = time.time()
         self.boiler.set_pwm_override(0.275)
-        # self.boiler.set_pwm_override()
 
         if self.pumping:
             self.toggle_pump()

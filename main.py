@@ -101,7 +101,7 @@ class Espyresso:
     def stop(self):
         self.temperature_thread.stop()
         self.display.stop()
-        self.boiler.set_pwm_override(0)
+        self.boiler.set_pwm_override(None)
         self.boiler.set_value(0)
         self.running = False
         time.sleep(1)
