@@ -29,4 +29,4 @@ class Flow:
         return self.get_pulse_count() / counts_per_liter
 
     def get_millilitres(self):
-        return self.get_litres * 1000
+        return self.get_litres() * 1000
