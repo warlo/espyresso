@@ -177,7 +177,7 @@ class Display(threading.Thread):
             if rounded:
                 step = round(step)
             label = self.small_font.render("{}".format(str(step)), 1, self.WHITE)
-            self.screen.blit(label, (X_MIN - 24, y_val - 8))  # Number on Y-axis step
+            self.screen.blit(label, (X_MIN - 24, y_val - 16))  # Number on Y-axis step
 
             # Transparent line
             horizontal_line = pygame.Surface((X_MAX - X_MIN, 1), flags=pygame.SRCALPHA)

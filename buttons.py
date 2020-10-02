@@ -29,10 +29,10 @@ class Buttons:
         self.pigpio_pi.set_pull_up_down(self.button_one, pigpio.PUD_DOWN)
         self.pigpio_pi.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
-        self.callback_one = self.pigpio_pi.callback(
+        self.pigpio_pi.callback(
             self.button_one, pigpio.RISING_EDGE, self.callback_button_one
         )
-        self.callback_two = self.pigpio_pi.callback(
+        self.pigpio_pi.callback(
             self.button_two, pigpio.RISING_EDGE, self.callback_button_two
         )
 
