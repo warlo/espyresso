@@ -86,7 +86,7 @@ class Display(threading.Thread):
                 target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
             )
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
-        self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
+        self.draw_coordinates(list(queue), X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
 
     def draw_y_axis(self, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high, number_of_steps):
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
