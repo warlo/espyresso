@@ -5,7 +5,12 @@ from pwm import PWM
 
 class Boiler:
     def __init__(
-        self, pigpio_pi=None, pwm_gpio=None, reset_started_time=None, boiling=True
+        self,
+        pigpio_pi=None,
+        pwm_gpio=None,
+        reset_started_time=None,
+        boiling=True,
+        add_to_queue=None,
     ):
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
         self.boiling = boiling
@@ -13,6 +18,7 @@ class Boiler:
 
         self.pwm_override = None
         self.set_pwm_override(None)
+        self.add_to_queue = add_to_queue
 
         if self.boiling and not config.DEBUG:
             # Start boiling initially
@@ -49,3 +55,4 @@ class Boiler:
             value = 1.0
 
         self.pwm.set_value(value)
+        self.add_to_queue(self.pwm.get_display_value())

@@ -21,6 +21,7 @@ class TemperatureThread(threading.Thread):
         display=None,
         pid=None,
         get_started_time=None,
+        add_to_queue=None,
         **kwargs,
     ):
         self.get_started_time = get_started_time
@@ -34,6 +35,7 @@ class TemperatureThread(threading.Thread):
         self.tsic = TsicInputChannel(pigpio_pi=pigpio_pi, gpio=config.TSIC_GPIO)
 
         self.running = True
+        self.add_to_queue = add_to_queue
 
         self.lock = threading.RLock()
         super().__init__(*args, **kwargs)
@@ -68,7 +70,7 @@ class TemperatureThread(threading.Thread):
 
                 lock = threading.RLock()
                 lock.acquire()
-                self.display.add_to_temp_queue(latest_measurement.degree_celsius)
+                self.add_to_queue(latest_measurement.degree_celsius)
                 lock.release()
 
                 if config.DEBUG:

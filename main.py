@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 import traceback
+from utils import WaveQueue
 
 import pigpio
 
@@ -29,11 +30,34 @@ class Espyresso:
         if not self.pigpio_pi:
             self.pigpio_pi = pigpio.pi()
 
-        self.flow = Flow(pigpio_pi=self.pigpio_pi, flow_in_gpio=config.FLOW_IN_GPIO)
+        self.flow_queue = WaveQueue(
+            0,
+            2,
+            X_MIN=config.FLOW_X_MIN,
+            X_MAX=config.FLOW_X_MAX,
+            Y_MIN=config.FLOW_Y_MIN,
+            Y_MAX=config.FLOW_Y_MAX,
+            steps=5,
+        )
+        self.flow = Flow(
+            pigpio_pi=self.pigpio_pi,
+            flow_in_gpio=config.FLOW_IN_GPIO,
+            add_to_queue=self.flow_queue.add_to_queue,
+        )
+        self.boiler_queue = WaveQueue(
+            0,
+            100,
+            X_MIN=config.BOILER_X_MIN,
+            X_MAX=config.BOILER_X_MAX,
+            Y_MIN=config.BOILER_Y_MIN,
+            Y_MAX=config.BOILER_Y_MAX,
+            steps=5,
+        )
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
             pwm_gpio=config.BOILER_PWM_GPIO,
             reset_started_time=self.reset_started_time,
+            add_to_queue=self.boiler_queue.add_to_queue,
         )
         self.ranger = Ranger(
             pigpio_pi=self.pigpio_pi,
@@ -50,6 +74,28 @@ class Espyresso:
         )
         self.started_time = time.time()
 
+        self.pid = PID()
+        self.pid.set_pid_gains(config.KP, config.KI, config.KD)
+        self.pid.set_integrator_limits(config.IMIN, config.IMAX)
+
+        self.temp_queue = WaveQueue(
+            90,
+            100,
+            X_MIN=config.TEMP_X_MIN,
+            X_MAX=config.TEMP_X_MAX,
+            Y_MIN=config.TEMP_Y_MIN,
+            Y_MAX=config.TEMP_Y_MAX,
+            target_y=config.TARGET_TEMP,
+        )
+        self.temperature_thread = TemperatureThread(
+            get_started_time=self.get_started_time,
+            pigpio_pi=self.pigpio_pi,
+            display=self.display,
+            boiler=self.boiler,
+            pid=self.pid,
+            add_to_queue=self.temp_queue.add_to_queue,
+        )
+
         self.display = Display(
             get_started_time=self.get_started_time,
             target_temp=config.TARGET_TEMP,
@@ -57,18 +103,11 @@ class Espyresso:
             pump=self.pump,
             ranger=self.ranger,
             flow=self.flow,
-        )
-
-        self.pid = PID()
-        self.pid.set_pid_gains(config.KP, config.KI, config.KD)
-        self.pid.set_integrator_limits(config.IMIN, config.IMAX)
-
-        self.temperature_thread = TemperatureThread(
-            get_started_time=self.get_started_time,
-            pigpio_pi=self.pigpio_pi,
-            display=self.display,
-            boiler=self.boiler,
-            pid=self.pid,
+            wave_queues={
+                "temp": self.temp_queue,
+                "flow": self.flow_queue,
+                "boiler": self.boiler_queue,
+            },
         )
 
         self.buttons = Buttons(
