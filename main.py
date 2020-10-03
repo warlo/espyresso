@@ -97,7 +97,6 @@ class Espyresso:
 
         self.display = Display(
             get_started_time=self.get_started_time,
-            target_temp=config.TARGET_TEMP,
             boiler=self.boiler,
             pump=self.pump,
             ranger=self.ranger,
