@@ -2,7 +2,6 @@ import os
 import sys
 import threading
 import time
-from collections import deque
 from utils import linear_transform, WaveQueue
 
 import pygame
@@ -35,7 +34,7 @@ class Display(threading.Thread):
         # set up the window
         pygame.event.set_allowed(None)
         flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT), flags)
+        self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
 
         font = "nk57-monospace-cd-rg.ttf"
         self.big_font = pygame.font.Font(font, 42)

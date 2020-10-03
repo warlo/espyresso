@@ -7,7 +7,6 @@ import time
 import traceback
 
 import config
-from pid import PID
 from tsic import Measurement, TsicInputChannel
 
 

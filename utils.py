@@ -4,7 +4,17 @@ from config import ZOOM
 
 class WaveQueue(deque):
     def __init__(
-        self, low, high, *args, X_MIN, X_MAX, Y_MIN, Y_MAX, steps=10, target_y=None, **kwargs
+        self,
+        low,
+        high,
+        *args,
+        X_MIN,
+        X_MAX,
+        Y_MIN,
+        Y_MAX,
+        steps=10,
+        target_y=None,
+        **kwargs
     ) -> None:
         self.low = low
         self.high = high
