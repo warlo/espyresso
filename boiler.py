@@ -55,4 +55,4 @@ class Boiler:
             value = 1.0
 
         self.pwm.set_value(value)
-        self.add_to_queue(self.pwm.get_display_value())
+        self.add_to_queue(round(value * 100, 1))
