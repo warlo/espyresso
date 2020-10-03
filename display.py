@@ -3,65 +3,12 @@ import sys
 import threading
 import time
 from collections import deque
-from utils import linear_transform
+from utils import linear_transform, WaveQueue
 
 import pygame
 from pygame.locals import *
 
 import config
-
-WIDTH = 320
-HEIGHT = 240
-
-AXIS_WIDTH = 28
-
-TEMP_X_MIN = 0 + AXIS_WIDTH
-TEMP_X_MAX = 160
-TEMP_Y_MIN = 50
-TEMP_Y_MAX = 240
-
-FLOW_X_MIN = 160 + AXIS_WIDTH
-FLOW_X_MAX = 320
-FLOW_Y_MIN = 50
-FLOW_Y_MAX = 140
-
-PRESSURE_X_MIN = 160 + AXIS_WIDTH
-PRESSURE_X_MAX = 320
-PRESSURE_Y_MIN = 150
-PRESSURE_Y_MAX = 240
-
-ZOOM = 2
-
-
-class Queue(deque):
-    def __init__(self, low, high, length, *args, **kwargs) -> None:
-        self.low = low
-        self.high = high
-        self.min_low = low
-        self.max_high = high
-
-        self.length = length
-        return super().__init__(*args, **kwargs)
-
-    def add_to_queue(self, new_value):
-        popped = None
-        if len(self) >= self.length / ZOOM:
-            popped = self.popleft()
-
-        self.append(new_value)
-
-        if new_value > self.high:
-            self.high = int(new_value)
-        elif new_value < self.low:
-            self.low = int(new_value)
-
-        if not popped:
-            return
-
-        if int(popped) >= self.low:
-            self.low = int(min(min(self), self.min_low))
-        elif int(popped) >= self.high:
-            self.high = int(max(max(self), self.max_high))
 
 
 class Display(threading.Thread):
@@ -72,8 +19,8 @@ class Display(threading.Thread):
         pump=None,
         ranger=None,
         flow=None,
-        target_temp=95,
         get_started_time=None,
+        wave_queues={},
         **kwargs,
     ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
@@ -103,11 +50,6 @@ class Display(threading.Thread):
         self.GREEN = (0, 255, 0)
         self.BLUE = (0, 0, 255)
 
-        self.temp_queue = Queue(90, 100, TEMP_X_MAX - TEMP_X_MIN)
-        self.flow_queue = Queue(0, 2, FLOW_X_MAX - FLOW_X_MIN)
-        self.pressure_queue = Queue(8, 10, PRESSURE_X_MAX - PRESSURE_X_MIN)
-
-        self.target_temp = target_temp
         self.notification = ""
 
         self.boiler = boiler
@@ -117,6 +59,7 @@ class Display(threading.Thread):
         self.get_started_time = get_started_time
 
         self.running = True
+        self.wave_queues = wave_queues
 
         super().__init__(*args, **kwargs)
 
@@ -126,23 +69,17 @@ class Display(threading.Thread):
     def generate_coordinates(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
         return [
             self.generate_coordinate(
-                temp, X_MIN + index * ZOOM, Y_MIN, Y_MAX, low, high
+                temp, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
             )
             for index, temp in enumerate(queue)
         ]
 
-    def add_to_temp_queue(self, new_temp):
-        self.temp_queue.add_to_queue(new_value=new_temp)
-
     def add_to_pressure_queue(self, new_value):
         self.pressure_queue.add_to_queue(new_value=new_value)
 
-    def add_to_flow_queue(self, new_value):
-        self.flow_queue.add_to_queue(new_value=new_value)
-
     def draw_notification(self):
         label = self.big_font.render(f"{self.notification}", 1, self.WHITE)
-        self.screen.blit(label, ((WIDTH / 2) - 25, (HEIGHT / 2)))
+        self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
 
     def draw_waveform(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, steps=10, target_y=None):
         if target_y:
@@ -246,7 +183,9 @@ class Display(threading.Thread):
                 config.TURN_OFF_SECONDS - (time.time() - self.get_started_time())
             )
             self.screen.fill(self.BLACK)
-            self.draw_degrees(self.temp_queue[-1] if self.temp_queue else 0)
+            self.draw_degrees(
+                self.wave_queues.get("temp")[-1] if self.wave_queues.get("temp") else 0
+            )
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
             self.draw_brewing_timer(
                 time_since_started=self.pump.get_time_since_started_brew()
@@ -254,30 +193,16 @@ class Display(threading.Thread):
             self.draw_flow(millilitres=self.flow.get_millilitres())
             if self.notification:
                 self.draw_notification()
-            self.draw_waveform(
-                queue=self.temp_queue,
-                X_MIN=TEMP_X_MIN,
-                X_MAX=TEMP_X_MAX,
-                Y_MIN=TEMP_Y_MIN,
-                Y_MAX=TEMP_Y_MAX,
-                target_y=self.target_temp,
-            )
-            self.draw_waveform(
-                queue=self.flow_queue,
-                X_MIN=FLOW_X_MIN,
-                X_MAX=FLOW_X_MAX,
-                Y_MIN=FLOW_Y_MIN,
-                Y_MAX=FLOW_Y_MAX,
-                steps=5,
-            )
-            self.draw_waveform(
-                queue=self.pressure_queue,
-                X_MIN=PRESSURE_X_MIN,
-                X_MAX=PRESSURE_X_MAX,
-                Y_MIN=PRESSURE_Y_MIN,
-                Y_MAX=PRESSURE_Y_MAX,
-                steps=5,
-            )
+            for queue in self.wave_queues.values():
+                self.draw_waveform(
+                    queue=queue,
+                    X_MIN=queue.X_MIN,
+                    X_MAX=queue.X_MAX,
+                    Y_MIN=queue.Y_MIN,
+                    Y_MAX=queue.Y_MAX,
+                    steps=queue.steps,
+                    target_y=queue.target_y,
+                )
             pygame.display.update()
             time.sleep(0.2)
 
@@ -296,9 +221,9 @@ class Display(threading.Thread):
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         print("Pos: %sx%s\n" % pygame.mouse.get_pos())
                 v += 1
-                self.add_to_temp_queue(random.randint(94, 96))
-                self.add_to_flow_queue(random.randint(1, 2))
-                self.add_to_pressure_queue(random.randint(8, 10))
+                self.wave_queues["temp"].add_to_queue(random.randint(94, 96))
+                self.wave_queues["flow"].add_to_queue(random.randint(1, 2))
+                self.wave_queues["boiler"].add_to_queue(random.randint(20, 80))
                 time.sleep(0.1)
         except Exception as e:
             print(e)
@@ -317,12 +242,43 @@ if __name__ == "__main__":
     flow = Mock()
     flow.get_millilitres = lambda: 10.0123
     time_started = time.time()
+    wave_queues = {
+        "temp": WaveQueue(
+            90,
+            100,
+            X_MIN=config.TEMP_X_MIN,
+            X_MAX=config.TEMP_X_MAX,
+            Y_MIN=config.TEMP_Y_MIN,
+            Y_MAX=config.TEMP_Y_MAX,
+            target_y=config.TARGET_TEMP,
+        ),
+        "flow": WaveQueue(
+            0,
+            100,
+            X_MIN=config.FLOW_X_MIN,
+            X_MAX=config.FLOW_X_MAX,
+            Y_MIN=config.FLOW_Y_MIN,
+            Y_MAX=config.FLOW_Y_MAX,
+            steps=5,
+        ),
+        "boiler": WaveQueue(
+            0,
+            2,
+            X_MIN=config.BOILER_X_MIN,
+            X_MAX=config.BOILER_X_MAX,
+            Y_MIN=config.BOILER_Y_MIN,
+            Y_MAX=config.BOILER_Y_MAX,
+            steps=5,
+        ),
+    }
+
     dis = Display(
         boiler=boiler,
         pump=pump,
         ranger=ranger,
         flow=flow,
         get_started_time=lambda: time_started,
+        wave_queues=wave_queues,
     )
     try:
         dis.start()
