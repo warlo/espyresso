@@ -24,7 +24,7 @@ class Flow:
         self.pulses_since = time.time()
 
     def pulse_callback(self, gpio, level, tick):
-        self.pulse_count += tick
+        self.pulse_count += 1
         self.add_to_queue(self.get_millilitres_per_sec())
 
     def get_pulse_count(self):
