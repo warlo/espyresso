@@ -17,7 +17,6 @@ class TemperatureThread(threading.Thread):
         pigpio_pi=None,
         boiler=None,
         pump=None,
-        display=None,
         pid=None,
         get_started_time=None,
         add_to_queue=None,
@@ -27,7 +26,6 @@ class TemperatureThread(threading.Thread):
 
         self.boiler = boiler
         self.pump = pump
-        self.display = display
 
         self.pid = pid
 

@@ -90,7 +90,6 @@ class Espyresso:
         self.temperature_thread = TemperatureThread(
             get_started_time=self.get_started_time,
             pigpio_pi=self.pigpio_pi,
-            display=self.display,
             boiler=self.boiler,
             pid=self.pid,
             add_to_queue=self.temp_queue.add_to_queue,
