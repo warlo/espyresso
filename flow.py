@@ -38,5 +38,5 @@ class Flow:
         return self.get_litres() * 1000
 
     def get_millilitres_per_sec(self):
-        time_since_started = time.time() - self.pulses_since()
+        time_since_started = time.time() - self.pulses_since
         return self.get_millilitres() / time_since_started
