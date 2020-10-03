@@ -27,6 +27,9 @@ class Flow:
         self.pulse_count += tick
         self.add_to_queue(self.get_millilitres_per_sec())
 
+    def get_pulse_count(self):
+        return self.pulse_count
+
     def get_litres(self):
         counts_per_liter = 1925
         return self.get_pulse_count() / counts_per_liter
