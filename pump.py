@@ -67,7 +67,6 @@ class Pump:
         if self.pumping:
             return self.reset_routine()
 
-        self.flow.reset_pulse_count()
         self.set_pwm_value(0.5)
         self.boiler.set_pwm_override(0.30)
         self.toggle_pump()
@@ -79,6 +78,7 @@ class Pump:
         self.stopped_brew = None
         self.started_brew = time.time()
         self.boiler.set_pwm_override(0.275)
+        self.flow.reset_pulse_count()
 
         while self.pumping and self.flow.get_millilitres() < 36:
             time_passed = time.time() - self.started_brew
