@@ -67,12 +67,16 @@ class Pump:
         if self.pumping:
             return self.reset_routine()
 
+        self.flow.reset_pulse_count()
+
         self.set_pwm_value(0.5)
         self.boiler.set_pwm_override(0.30)
         self.toggle_pump()
 
         started_preinfuse = time.time()
-        while self.pumping and (time.time() - started_preinfuse) < 5:
+        while self.pumping and (
+            self.flow.get_millilitres() < 36 or (time.time() - started_preinfuse) < 7
+        ):
             time.sleep(0.1)
 
         self.stopped_brew = None
