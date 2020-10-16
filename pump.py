@@ -75,7 +75,7 @@ class Pump:
 
         started_preinfuse = time.time()
         while self.pumping and (
-            self.flow.get_millilitres() < 30 or (time.time() - started_preinfuse) < 7
+            self.flow.get_millilitres() < 25 or (time.time() - started_preinfuse) < 5
         ):
             time.sleep(0.1)
 
