@@ -13,7 +13,7 @@ class Flow:
             self.flow_in_gpio, pigpio.RISING_EDGE, self.pulse_callback
         )
 
-        self.counts_per_liter = 2187  # Original 1925
+        self.counts_per_liter = 2085  # Original 1925
 
         self.flowing = False
         self.add_to_queue = add_to_queue
