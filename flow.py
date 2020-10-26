@@ -26,7 +26,9 @@ class Flow:
 
     def reset_pulse_count(self):
         self.pulse_count = 0
-        self.pulses_start = time.time()
+        self.last_pulse_count = 0
+        self.pulse_start = time.time()
+        self.last_time = time.time()
 
     def pulse_callback(self, gpio, level, tick):
         self.pulse_count += 1
@@ -56,4 +58,4 @@ class Flow:
         time_diff = current_time - self.last_time
         self.last_time = current_time
 
-        return self.get_millilitres_diff() / time_diff
+        return max(self.get_millilitres_diff() / time_diff, 0)
