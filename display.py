@@ -22,7 +22,7 @@ class Display(threading.Thread):
         wave_queues={},
         **kwargs,
     ):
-        os.environ["SDL_FBDEV"] = "/dev/fb1"
+        #os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
         # os.environ["SDL_MOUSEDEV"] = "/dev/input/eventX"
