@@ -86,7 +86,9 @@ class Display(threading.Thread):
                 target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
             )
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
-        self.draw_coordinates(list(queue), X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
+        self.draw_coordinates(
+            list(queue), X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
+        )
 
     def draw_y_axis(self, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high, number_of_steps):
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
@@ -149,14 +151,16 @@ class Display(threading.Thread):
         )
 
     def draw_brewing_timer(self, time_since_started=0):
-        label = self.medium_font.render(
-            f"{round(time_since_started, 1)}", 1, self.WHITE
-        )
+        label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
         self.screen.blit(label, (140, 0))
+
+    def draw_preinfuse_timer(self, time_since_started=0):
+        label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
+        self.screen.blit(label, (140, 14))
 
     def draw_flow(self, millilitres=0):
         label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
-        self.screen.blit(label, (140, 30))
+        self.screen.blit(label, (140, 28))
 
     def draw_target_line(self, target, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
         target_y = round(linear_transform(target, low, high, Y_MAX, Y_MIN))
@@ -186,6 +190,9 @@ class Display(threading.Thread):
                 self.wave_queues.get("temp")[-1] if self.wave_queues.get("temp") else 0
             )
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
+            self.draw_preinfuse_timer(
+                time_since_started=self.pump.get_time_since_started_preinfuse()
+            )
             self.draw_brewing_timer(
                 time_since_started=self.pump.get_time_since_started_brew()
             )
