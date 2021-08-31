@@ -9,7 +9,7 @@ class Boiler:
         pigpio_pi=None,
         pwm_gpio=None,
         reset_started_time=None,
-        boiling=True,
+        boiling=False,
         add_to_queue=None,
     ):
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)

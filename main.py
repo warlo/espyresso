@@ -133,6 +133,10 @@ class Espyresso:
         self.temperature_thread.start()
         self.ranger.start()
 
+        self.display.join()
+        self.temperature_thread.join()
+        self.ranger.join()
+
         threading.Semaphore(0).acquire()
 
     def stop(self):
