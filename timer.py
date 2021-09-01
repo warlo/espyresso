@@ -38,6 +38,7 @@ class BrewingTimer(threading.Thread):
         self.flow = flow
         self.started = None
         self.stopped = None
+        super().__init__(*args, **kwargs)
 
     def get_time_since_started(self):
         if self.stopped and self.started:
