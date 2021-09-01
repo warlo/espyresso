@@ -5,7 +5,9 @@ import pigpio
 
 
 class Flow:
-    def __init__(self, pigpio_pi=None, flow_in_gpio=None, add_to_queue=None):
+    def __init__(
+        self, pigpio_pi=None, flow_in_gpio=None, add_to_queue=None, brewing_timer=None
+    ):
         self.pigpio_pi = pigpio_pi
         self.flow_in_gpio = flow_in_gpio
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
@@ -23,6 +25,9 @@ class Flow:
 
         self.last_time = time.time()
         self.last_pulse_count = 0
+        self.last_pulse_time = time.time()
+
+        self.brewing_timer = brewing_timer
 
     def reset_pulse_count(self):
         self.pulse_count = 0
@@ -31,8 +36,19 @@ class Flow:
         self.last_time = time.time()
 
     def pulse_callback(self, gpio, level, tick):
+
+        # Start brewing timer on first pulse after 3 sec
+        if self.last_pulse_time - time.time() > 3:
+            self.brewing_timer.start_timer()
+
         self.pulse_count += 1
         self.add_to_queue(self.get_millilitres_per_sec())
+        last_pulse_time = time.time()
+        self.last_pulse_time = last_pulse_time
+
+        time.sleep(1)
+        if last_pulse_time == self.last_pulse_time:
+            self.brewing_timer.stop_timer(subtract_time=1)
 
     def get_pulse_count(self):
         return self.pulse_count

@@ -17,6 +17,7 @@ class Pump:
         pump_pwm_gpio=None,
         reset_started_time=None,
         pumping=False,
+        brewing_timer=None,
     ):
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
@@ -30,6 +31,7 @@ class Pump:
 
         self.started_brew = None
         self.stopped_brew = None
+        self.brewing_timer = brewing_timer
 
         self.started_preinfuse = None
         self.stopped_preinfuse = None
@@ -50,13 +52,6 @@ class Pump:
         self.boiler.set_pwm_override(None)
         self.pumping = False
 
-    def get_time_since_started_brew(self):
-        if self.stopped_brew and self.started_brew:
-            return self.stopped_brew - self.started_brew
-        if self.started_brew and self.pumping:
-            return time.time() - self.started_brew
-        return 0
-
     def get_time_since_started_preinfuse(self):
         if self.stopped_preinfuse and self.started_preinfuse:
             return self.stopped_preinfuse - self.started_preinfuse
@@ -66,7 +61,7 @@ class Pump:
 
     def brew_shot(self):
         if self.brew_thread.is_alive():
-            self.stopped_brew = time.time()
+            self.brewing_timer.stop_timer()
             self.stop_pump()
         else:
             self.brew_thread = threading.Thread(target=self.brew_shot_routine)
@@ -92,23 +87,23 @@ class Pump:
 
         # Sleep until flow is above 30ml or 7seconds
         while self.pumping and not (
-            self.flow.get_millilitres() > 30 or (time.time() - self.started_preinfuse) > 7
+            self.flow.get_millilitres() > 30
+            or (time.time() - self.started_preinfuse) > 7
         ):
             time.sleep(0.1)
-
 
         # Stop preinfuse timer
         self.stopped_preinfuse = time.time()
 
         # Start brewing timer
-        self.stopped_brew = None
-        self.started_brew = time.time()
+        self.brewing_timer.reset_timer()
+        self.brewing_timer.start_timer()
 
         # Hard-code boiler to 27.5%
         self.boiler.set_pwm_override(0.275)
 
         while self.pumping and self.flow.get_millilitres() < (30 + 36):
-            time_passed = time.time() - self.started_brew
+            time_passed = self.brewing_timer.get_time_since_started()
 
             # Gradually increase pump PWM to 100% over 5sec
             if time_passed < 5:
@@ -125,7 +120,7 @@ class Pump:
             self.toggle_pump()
         self.set_pwm_value(1)
         self.boiler.set_pwm_override(None)
-        self.stopped_brew = time.time()
+        self.brewing_timer.stop_timer()
         if not self.stopped_preinfuse:
             self.stopped_preinfuse = time.time()
 

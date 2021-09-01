@@ -15,6 +15,7 @@ class Display(threading.Thread):
         self,
         *args,
         boiler=None,
+        brewing_timer=None,
         pump=None,
         ranger=None,
         flow=None,
@@ -52,6 +53,7 @@ class Display(threading.Thread):
         self.notification = ""
 
         self.boiler = boiler
+        self.brewing_timer = brewing_timer
         self.pump = pump
         self.ranger = ranger
         self.flow = flow
@@ -194,7 +196,7 @@ class Display(threading.Thread):
                 time_since_started=self.pump.get_time_since_started_preinfuse()
             )
             self.draw_brewing_timer(
-                time_since_started=self.pump.get_time_since_started_brew()
+                time_since_started=self.brewing_timer.get_time_since_started()
             )
             self.draw_flow(millilitres=self.flow.get_millilitres())
             if self.notification:
@@ -242,7 +244,8 @@ if __name__ == "__main__":
     boiler = Mock()
     boiler.pwm.get_display_value = lambda: 0
     pump = Mock()
-    pump.get_time_since_started_brew = lambda: 0
+    brewing_timer = Mock()
+    brewing_timer.get_time_since_started = lambda: 0
     ranger = Mock()
     ranger.get_current_distance = lambda: 0
     flow = Mock()
