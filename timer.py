@@ -50,7 +50,7 @@ class BrewingTimer(threading.Thread):
     def get_time_since_stopped(self):
         if self.stopped:
             return time.time() - self.stopped
-        return 0
+        return 999999
 
     def timer_running(self):
         return self.started and not self.stopped
@@ -74,12 +74,13 @@ class BrewingTimer(threading.Thread):
 
             if (
                 not self.timer_running()
-                and (self.stopped is not None and self.get_time_since_stopped() > 1)
+                and (self.get_time_since_stopped() > 1)
                 and self.flow.get_time_since_last_pulse() < 1
             ):
+                self.flow.reset_pulse_count()
                 self.start_timer()
 
             elif self.timer_running() and self.flow.get_time_since_last_pulse() > 1:
                 self.stop_timer(subtract_time=self.flow.get_time_since_last_pulse())
 
-            time.sleep(0.5)
+            time.sleep(0.2)

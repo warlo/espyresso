@@ -212,7 +212,7 @@ class Display(threading.Thread):
                     target_y=queue.target_y,
                 )
             pygame.display.update()
-            time.sleep(0.2)
+            time.sleep(0.1)
 
     def test_display(self):
         # run the game loop

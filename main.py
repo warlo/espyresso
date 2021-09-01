@@ -43,7 +43,7 @@ class Espyresso:
         self.flow = Flow(
             pigpio_pi=self.pigpio_pi,
             flow_in_gpio=config.FLOW_IN_GPIO,
-            add_to_queue=self.flow_queue.add_to_queue,
+            flow_queue=self.flow_queue,
         )
 
         self.brewing_timer = BrewingTimer(flow=self.flow)

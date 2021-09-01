@@ -5,7 +5,7 @@ import pigpio
 
 
 class Flow:
-    def __init__(self, pigpio_pi=None, flow_in_gpio=None, add_to_queue=None):
+    def __init__(self, pigpio_pi=None, flow_in_gpio=None, flow_queue=None):
         self.pigpio_pi = pigpio_pi
         self.flow_in_gpio = flow_in_gpio
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
@@ -16,7 +16,7 @@ class Flow:
         self.counts_per_liter = 2100  # Original 1925
 
         self.flowing = False
-        self.add_to_queue = add_to_queue
+        self.flow_queue = flow_queue
 
         self.pulse_start = time.time()
         self.pulse_count = 0
@@ -30,11 +30,12 @@ class Flow:
         self.last_pulse_count = 0
         self.pulse_start = time.time()
         self.last_time = time.time()
+        self.flow_queue.clear()
 
     def pulse_callback(self, gpio, level, tick):
 
         self.pulse_count += 1
-        self.add_to_queue(self.get_millilitres_per_sec())
+        self.flow_queue.add_to_queue(self.get_millilitres_per_sec())
         self.last_pulse_time = time.time()
 
     def get_time_since_last_pulse(self):
