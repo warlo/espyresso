@@ -23,7 +23,7 @@ class Flow:
 
         self.last_time = time.time()
         self.last_pulse_count = 0
-        self.last_pulse_time = time.time()
+        self.last_pulse_time = 0
 
     def reset_pulse_count(self):
         self.pulse_count = 0

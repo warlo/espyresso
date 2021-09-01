@@ -137,6 +137,7 @@ class Espyresso:
         self.display.start()
         self.temperature_thread.start()
         self.ranger.start()
+        self.brewing_timer.start()
 
         self.display.join()
         self.temperature_thread.join()
