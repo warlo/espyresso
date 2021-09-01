@@ -20,7 +20,7 @@ from pid import PID
 from pump import Pump
 from ranger import Ranger
 from temperature_thread import TemperatureThread
-from timer import Timer
+from timer import BrewingTimer
 
 
 class Espyresso:
@@ -30,8 +30,6 @@ class Espyresso:
         self.pigpio_pi = pigpio_pi
         if not self.pigpio_pi:
             self.pigpio_pi = pigpio.pi()
-
-        self.brewing_timer = Timer()
 
         self.flow_queue = WaveQueue(
             0,
@@ -46,8 +44,9 @@ class Espyresso:
             pigpio_pi=self.pigpio_pi,
             flow_in_gpio=config.FLOW_IN_GPIO,
             add_to_queue=self.flow_queue.add_to_queue,
-            brewing_timer=self.brewing_timer,
         )
+
+        self.brewing_timer = BrewingTimer(flow=self.flow)
         self.boiler_queue = WaveQueue(
             0,
             100,
@@ -142,6 +141,7 @@ class Espyresso:
         self.display.join()
         self.temperature_thread.join()
         self.ranger.join()
+        self.brewing_timer.join()
 
         threading.Semaphore(0).acquire()
 

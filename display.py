@@ -195,8 +195,6 @@ class Display(threading.Thread):
             self.draw_preinfuse_timer(
                 time_since_started=self.pump.get_time_since_started_preinfuse()
             )
-            if self.brewing_timer.running() and self.flow.get_time_since_last_pulse() > 1:
-                self.brewing_timer.stop_timer(subtract_time=self.flow.get_time_since_last_pulse())
             self.draw_brewing_timer(
                 time_since_started=self.brewing_timer.get_time_since_started()
             )
