@@ -99,8 +99,8 @@ class Pump:
         self.brewing_timer.reset_timer()
         self.brewing_timer.start_timer()
 
-        # Hard-code boiler to 27.5%
-        self.boiler.set_pwm_override(0.275)
+        # Hard-code boiler to 25%
+        self.boiler.set_pwm_override(0.25)
 
         while self.pumping and self.flow.get_millilitres() < (30 + 36):
             time_passed = self.brewing_timer.get_time_since_started()
