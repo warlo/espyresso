@@ -33,9 +33,11 @@ class Timer:
 
 
 class BrewingTimer(threading.Thread, Timer):
-    def __init__(self, flow=None):
+    def __init__(self, flow=None, *args, **kwargs):
         self.running = True
         self.flow = flow
+
+        super().__init__(*args, **kwargs)
 
     def stop(self):
         self.running = False
