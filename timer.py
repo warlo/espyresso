@@ -16,6 +16,9 @@ class Timer:
             return time.time() - self.started
         return 0
 
+    def running(self):
+        return self.started and not self.stopped
+
     def start_timer(self):
         self.stopped = None
         self.started = time.time()

@@ -38,13 +38,16 @@ class Flow:
     def pulse_callback(self, gpio, level, tick):
 
         # Start brewing timer on first pulse after 3 sec
-        if time.time() - self.last_pulse_time > 3:
+        if self.get_time_since_last_pulse() > 3:
             self.reset_pulse_count()
             self.brewing_timer.start_timer()
 
         self.pulse_count += 1
         self.add_to_queue(self.get_millilitres_per_sec())
         self.last_pulse_time = time.time()
+
+    def get_time_since_last_pulse(self):
+        return time.time() - self.last_pulse_time
 
     def get_pulse_count(self):
         return self.pulse_count
