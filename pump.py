@@ -107,10 +107,7 @@ class Pump:
         # Hard-code boiler to 27.5%
         self.boiler.set_pwm_override(0.275)
 
-        # Reset flow from preinfuse
-        self.flow.reset_pulse_count()
-
-        while self.pumping and self.flow.get_millilitres() < 36:
+        while self.pumping and self.flow.get_millilitres() < (30 + 36):
             time_passed = time.time() - self.started_brew
 
             # Gradually increase pump PWM to 100% over 5sec
