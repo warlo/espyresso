@@ -39,6 +39,7 @@ class Flow:
 
         # Start brewing timer on first pulse after 3 sec
         if time.time() - self.last_pulse_time > 3:
+            self.reset_pulse_count()
             self.brewing_timer.start_timer()
 
         self.pulse_count += 1
