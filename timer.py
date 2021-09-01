@@ -32,12 +32,33 @@ class Timer:
         self.stopped = None
 
 
-class BrewingTimer(threading.Thread, Timer):
+class BrewingTimer(threading.Thread):
     def __init__(self, flow=None, *args, **kwargs):
         self.running = True
         self.flow = flow
+        self.started = None
+        self.stopped = None
 
-        super().__init__(*args, **kwargs)
+    def get_time_since_started(self):
+        if self.stopped and self.started:
+            return self.stopped - self.started
+        if self.started:
+            return time.time() - self.started
+        return 0
+
+    def timer_running(self):
+        return self.started and not self.stopped
+
+    def start_timer(self):
+        self.stopped = None
+        self.started = time.time()
+
+    def stop_timer(self, *, subtract_time=0):
+        self.stopped = time.time() - subtract_time
+
+    def reset_timer(self):
+        self.stopped = None
+        self.stopped = None
 
     def stop(self):
         self.running = False
