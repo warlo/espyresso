@@ -74,7 +74,7 @@ class BrewingTimer(threading.Thread):
 
             if (
                 not self.timer_running()
-                and (self.get_time_since_stopped() > 1)
+                and (self.get_time_since_stopped() > 3)
                 and self.flow.get_time_since_last_pulse() < 1
             ):
                 self.flow.reset_pulse_count()
