@@ -6,8 +6,8 @@ After=pigpiod.service
 
 [Service]
 User=root
-WorkingDirectory=/home/alarm/espyresso
-ExecStart=/usr/bin/stdbuf -oL /home/alarm/espyresso/start.sh
+WorkingDirectory=/home/alarm/espyresso/espyresso
+ExecStart=/usr/bin/stdbuf -oL /home/alarm/espyresso/espyresso/start.sh
 Type=idle
 SendSIGHUP=no
 

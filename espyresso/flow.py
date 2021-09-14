@@ -50,7 +50,7 @@ class Flow:
     def get_litres_diff(self):
         pulse_count = self.get_pulse_count()
         pulse_diff = pulse_count - self.last_pulse_count
-        self.last_pulse_count = pulse_count 
+        self.last_pulse_count = pulse_count
 
         return pulse_diff / self.counts_per_liter
 
