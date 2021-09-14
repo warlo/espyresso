@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 
-DEBUG = False
+DEBUG = True
+
+if DEBUG:
+    import sys
+
+    from mock import MagicMock
+
+    sys.modules["pigpio"] = MagicMock()
 
 TSIC_GPIO = 24
 BOILER_PWM_GPIO = 12

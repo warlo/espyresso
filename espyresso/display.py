@@ -2,19 +2,17 @@ import os
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
 import config
 import pygame
-from pygame.locals import *
+from boiler import Boiler
+from flow import Flow
+from pump import Pump
+from ranger import Ranger
+from timer import BrewingTimer
 from utils import WaveQueue, linear_transform
-from pathlib import Path
-
-from .boiler import Boiler
-from .timer import BrewingTimer
-from .pump import Pump
-from .ranger import Ranger
-from .flow import Flow
 
 
 class Display(threading.Thread):
