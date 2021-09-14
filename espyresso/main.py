@@ -24,7 +24,7 @@ from utils import WaveQueue
 
 class Espyresso:
     def __init__(self, pigpio_pi=None):
-        self.started_time = 0
+        self.started_time = 0.0
 
         self.pigpio_pi = pigpio_pi
         if not self.pigpio_pi:
@@ -124,13 +124,13 @@ class Espyresso:
 
         self.running = True
 
-    def reset_started_time(self):
+    def reset_started_time(self) -> None:
         self.started_time = time.time()
 
-    def get_started_time(self):
+    def get_started_time(self) -> float:
         return self.started_time
 
-    def start(self):
+    def start(self) -> None:
         self.reset_started_time()
 
         self.display.start()
@@ -145,7 +145,7 @@ class Espyresso:
 
         threading.Semaphore(0).acquire()
 
-    def stop(self):
+    def stop(self) -> None:
         self.temperature_thread.stop()
         self.display.stop()
         self.boiler.set_pwm_override(None)
@@ -154,7 +154,7 @@ class Espyresso:
         time.sleep(1)
         self.pigpio_pi.stop()
 
-    def exit(self):
+    def exit(self) -> None:
         self.stop()
         sys.exit(0)
 

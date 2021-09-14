@@ -2,22 +2,30 @@ import os
 import sys
 import threading
 import time
+from typing import Deque, List, Tuple
 
 import config
 import pygame
 from pygame.locals import *
 from utils import WaveQueue, linear_transform
+from pathlib import Path
+
+from .boiler import Boiler
+from .timer import BrewingTimer
+from .pump import Pump
+from .ranger import Ranger
+from .flow import Flow
 
 
 class Display(threading.Thread):
     def __init__(
         self,
         *args,
-        boiler=None,
-        brewing_timer=None,
-        pump=None,
-        ranger=None,
-        flow=None,
+        boiler: Boiler,
+        brewing_timer: BrewingTimer,
+        pump: Pump,
+        ranger: Ranger,
+        flow: Flow,
         get_started_time=None,
         wave_queues={},
         **kwargs,
@@ -33,10 +41,13 @@ class Display(threading.Thread):
 
         # set up the window
         pygame.event.set_allowed(None)
-        flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
+        if not config.DEBUG:
+            flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
+        else:
+            flags = pygame.HWSURFACE | pygame.DOUBLEBUF
         self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
 
-        font = "nk57-monospace-cd-rg.ttf"
+        font = str(Path(__file__).parent / "nk57-monospace-cd-rg.ttf")
         self.big_font = pygame.font.Font(font, 42)
         self.medium_font = pygame.font.Font(font, 28)
         self.small_font = pygame.font.Font(font, 12)
@@ -63,10 +74,21 @@ class Display(threading.Thread):
 
         super().__init__(*args, **kwargs)
 
-    def generate_coordinate(self, temp, index, Y_MIN, Y_MAX, low, high):
+    def generate_coordinate(
+        self, temp, index, Y_MIN, Y_MAX, low, high
+    ) -> Tuple[int, float]:
         return (index, round(linear_transform(temp, low, high, Y_MAX, Y_MIN)))
 
-    def generate_coordinates(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
+    def generate_coordinates(
+        self,
+        queue: Deque[float],
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        low: int,
+        high: int,
+    ) -> List[Tuple[int, float]]:
         return [
             self.generate_coordinate(
                 temp, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
@@ -91,7 +113,16 @@ class Display(threading.Thread):
             list(queue), X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
         )
 
-    def draw_y_axis(self, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high, number_of_steps):
+    def draw_y_axis(
+        self,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        low: int,
+        high: int,
+        number_of_steps: int,
+    ) -> None:
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MAX, Y_MAX))
         range_steps = int(
@@ -125,11 +156,11 @@ class Display(threading.Thread):
             )  # You can change the 100 depending on what transparency it is.
             self.screen.blit(horizontal_line, (X_MIN, y_val))  # Line on Y-axis
 
-    def draw_degrees(self, degrees=0):
+    def draw_degrees(self, degrees: float = 0) -> None:
         label = self.big_font.render(f"{round(degrees, 1)}\u00B0C", 1, self.WHITE)
         self.screen.blit(label, (max(0, (100 - int(label.get_rect().width))), 0))
 
-    def draw_boiling_label(self, boiling=False, time_left=0):
+    def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:
         time_label = self.small_font.render(f"Time:  {time_left}", 1, self.WHITE)
         power_label = self.small_font.render(
             f"Power: {self.boiler.pwm.get_display_value()}%", 1, self.WHITE
@@ -151,23 +182,41 @@ class Display(threading.Thread):
             on_off_label, (300 - int(on_off_label.get_rect().width / 2), 24)
         )
 
-    def draw_brewing_timer(self, time_since_started=0):
+    def draw_brewing_timer(self, time_since_started: float = 0) -> None:
         label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
         self.screen.blit(label, (140, 0))
 
-    def draw_preinfuse_timer(self, time_since_started=0):
+    def draw_preinfuse_timer(self, time_since_started: float = 0) -> None:
         label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
         self.screen.blit(label, (140, 14))
 
-    def draw_flow(self, millilitres=0):
+    def draw_flow(self, millilitres: float = 0) -> None:
         label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
         self.screen.blit(label, (140, 28))
 
-    def draw_target_line(self, target, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
+    def draw_target_line(
+        self,
+        target: int,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        low: int,
+        high: int,
+    ):
         target_y = round(linear_transform(target, low, high, Y_MAX, Y_MIN))
         pygame.draw.line(self.screen, self.RED, (X_MIN, target_y), (X_MAX, target_y))
 
-    def draw_coordinates(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high):
+    def draw_coordinates(
+        self,
+        queue: WaveQueue,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        low: int,
+        high: int,
+    ):
         points = self.generate_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high)
         if not points:
             return
@@ -222,7 +271,7 @@ class Display(threading.Thread):
         try:
             while self.running and v < 1000:
                 for event in pygame.event.get():
-                    if event.type == QUIT:
+                    if event.type == pygame.QUIT:
                         pygame.quit()
                         sys.exit()
                     if event.type == pygame.MOUSEBUTTONDOWN:
@@ -238,16 +287,17 @@ class Display(threading.Thread):
 
 
 if __name__ == "__main__":
-    from mock import Mock
+    from mock import MagicMock
 
-    boiler = Mock()
+    boiler = MagicMock()
     boiler.pwm.get_display_value = lambda: 0
-    pump = Mock()
-    brewing_timer = Mock()
+    pump = MagicMock()
+    pump.get_time_since_started_preinfuse = lambda: 0
+    brewing_timer = MagicMock()
     brewing_timer.get_time_since_started = lambda: 0
-    ranger = Mock()
+    ranger = MagicMock()
     ranger.get_current_distance = lambda: 0
-    flow = Mock()
+    flow = MagicMock()
     flow.get_millilitres = lambda: 10.0123
     time_started = time.time()
     wave_queues = {
@@ -282,6 +332,7 @@ if __name__ == "__main__":
 
     dis = Display(
         boiler=boiler,
+        brewing_timer=brewing_timer,
         pump=pump,
         ranger=ranger,
         flow=flow,

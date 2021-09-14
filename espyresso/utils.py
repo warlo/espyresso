@@ -6,15 +6,15 @@ from config import ZOOM
 class WaveQueue(deque):
     def __init__(
         self,
-        low,
-        high,
+        low: int,
+        high: int,
         *args,
-        X_MIN,
-        X_MAX,
-        Y_MIN,
-        Y_MAX,
-        steps=10,
-        target_y=None,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        steps: int = 10,
+        target_y: int = None,
         **kwargs
     ) -> None:
         self.low = low
@@ -52,7 +52,7 @@ class WaveQueue(deque):
             self.high = int(max(max(self), self.max_high))
 
 
-def linear_transform(x, a, b, c, d):
+def linear_transform(x: float, a: float, b: float, c: float, d: float) -> float:
     """
     Map X within [A, B] to [C, D]
     linear_transform(70, 70, 120, 240, 50) => 240
