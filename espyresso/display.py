@@ -2,12 +2,11 @@ import os
 import sys
 import threading
 import time
-from utils import linear_transform, WaveQueue
-
-import pygame
-from pygame.locals import *
 
 import config
+import pygame
+from pygame.locals import *
+from utils import WaveQueue, linear_transform
 
 
 class Display(threading.Thread):

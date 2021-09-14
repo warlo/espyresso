@@ -65,7 +65,7 @@ class ZacWireInputChannel(object):
         pigpio_pi is the pigpio.pi object to use for GPIO access.
         gpio is the GPIO as Broadcom chip number.
         Initializes the GPIO as input without pull-up or pull-down.
-                
+
         Raises PigpioNotConnectedError if pigpio_pi is not connected.
         """
         self.pi = pigpio_pi
@@ -86,7 +86,7 @@ class ZacWireInputChannel(object):
         Start listening for data and pass received packet bytes
         to the a callback callback(status, [bytes]).
         Note that the callback is called by a pigpio thread.
-        
+
         Exceptions from the callback function are logged with standard
         python logging.
         """
@@ -250,7 +250,7 @@ Measurement.UNDEF = Measurement(None, None)
 
 class TsicInputChannel(object):
     """
-    Receive temperature measurements from a TSIC 206 or TSIC 306 sensor 
+    Receive temperature measurements from a TSIC 206 or TSIC 306 sensor
     connected to a Raspberry PI GPIO channel.
     """
 
@@ -270,11 +270,11 @@ class TsicInputChannel(object):
     def start(self, callback=None):
         """
         Start reading temperatures from the TSIC. Optionally pass each
-        successfully received measurement to a callback callback(Measurement) 
+        successfully received measurement to a callback callback(Measurement)
         if callback is not None.
-        
+
         Note that the callback is called by a pigpio thread.
-        
+
         You can also fetch the last reading from property measurement.
         """
         self.stop()
@@ -304,7 +304,7 @@ class TsicInputChannel(object):
 
     def measure_once(self, timeout=None):
         """
-        Wait up to optional timeout seconds for a measurement and 
+        Wait up to optional timeout seconds for a measurement and
         return the first successfully received measurement as
         Measurement or Measurement.UNDEF otherwise.
         Temporarily start and stop measurement if it is not yet running.

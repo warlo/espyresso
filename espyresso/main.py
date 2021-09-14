@@ -7,11 +7,9 @@ import sys
 import threading
 import time
 import traceback
-from utils import WaveQueue
-
-import pigpio
 
 import config
+import pigpio
 from boiler import Boiler
 from buttons import Buttons
 from display import Display
@@ -21,6 +19,7 @@ from pump import Pump
 from ranger import Ranger
 from temperature_thread import TemperatureThread
 from timer import BrewingTimer
+from utils import WaveQueue
 
 
 class Espyresso:

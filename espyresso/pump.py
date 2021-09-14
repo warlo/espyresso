@@ -3,7 +3,6 @@ import threading
 import time
 
 import pigpio
-
 from pwm import PWM
 
 
