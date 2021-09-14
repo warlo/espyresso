@@ -2,7 +2,7 @@ import os
 import sys
 import threading
 import time
-from typing import Deque, List, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 import config
 import pygame
@@ -26,8 +26,8 @@ class Display(threading.Thread):
         pump: Pump,
         ranger: Ranger,
         flow: Flow,
-        get_started_time=None,
-        wave_queues={},
+        get_started_time: Callable[[], float],
+        wave_queues: Dict[str, WaveQueue],
         **kwargs,
     ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
@@ -81,7 +81,7 @@ class Display(threading.Thread):
 
     def generate_coordinates(
         self,
-        queue: Deque[float],
+        queue: WaveQueue,
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
@@ -96,14 +96,20 @@ class Display(threading.Thread):
             for index, temp in enumerate(queue)
         ]
 
-    def add_to_pressure_queue(self, new_value):
-        self.pressure_queue.add_to_queue(new_value=new_value)
-
-    def draw_notification(self):
+    def draw_notification(self) -> None:
         label = self.big_font.render(f"{self.notification}", 1, self.WHITE)
         self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
 
-    def draw_waveform(self, queue, X_MIN, X_MAX, Y_MIN, Y_MAX, steps=10, target_y=None):
+    def draw_waveform(
+        self,
+        queue: WaveQueue,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        steps: int = 10,
+        target_y: Optional[int] = None,
+    ):
         if target_y:
             self.draw_target_line(
                 target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
@@ -123,13 +129,15 @@ class Display(threading.Thread):
         high: int,
         number_of_steps: int,
     ) -> None:
+
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MAX, Y_MAX))
+
         range_steps = int(
             (high * number_of_steps - low * number_of_steps) / number_of_steps
         )
 
-        steps = []
+        steps: List[Tuple[float, int]] = []
         rounded = True
         for i in range(low * number_of_steps, high * number_of_steps, range_steps):
             closest_step = i / number_of_steps
@@ -203,7 +211,7 @@ class Display(threading.Thread):
         Y_MAX: int,
         low: int,
         high: int,
-    ):
+    ) -> None:
         target_y = round(linear_transform(target, low, high, Y_MAX, Y_MIN))
         pygame.draw.line(self.screen, self.RED, (X_MIN, target_y), (X_MAX, target_y))
 
@@ -216,7 +224,7 @@ class Display(threading.Thread):
         Y_MAX: int,
         low: int,
         high: int,
-    ):
+    ) -> None:
         points = self.generate_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high)
         if not points:
             return
@@ -226,18 +234,18 @@ class Display(threading.Thread):
             pygame.draw.line(self.screen, self.GREEN, previous_point, point)
             previous_point = point
 
-    def stop(self):
+    def stop(self) -> None:
         self.running = False
         pygame.quit()
 
-    def run(self):
+    def run(self) -> None:
         while self.running:
             time_left = int(
                 config.TURN_OFF_SECONDS - (time.time() - self.get_started_time())
             )
             self.screen.fill(self.BLACK)
             self.draw_degrees(
-                self.wave_queues.get("temp")[-1] if self.wave_queues.get("temp") else 0
+                self.wave_queues["temp"][-1] if self.wave_queues.get("temp") else 0
             )
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
             self.draw_preinfuse_timer(

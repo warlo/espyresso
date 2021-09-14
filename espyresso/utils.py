@@ -3,7 +3,7 @@ from collections import deque
 from config import ZOOM
 
 
-class WaveQueue(deque):
+class WaveQueue(deque[float]):
     def __init__(
         self,
         low: int,
