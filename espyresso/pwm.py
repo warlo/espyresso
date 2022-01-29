@@ -10,9 +10,6 @@ class PWM:
         self.freq = freq
         self.value = 0
 
-    def set_pwm(self, value=0):
-        self.pigpio_pi.hardware_PWM(self.pwm_gpio, self.freq, value)
-
     def get_display_value(self):
         return str(round(self.value * 100, 1))
 

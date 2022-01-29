@@ -31,7 +31,7 @@ class WaveQueue(deque[float]):
         self.length = X_MAX - X_MIN
         return super().__init__(*args, **kwargs)
 
-    def add_to_queue(self, new_value):
+    def add_to_queue(self, new_value: float):
         popped = None
         if len(self) >= self.length / ZOOM:
             popped = self.popleft()
