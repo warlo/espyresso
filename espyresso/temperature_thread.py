@@ -58,7 +58,8 @@ class TemperatureThread(threading.Thread):
                     or latest_measurement == Measurement.UNDEF
                 ):
                     logger.warning(
-                        f"Undefined or no new temperature measurement: {prev_timestamp}, {latest_measurement}"
+                        f"Undefined or no new temperature measurement: "
+                        f"{prev_timestamp}, {latest_measurement}"
                     )
                     continue
 

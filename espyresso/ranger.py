@@ -51,15 +51,15 @@ class Ranger(threading.Thread):
 
     def run(self):
         while not self._stop_event.is_set():
-            logger.debug(f"Ranger running {self._stop_event.is_set()}")
             self.done.clear()
             self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
             if self.done.wait(timeout=5):
                 distance = linear_transform(self.low, 180, 860, 100, 0)
                 self.history.append(distance)
 
-                if config.DEBUG:
-                    print(distance, self.low, self.high)
+                logger.debug(
+                    f"Ranger distance: {distance}; low: {self.low}; high: {self.high}"
+                )
             time.sleep(0.5)
 
     def stop(self):

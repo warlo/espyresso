@@ -2,80 +2,84 @@
 import logging
 import threading
 import time
+from typing import TYPE_CHECKING, Optional
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from espyresso.flow import Flow
 
 
 class Timer:
     def __init__(
         self,
-    ):
-        self.started = None
-        self.stopped = None
+    ) -> None:
+        self.started: Optional[float] = None
+        self.stopped: Optional[float] = None
 
-    def get_time_since_started(self):
+    def get_time_since_started(self) -> float:
         if self.stopped and self.started:
             return self.stopped - self.started
         if self.started:
             return time.time() - self.started
         return 0
 
-    def timer_running(self):
-        return self.started and not self.stopped
+    def timer_running(self) -> bool:
+        return bool(self.started and not self.stopped)
 
-    def start_timer(self):
+    def start_timer(self) -> None:
         self.stopped = None
         self.started = time.time()
 
-    def stop_timer(self, *, subtract_time=0):
+    def stop_timer(self, *, subtract_time=0) -> None:
         self.stopped = time.time() - subtract_time
 
-    def reset_timer(self):
+    def reset_timer(self) -> None:
         self.stopped = None
         self.stopped = None
 
 
 class BrewingTimer(threading.Thread):
-    def __init__(self, flow=None, *args, **kwargs):
+    def __init__(self, flow: "Flow", *args, **kwargs):
         self._stop_event = threading.Event()
 
         self.flow = flow
-        self.started = None
-        self.stopped = None
+        self.started: Optional[float] = None
+        self.stopped: Optional[float] = None
         super().__init__(*args, **kwargs)
 
-    def get_time_since_started(self):
+    def get_time_since_started(self) -> float:
         if self.stopped and self.started:
             return self.stopped - self.started
         if self.started:
             return time.time() - self.started
         return 0
 
-    def get_time_since_stopped(self):
+    def get_time_since_stopped(self) -> float:
         if self.stopped:
             return time.time() - self.stopped
         return 999999
 
-    def timer_running(self):
-        return self.started and not self.stopped
+    def timer_running(self) -> bool:
+        return bool(self.started and not self.stopped)
 
-    def start_timer(self):
+    def start_timer(self) -> None:
         self.stopped = None
         self.started = time.time()
 
-    def stop_timer(self, *, subtract_time=0):
+    def stop_timer(self, *, subtract_time=0) -> None:
         self.stopped = time.time() - subtract_time
 
-    def reset_timer(self):
+    def reset_timer(self) -> None:
         self.stopped = None
         self.stopped = None
 
-    def stop(self):
+    def stop(self) -> None:
         logger.debug("Brewingtimer stopping")
         self._stop_event.set()
         logger.debug("Brewingtimer stopped")
 
-    def run(self):
+    def run(self) -> None:
         while not self._stop_event.is_set():
 
             if (
