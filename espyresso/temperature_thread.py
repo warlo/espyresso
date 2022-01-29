@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import logging
-import signal
 import threading
 import time
-import traceback
 
-import config
-from tsic import Measurement, TsicInputChannel
+from espyresso import config
+from espyresso.tsic import Measurement, TsicInputChannel
+
+logger = logging.getLogger(__name__)
 
 
 class TemperatureThread(threading.Thread):
@@ -31,7 +31,8 @@ class TemperatureThread(threading.Thread):
 
         self.tsic = TsicInputChannel(pigpio_pi=pigpio_pi, gpio=config.TSIC_GPIO)
 
-        self.running = True
+        self._stop_event = threading.Event()
+
         self.add_to_queue = add_to_queue
 
         self.lock = threading.RLock()
@@ -40,7 +41,7 @@ class TemperatureThread(threading.Thread):
     def run(self):
         with self.tsic:
             prev_timestamp = None
-            while self.running:
+            while not self._stop_event.is_set():
                 if (
                     time.time() - self.get_started_time() > config.TURN_OFF_SECONDS
                     and self.boiler.get_boiling()
@@ -56,7 +57,9 @@ class TemperatureThread(threading.Thread):
                     prev_timestamp == latest_measurement.seconds_since_epoch
                     or latest_measurement == Measurement.UNDEF
                 ):
-                    print("UNDEF", latest_measurement)
+                    logger.warning(
+                        f"Undefined or no new temperature measurement: {prev_timestamp}, {latest_measurement}"
+                    )
                     continue
 
                 prev_timestamp = latest_measurement.seconds_since_epoch
@@ -71,27 +74,11 @@ class TemperatureThread(threading.Thread):
                 lock.release()
 
                 if config.DEBUG:
-                    pass
-                    print(f"Temp: {round(temp, 2)} - PID: {pid_value}")
+                    logger.debug(f"Temp: {round(temp, 2)} - PID: {pid_value}")
 
     def stop(self):
-        self.running = False
+        logger.debug("temperature_thread stopping")
         self.boiler.set_value(0)
-
-
-def handler(signum, frame):
-    """Why is systemd sending sighups? I DON'T KNOW."""
-    logging.warning(f"Got a {signum} signal. Doing nothing")
-
-
-if __name__ == "__main__":
-    try:
-        signal.signal(signal.SIGHUP, handler)
-
-        temperature_thread = TemperatureThread()
-        signal.signal(signal.SIGINT, temperature_thread.signal_handler)
-        signal.signal(signal.SIGTERM, temperature_thread.signal_handler)
-        temperature_thread.run()
-    except Exception as e:
-        logging.warning(f"EXCEPTION:{e}")
-        logging.warning(traceback.format_exc())
+        self.tsic.stop()
+        self._stop_event.set()
+        logger.debug("temperature_thread stopped")

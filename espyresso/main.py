@@ -6,20 +6,24 @@ import signal
 import sys
 import threading
 import time
-import traceback
 
-import config
 import pigpio
-from boiler import Boiler
-from buttons import Buttons
-from display import Display
-from flow import Flow
-from pid import PID
-from pump import Pump
-from ranger import Ranger
-from temperature_thread import TemperatureThread
-from timer import BrewingTimer
-from utils import WaveQueue
+
+from espyresso import config
+from espyresso.boiler import Boiler
+from espyresso.buttons import Buttons
+from espyresso.display import Display
+from espyresso.flow import Flow
+from espyresso.pid import PID
+from espyresso.pump import Pump
+from espyresso.ranger import Ranger
+from espyresso.temperature_thread import TemperatureThread
+from espyresso.timer import BrewingTimer
+from espyresso.utils import WaveQueue
+
+logging.basicConfig(level=logging.DEBUG)
+
+logger = logging.getLogger(__name__)
 
 
 class Espyresso:
@@ -143,21 +147,31 @@ class Espyresso:
         self.ranger.join()
         self.brewing_timer.join()
 
-        threading.Semaphore(0).acquire()
-
     def stop(self) -> None:
+        self.brewing_timer.stop()
+        self.ranger.stop()
         self.temperature_thread.stop()
         self.display.stop()
         self.boiler.stop()
+
         self.running = False
         time.sleep(1)
+        logger.debug("Pigpio stopping")
         self.pigpio_pi.stop()
 
     def exit(self) -> None:
         self.stop()
-        sys.exit(0)
+        logger.debug("EXITING: Stopped all")
+        time.sleep(1)
+        try:
+            logger.debug("SYS EXIT 0")
+            sys.exit(0)
+        except Exception:
+            logger.exception("Failed exiting")
 
     def turn_off_system(self):
+        self.stop()
+        logger.debug("Triggering shutdown")
         os.system("shutdown now -h")
 
     def signal_handler(self, sig, frame):
@@ -169,11 +183,11 @@ class Espyresso:
 
 
 def handler(signum, frame):
-    """Why is systemd sending sighups? I DON'T KNOW."""
-    logging.warning(f"Got a {signum} signal. Doing nothing")
+    """Why is systemd sending sighups?"""
+    logger.warning(f"Got a {signum} signal. Doing nothing")
 
 
-if __name__ == "__main__":
+def run():
     if not config.DEBUG:
         espyresso = Espyresso()
     else:
@@ -185,7 +199,6 @@ if __name__ == "__main__":
         signal.signal(signal.SIGINT, espyresso.signal_handler)
         signal.signal(signal.SIGTERM, espyresso.signal_handler)
         espyresso.start()
-    except Exception as e:
-        logging.warning(f"EXCEPTION:{e}")
-        logging.warning(traceback.format_exc())
+    except Exception:
+        logger.exception("EXCEPTION")
         espyresso.exit()

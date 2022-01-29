@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
+import logging
 import threading
 import time
+
+logger = logging.getLogger(__name__)
 
 
 class Timer:
@@ -34,7 +37,8 @@ class Timer:
 
 class BrewingTimer(threading.Thread):
     def __init__(self, flow=None, *args, **kwargs):
-        self.running = True
+        self._stop_event = threading.Event()
+
         self.flow = flow
         self.started = None
         self.stopped = None
@@ -67,10 +71,12 @@ class BrewingTimer(threading.Thread):
         self.stopped = None
 
     def stop(self):
-        self.running = False
+        logger.debug("Brewingtimer stopping")
+        self._stop_event.set()
+        logger.debug("Brewingtimer stopped")
 
     def run(self):
-        while self.running:
+        while not self._stop_event.is_set():
 
             if (
                 not self.timer_running()

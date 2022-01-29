@@ -1,5 +1,9 @@
-import config
-from pwm import PWM
+import logging
+
+from espyresso import config
+from espyresso.pwm import PWM
+
+logger = logging.getLogger(__name__)
 
 
 class Boiler:
@@ -11,6 +15,8 @@ class Boiler:
         boiling=False,
         add_to_queue=None,
     ):
+        logger.debug(f"Boiler INIT: gpio {pwm_gpio} boiling {boiling}")
+
         self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
@@ -22,6 +28,8 @@ class Boiler:
         if self.boiling and not config.DEBUG:
             # Start boiling initially
             self.pwm.set_value(1.0)
+
+        logger.debug("Boiler READY")
 
     def get_boiling(self):
         return self.boiling
@@ -57,5 +65,7 @@ class Boiler:
         self.add_to_queue(round(value * 100, 1))
 
     def stop(self):
-        self.boiler.set_pwm_override(None)
-        self.boiler.set_value(0)
+        logger.debug("Boiler stopping")
+        self.set_pwm_override(None)
+        self.set_value(0)
+        logger.debug("Boiler stopped")

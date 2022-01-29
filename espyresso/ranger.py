@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 import collections
+import logging
 import statistics
 import threading
 import time
 
-import config
 import pigpio
-from utils import linear_transform
+
+from espyresso import config
+from espyresso.utils import linear_transform
+
+logger = logging.getLogger(__name__)
 
 
 class Ranger(threading.Thread):
@@ -16,7 +20,7 @@ class Ranger(threading.Thread):
         pigpio_pi=None,
         ranger_trigger_out_gpio=None,
         ranger_echo_in_gpio=None,
-        **kwargs
+        **kwargs,
     ):
         self.pigpio_pi = pigpio_pi
         self.ranger_echo_in_gpio = ranger_echo_in_gpio
@@ -29,12 +33,13 @@ class Ranger(threading.Thread):
         self.pigpio_pi.callback(
             self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, self.fall
         )
-        self.running = True
         self.done = threading.Event()
 
         self.history = collections.deque(maxlen=10)
         self.high = 0
         self.low = 0
+
+        self._stop_event = threading.Event()
         super().__init__(*args, **kwargs)
 
     def rise(self, gpio, level, tick):
@@ -45,7 +50,8 @@ class Ranger(threading.Thread):
         self.done.set()
 
     def run(self):
-        while self.running:
+        while not self._stop_event.is_set():
+            logger.debug(f"Ranger running {self._stop_event.is_set()}")
             self.done.clear()
             self.pigpio_pi.gpio_trigger(self.ranger_trigger_out_gpio, 50, 1)
             if self.done.wait(timeout=5):
@@ -57,7 +63,8 @@ class Ranger(threading.Thread):
             time.sleep(0.5)
 
     def stop(self):
-        self.running = False
+        logger.debug("Ranger stopping")
+        self._stop_event.set()
 
     def get_current_distance(self):
         return statistics.median(self.history) if self.history else 0

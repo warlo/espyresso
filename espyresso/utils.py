@@ -1,6 +1,6 @@
 from collections import deque
 
-from config import ZOOM
+from espyresso.config import ZOOM
 
 
 class WaveQueue(deque[float]):
@@ -14,7 +14,7 @@ class WaveQueue(deque[float]):
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: int = None,
+        target_y: float = None,
         **kwargs
     ) -> None:
         self.low = low

@@ -1,3 +1,3 @@
 echo "STARTING PYTHON"
-sudo python main.py
+sudo python -m espyresso
 echo "STOPPED"

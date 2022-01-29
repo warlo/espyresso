@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 import threading
@@ -5,14 +6,17 @@ import time
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-import config
 import pygame
-from boiler import Boiler
-from flow import Flow
-from pump import Pump
-from ranger import Ranger
-from timer import BrewingTimer
-from utils import WaveQueue, linear_transform
+
+from espyresso import config
+from espyresso.boiler import Boiler
+from espyresso.flow import Flow
+from espyresso.pump import Pump
+from espyresso.ranger import Ranger
+from espyresso.timer import BrewingTimer
+from espyresso.utils import WaveQueue, linear_transform
+
+logger = logging.getLogger(__name__)
 
 
 class Display(threading.Thread):
@@ -67,7 +71,7 @@ class Display(threading.Thread):
         self.flow = flow
         self.get_started_time = get_started_time
 
-        self.running = True
+        self._stop_event = threading.Event()
         self.wave_queues = wave_queues
 
         super().__init__(*args, **kwargs)
@@ -106,16 +110,14 @@ class Display(threading.Thread):
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: Optional[int] = None,
+        target_y: Optional[float] = None,
     ):
         if target_y:
             self.draw_target_line(
                 target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
             )
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
-        self.draw_coordinates(
-            list(queue), X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
-        )
+        self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
 
     def draw_y_axis(
         self,
@@ -202,7 +204,7 @@ class Display(threading.Thread):
 
     def draw_target_line(
         self,
-        target: int,
+        target: float,
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
@@ -233,11 +235,13 @@ class Display(threading.Thread):
             previous_point = point
 
     def stop(self) -> None:
-        self.running = False
+        logger.debug("Display stopping")
+        self._stop_event.set()
         pygame.quit()
+        logger.debug("Display stopped")
 
     def run(self) -> None:
-        while self.running:
+        while not self._stop_event.is_set():
             time_left = int(
                 config.TURN_OFF_SECONDS - (time.time() - self.get_started_time())
             )
@@ -275,7 +279,7 @@ class Display(threading.Thread):
 
         v = 25
         try:
-            while self.running and v < 1000:
+            while not self._stop_event.is_set() and v < 1000:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         pygame.quit()
@@ -287,8 +291,8 @@ class Display(threading.Thread):
                 self.wave_queues["flow"].add_to_queue(random.randint(1, 2))
                 self.wave_queues["boiler"].add_to_queue(random.randint(20, 80))
                 time.sleep(0.1)
-        except Exception as e:
-            print(e)
+        except Exception:
+            logger.exception("EXC")
             self.stop()
 
 

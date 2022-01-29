@@ -3,7 +3,8 @@ import threading
 import time
 
 import pigpio
-from pwm import PWM
+
+from espyresso.pwm import PWM
 
 
 class Pump:
