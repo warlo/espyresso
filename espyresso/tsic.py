@@ -22,6 +22,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from typing import Optional
 
 import pigpio
 
@@ -227,7 +228,9 @@ class Measurement(object):
     seconds_since_epoch.
     """
 
-    def __init__(self, degree_celsius, seconds_since_epoch):
+    def __init__(
+        self, degree_celsius: Optional[float], seconds_since_epoch: Optional[float]
+    ):
         self.degree_celsius = degree_celsius
         self.seconds_since_epoch = seconds_since_epoch
 
@@ -244,7 +247,7 @@ class Measurement(object):
             )
 
 
-Measurement.UNDEF = Measurement(None, None)
+Measurement.UNDEF = Measurement(None, None)  # type: ignore
 """ Undefined measurement """
 
 
