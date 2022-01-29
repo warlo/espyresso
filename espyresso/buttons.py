@@ -1,19 +1,27 @@
 import time
+from typing import TYPE_CHECKING, Callable
 
 import pigpio
+
+if TYPE_CHECKING:
+    from pigpio import pi
+
+    from espyresso.boiler import Boiler
+    from espyresso.display import Display
+    from espyresso.pump import Pump
 
 
 class Buttons:
     def __init__(
         self,
         *,
-        pigpio_pi=None,
-        boiler=None,
-        pump=None,
-        display=None,
-        button_one=None,
-        button_two=None,
-        turn_off_system=None
+        pigpio_pi: "pi",
+        boiler: "Boiler",
+        pump: "Pump",
+        display: "Display",
+        button_one: int,
+        button_two: int,
+        turn_off_system: Callable
     ):
         self.pigpio_pi = pigpio_pi
         self.button_one = button_one
@@ -35,7 +43,7 @@ class Buttons:
             self.button_two, pigpio.RISING_EDGE, self.callback_button_two
         )
 
-    def callback_button_one(self, gpio, level, tick):
+    def callback_button_one(self, gpio, level, tick) -> None:
         timestamp = time.time()
         while True:
             seconds = time.time() - timestamp
@@ -45,7 +53,7 @@ class Buttons:
                 return
             time.sleep(0.2)
 
-    def callback_button_two(self, gpio, level, tick):
+    def callback_button_two(self, gpio, level, tick) -> None:
         timestamp = time.time()
         while True:
             seconds = time.time() - timestamp
@@ -59,5 +67,5 @@ class Buttons:
                 return
             time.sleep(0.2)
 
-    def reset_button_one(self, gpio, level, tick):
+    def reset_button_one(self, gpio, level, tick) -> None:
         pass

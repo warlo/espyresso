@@ -4,16 +4,19 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Optional
 
 import pygame
 
 from espyresso import config
-from espyresso.boiler import Boiler
-from espyresso.flow import Flow
-from espyresso.pump import Pump
-from espyresso.ranger import Ranger
-from espyresso.timer import BrewingTimer
+
+if TYPE_CHECKING:
+    from espyresso.boiler import Boiler
+    from espyresso.flow import Flow
+    from espyresso.pump import Pump
+    from espyresso.ranger import Ranger
+    from espyresso.timer import BrewingTimer
+
 from espyresso.utils import WaveQueue, linear_transform
 
 logger = logging.getLogger(__name__)
@@ -23,13 +26,13 @@ class Display(threading.Thread):
     def __init__(
         self,
         *args,
-        boiler: Boiler,
-        brewing_timer: BrewingTimer,
-        pump: Pump,
-        ranger: Ranger,
-        flow: Flow,
+        boiler: "Boiler",
+        brewing_timer: "BrewingTimer",
+        pump: "Pump",
+        ranger: "Ranger",
+        flow: "Flow",
         get_started_time: Callable[[], float],
-        wave_queues: Dict[str, WaveQueue],
+        wave_queues: dict[str, WaveQueue],
         **kwargs,
     ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
@@ -62,7 +65,7 @@ class Display(threading.Thread):
         self.GREEN = (0, 255, 0)
         self.BLUE = (0, 0, 255)
 
-        self.notification = ""
+        self.notification: str = ""
 
         self.boiler = boiler
         self.brewing_timer = brewing_timer
@@ -78,7 +81,7 @@ class Display(threading.Thread):
 
     def generate_coordinate(
         self, temp, index, Y_MIN, Y_MAX, low, high
-    ) -> Tuple[int, float]:
+    ) -> tuple[int, float]:
         return (index, round(linear_transform(temp, low, high, Y_MAX, Y_MIN)))
 
     def generate_coordinates(
@@ -90,7 +93,7 @@ class Display(threading.Thread):
         Y_MAX: int,
         low: int,
         high: int,
-    ) -> List[Tuple[int, float]]:
+    ) -> list[tuple[int, float]]:
         return [
             self.generate_coordinate(
                 temp, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
@@ -137,7 +140,7 @@ class Display(threading.Thread):
             (high * number_of_steps - low * number_of_steps) / number_of_steps
         )
 
-        steps: List[Tuple[float, int]] = []
+        steps: list[tuple[float, int]] = []
         rounded = True
         for i in range(low * number_of_steps, high * number_of_steps, range_steps):
             closest_step = i / number_of_steps
