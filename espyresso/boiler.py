@@ -55,3 +55,7 @@ class Boiler:
 
         self.pwm.set_value(value)
         self.add_to_queue(round(value * 100, 1))
+
+    def stop(self):
+        self.boiler.set_pwm_override(None)
+        self.boiler.set_value(0)
