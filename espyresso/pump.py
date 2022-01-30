@@ -129,12 +129,12 @@ class Pump:
 
             time.sleep(0.05)
 
-        self.log_shot()
         return self.reset_routine()
 
     def reset_routine(self):
         if self.pumping:
             self.toggle_pump()
+        self.log_shot()
         self.set_pwm_value(1)
         self.boiler.set_pwm_override(None)
         self.brewing_timer.stop_timer()
