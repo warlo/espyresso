@@ -11,7 +11,6 @@ from espyresso.boiler import Boiler
 from espyresso.buttons import Buttons
 from espyresso.display import Display
 from espyresso.flow import Flow
-from espyresso.pid import PID
 from espyresso.pump import Pump
 from espyresso.ranger import Ranger
 from espyresso.temperature_thread import TemperatureThread

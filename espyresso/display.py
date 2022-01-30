@@ -246,7 +246,8 @@ class Display(threading.Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             time_left = int(
-                config.TURN_OFF_SECONDS - (time.perf_counter() - self.get_started_time())
+                config.TURN_OFF_SECONDS
+                - (time.perf_counter() - self.get_started_time())
             )
             self.screen.fill(self.BLACK)
             self.draw_degrees(
