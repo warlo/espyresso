@@ -1,23 +1,29 @@
 #!/usr/bin/env python3
 import threading
 import time
+from typing import TYPE_CHECKING, Callable
 
 import pigpio
 
 from espyresso.pwm import PWM
 
+if TYPE_CHECKING:
+    from espyresso.boiler import Boiler
+    from espyresso.flow import Flow
+    from espyresso.timer import BrewingTimer
+
 
 class Pump:
     def __init__(
         self,
-        pigpio_pi=None,
-        boiler=None,
-        flow=None,
-        pump_out_gpio=None,
-        pump_pwm_gpio=None,
-        reset_started_time=None,
+        pigpio_pi: pigpio.pi,
+        boiler: "Boiler",
+        flow: "Flow",
+        pump_out_gpio: int,
+        pump_pwm_gpio: int,
+        reset_started_time: Callable,
+        brewing_timer: "BrewingTimer",
         pumping=False,
-        brewing_timer=None,
     ):
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler

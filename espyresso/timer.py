@@ -67,7 +67,7 @@ class BrewingTimer(threading.Thread):
         self.stopped = None
         self.started = time.time()
 
-    def stop_timer(self, *, subtract_time=0) -> None:
+    def stop_timer(self, *, subtract_time: float = 0) -> None:
         self.stopped = time.time() - subtract_time
 
     def reset_timer(self) -> None:
