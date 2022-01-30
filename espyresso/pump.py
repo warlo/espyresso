@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Callable
 
 import pigpio
 
+from espyresso import config
 from espyresso.pwm import PWM
 
 if TYPE_CHECKING:
@@ -128,6 +129,7 @@ class Pump:
 
             time.sleep(0.05)
 
+        self.log_shot()
         return self.reset_routine()
 
     def reset_routine(self):
@@ -147,3 +149,14 @@ class Pump:
             value = 1.0
 
         self.pwm.set_value(value)
+
+    def log_shot(self):
+        preinfuse_ml = (self.stopped_preinfuse or 0) - (self.started_preinfuse or 0)
+        shot_log = (
+            f"\n{time.strftime('%Y-%m-%dT%H:%M:%S%z')};"
+            f"Time: {self.brewing_timer.get_time_since_started()};"
+            f"Shot mL {self.flow.get_millilitres()};"
+            f"Preinfuse mL: {preinfuse_ml};"
+        )
+        with open(config.SHOT_COUNT_FILE, "a") as f:
+            f.write(shot_log)
