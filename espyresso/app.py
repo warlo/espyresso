@@ -58,6 +58,7 @@ class Espyresso:
         )
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
+            boiling=config.DEBUG,
             pwm_gpio=config.BOILER_PWM_GPIO,
             reset_started_time=self.reset_started_time,
             add_to_queue=self.boiler_queue.add_to_queue,
@@ -188,9 +189,10 @@ def run():
     if not config.DEBUG:
         espyresso = Espyresso()
     else:
-        from mock import Mock
+        from espyresso.simulator_mock import get_espyresso_simulator
 
-        espyresso = Espyresso(pigpio_pi=Mock())
+        espyresso = get_espyresso_simulator()
+
     try:
         signal.signal(signal.SIGHUP, handler)
         signal.signal(signal.SIGINT, espyresso.signal_handler)

@@ -3,29 +3,35 @@
 import logging
 import threading
 import time
+from typing import TYPE_CHECKING, Callable
 
 from espyresso import config
 from espyresso.tsic import Measurement, TsicInputChannel
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from pigpio import pi
+
+    from espyresso.boiler import Boiler
+    from espyresso.pid import PID
+    from espyresso.pump import Pump
+
 
 class TemperatureThread(threading.Thread):
     def __init__(
         self,
         *args,
-        pigpio_pi=None,
-        boiler=None,
-        pump=None,
-        pid=None,
-        get_started_time=None,
-        add_to_queue=None,
+        pigpio_pi: "pi",
+        boiler: "Boiler",
+        pid: "PID",
+        get_started_time: Callable,
+        add_to_queue: Callable,
         **kwargs,
     ):
         self.get_started_time = get_started_time
 
         self.boiler = boiler
-        self.pump = pump
 
         self.pid = pid
 
@@ -53,9 +59,10 @@ class TemperatureThread(threading.Thread):
                     self.tsic._measure_waiting.wait(5)
 
                 latest_measurement = self.tsic.measurement
+
                 if (
                     prev_timestamp == latest_measurement.seconds_since_epoch
-                    or latest_measurement == Measurement.UNDEF
+                    or latest_measurement.degree_celsius is None
                 ):
                     logger.warning(
                         f"Undefined or no new temperature measurement: "
@@ -74,8 +81,7 @@ class TemperatureThread(threading.Thread):
                 self.add_to_queue(latest_measurement.degree_celsius)
                 lock.release()
 
-                if config.DEBUG:
-                    logger.debug(f"Temp: {round(temp, 2)} - PID: {pid_value}")
+                logger.debug(f"Temp: {round(temp, 2)} - PID: {pid_value}")
 
     def stop(self):
         logger.debug("temperature_thread stopping")
