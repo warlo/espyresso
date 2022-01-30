@@ -42,9 +42,14 @@ class FlowSimulator(PigpioSimulator):
     name = "flow"
 
     def run(self):
+        time.sleep(10)
+        last_flow = time.perf_counter()
         while SIMULATOR_RUNNING:
-            time.sleep(0.3)
-            # self.callback(0, 0, 0)
+            time.sleep(0.2)
+            self.callback(0, 0, 0)
+            if time.perf_counter() - last_flow > 10:
+                time.sleep(10)
+                last_flow = time.perf_counter()
 
 
 class RangerRiseSimulator(PigpioSimulator):

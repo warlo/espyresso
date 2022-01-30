@@ -5,7 +5,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Callable
 
-from espyresso import config
+from espyresso import config, flow
 from espyresso.pid import PID
 from espyresso.tsic import TsicInputChannel
 
@@ -33,6 +33,7 @@ class TemperatureThread(threading.Thread):
         self.get_started_time = get_started_time
 
         self.boiler = boiler
+        self.flow = flow
 
         self.pid = PID()
         self.pid.set_pid_gains(config.KP, config.KI, config.KD)
@@ -46,6 +47,17 @@ class TemperatureThread(threading.Thread):
 
         self.lock = threading.RLock()
         super().__init__(*args, **kwargs)
+
+    def update_boiler_value(self, pid_value: float) -> None:
+
+        flow_ml_per_sec = self.flow.get_millilitres_per_sec() or 0
+        flow_term = min(flow_ml_per_sec / 10, 0.25)
+
+        value = pid_value + flow_term
+        logger.debug(
+            f"Updating boiler: value {value}; pid {pid_value}; flow_term {flow_term}"
+        )
+        self.boiler.set_value(value)
 
     def run(self):
         with self.tsic:
@@ -78,7 +90,7 @@ class TemperatureThread(threading.Thread):
 
                 temp = latest_measurement.degree_celsius
                 pid_value = self.pid.update(config.TARGET_TEMP - temp, temp)
-                self.boiler.set_value(pid_value)
+                self.update_boiler_value(pid_value)
 
                 lock = threading.RLock()
                 lock.acquire()
