@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 import threading
 import time
 from typing import TYPE_CHECKING, Callable
@@ -11,6 +12,9 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.timer import BrewingTimer
+
+
+logger = logging.getLogger(__name__)
 
 
 class Pump:
@@ -62,7 +66,7 @@ class Pump:
         if self.stopped_preinfuse and self.started_preinfuse:
             return self.stopped_preinfuse - self.started_preinfuse
         if self.started_preinfuse and self.pumping:
-            return time.time() - self.started_preinfuse
+            return time.perf_counter() - self.started_preinfuse
         return 0
 
     def brew_shot(self):
@@ -75,12 +79,17 @@ class Pump:
             self.brew_thread.start()
 
     def brew_shot_routine(self):
-        # If already pumping then reset the routing
+        logger.debug("Starting brew shot routine!")
+
+        # If already pumping then reset the routine
         if self.pumping:
             return self.reset_routine()
 
         # Reset flow meter
         self.flow.reset_pulse_count()
+
+        # Disable automatic BrewingTimer
+        self.brewing_timer.disable_automatic_timing()
 
         # Hard-code boiler to 30% during preinfuse and start pump at 0.5 PWM (2-3 bars?)
         self.set_pwm_value(0.5)
@@ -88,18 +97,18 @@ class Pump:
         self.toggle_pump()
 
         # Set started preinfuse time
-        self.started_preinfuse = time.time()
+        self.started_preinfuse = time.perf_counter()
         self.stopped_preinfuse = None
 
         # Sleep until flow is above 30ml or 7seconds
         while self.pumping and not (
             self.flow.get_millilitres() > 30
-            or (time.time() - self.started_preinfuse) > 7
+            or (time.perf_counter() - self.started_preinfuse) > 7
         ):
             time.sleep(0.1)
 
         # Stop preinfuse timer
-        self.stopped_preinfuse = time.time()
+        self.stopped_preinfuse = time.perf_counter()
 
         # Start brewing timer
         self.brewing_timer.reset_timer()
@@ -127,8 +136,9 @@ class Pump:
         self.set_pwm_value(1)
         self.boiler.set_pwm_override(None)
         self.brewing_timer.stop_timer()
+        self.brewing_timer.enable_automatic_timing()
         if not self.stopped_preinfuse:
-            self.stopped_preinfuse = time.time()
+            self.stopped_preinfuse = time.perf_counter()
 
     def set_pwm_value(self, value):
         if value < 0.0:

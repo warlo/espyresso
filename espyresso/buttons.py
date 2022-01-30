@@ -44,9 +44,9 @@ class Buttons:
         )
 
     def callback_button_one(self, gpio, level, tick) -> None:
-        timestamp = time.time()
+        timestamp = time.perf_counter()
         while True:
-            seconds = time.time() - timestamp
+            seconds = time.perf_counter() - timestamp
             if not self.pigpio_pi.read(self.button_one):
                 if seconds > 0.25:
                     self.pump.brew_shot()
@@ -54,9 +54,9 @@ class Buttons:
             time.sleep(0.2)
 
     def callback_button_two(self, gpio, level, tick) -> None:
-        timestamp = time.time()
+        timestamp = time.perf_counter()
         while True:
-            seconds = time.time() - timestamp
+            seconds = time.perf_counter() - timestamp
             self.display.notification = str(int(seconds) + 1)
             if seconds >= 2:
                 self.turn_off_system()

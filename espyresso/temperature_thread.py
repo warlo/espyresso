@@ -49,7 +49,8 @@ class TemperatureThread(threading.Thread):
             prev_timestamp = None
             while not self._stop_event.is_set():
                 if (
-                    time.time() - self.get_started_time() > config.TURN_OFF_SECONDS
+                    time.perf_counter() - self.get_started_time()
+                    > config.TURN_OFF_SECONDS
                     and self.boiler.get_boiling()
                 ):
                     # Turn off boiler after 10 minutes

@@ -117,7 +117,9 @@ class MeasureWaiting:
             self.preheated = True
             self.current_temp += -0.2 + ((1 + self.boiler.pwm.value) ** 2 - 1) * 0.6
 
-        self.tsic.return_value.measurement = Measurement(self.current_temp, time.time())
+        self.tsic.return_value.measurement = Measurement(
+            self.current_temp, time.perf_counter()
+        )
 
 
 def get_espyresso_simulator():

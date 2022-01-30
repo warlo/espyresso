@@ -246,7 +246,7 @@ class Display(threading.Thread):
     def run(self) -> None:
         while not self._stop_event.is_set():
             time_left = int(
-                config.TURN_OFF_SECONDS - (time.time() - self.get_started_time())
+                config.TURN_OFF_SECONDS - (time.perf_counter() - self.get_started_time())
             )
             self.screen.fill(self.BLACK)
             self.draw_degrees(
@@ -312,7 +312,7 @@ if __name__ == "__main__":
     ranger.get_current_distance = lambda: 0
     flow = MagicMock()
     flow.get_millilitres = lambda: 10.0123
-    time_started = time.time()
+    time_started = time.perf_counter()
     wave_queues = {
         "temp": WaveQueue(
             90,

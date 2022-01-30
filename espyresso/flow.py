@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import pigpio
 
@@ -8,6 +9,8 @@ if TYPE_CHECKING:
     from pigpio import pi
 
     from espyresso.utils import WaveQueue
+
+logger = logging.getLogger(__name__)
 
 
 class Flow:
@@ -23,28 +26,30 @@ class Flow:
 
         self.flow_queue = flow_queue
 
-        self.pulse_start: float = time.time()
+        self.pulse_start: float = time.perf_counter()
         self.pulse_count: int = 0
 
-        self.last_time: float = time.time()
+        self.last_time: float = time.perf_counter()
         self.last_pulse_count: int = 0
-        self.last_pulse_time: float = 0
+        self.last_pulse_time: Optional[float] = None
 
-    def reset_pulse_count(self):
+    def reset_pulse_count(self) -> None:
         self.pulse_count = 0
         self.last_pulse_count = 0
-        self.pulse_start = time.time()
-        self.last_time = time.time()
+        self.pulse_start = time.perf_counter()
+        self.last_time = time.perf_counter()
         self.flow_queue.clear()
 
     def pulse_callback(self, gpio: int, level: int, tick: int) -> None:
 
         self.pulse_count += 1
         self.flow_queue.add_to_queue(self.get_millilitres_per_sec())
-        self.last_pulse_time = time.time()
+        self.last_pulse_time = time.perf_counter()
 
-    def get_time_since_last_pulse(self):
-        return time.time() - self.last_pulse_time
+    def get_time_since_last_pulse(self) -> float:
+        if not self.last_pulse_time:
+            return float("inf")
+        return time.perf_counter() - self.last_pulse_time
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -66,7 +71,7 @@ class Flow:
         return self.get_litres_diff() * 1000
 
     def get_millilitres_per_sec(self) -> float:
-        current_time = time.time()
+        current_time = time.perf_counter()
         time_diff = current_time - self.last_time
         self.last_time = current_time
 

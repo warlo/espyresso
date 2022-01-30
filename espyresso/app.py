@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class Espyresso:
     def __init__(self, pigpio_pi=None):
-        self.started_time = 0.0
+        self.started_time = time.perf_counter()
 
         self.pigpio_pi = pigpio_pi
         if not self.pigpio_pi:
@@ -45,8 +45,8 @@ class Espyresso:
             flow_in_gpio=config.FLOW_IN_GPIO,
             flow_queue=self.flow_queue,
         )
-
         self.brewing_timer = BrewingTimer(flow=self.flow)
+
         self.boiler_queue = WaveQueue(
             0,
             100,
@@ -77,7 +77,6 @@ class Espyresso:
             reset_started_time=self.reset_started_time,
             brewing_timer=self.brewing_timer,
         )
-        self.started_time = time.time()
 
         self.pid = PID()
         self.pid.set_pid_gains(config.KP, config.KI, config.KD)
@@ -127,7 +126,7 @@ class Espyresso:
         self.running = True
 
     def reset_started_time(self) -> None:
-        self.started_time = time.time()
+        self.started_time = time.perf_counter()
 
     def get_started_time(self) -> float:
         return self.started_time

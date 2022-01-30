@@ -344,7 +344,7 @@ class TsicInputChannel(object):
                 self.__degree_celsius = (
                     packet_bytes[0] * 256 + packet_bytes[1]
                 ) / 2047.0 * (150 + 50) - 50
-                self.__timestamp = time.time()
+                self.__timestamp = time.perf_counter()
                 measurement = self.measurement
 
             # print('====> Temperature {0}°C'.format(self.__degree_celsius))

@@ -21,7 +21,7 @@ class Timer:
         if self.stopped and self.started:
             return self.stopped - self.started
         if self.started:
-            return time.time() - self.started
+            return time.perf_counter() - self.started
         return 0
 
     def timer_running(self) -> bool:
@@ -29,10 +29,10 @@ class Timer:
 
     def start_timer(self) -> None:
         self.stopped = None
-        self.started = time.time()
+        self.started = time.perf_counter()
 
     def stop_timer(self, *, subtract_time=0) -> None:
-        self.stopped = time.time() - subtract_time
+        self.stopped = time.perf_counter() - subtract_time
 
     def reset_timer(self) -> None:
         self.stopped = None
@@ -44,31 +44,41 @@ class BrewingTimer(threading.Thread):
         self._stop_event = threading.Event()
 
         self.flow = flow
+        self.enable_automatic_timing_flag = True
         self.started: Optional[float] = None
         self.stopped: Optional[float] = None
         super().__init__(*args, **kwargs)
 
     def get_time_since_started(self) -> float:
+        logger.debug(f"TIME since started {self.started}, {self.stopped}")
         if self.stopped and self.started:
             return self.stopped - self.started
         if self.started:
-            return time.time() - self.started
+            return time.perf_counter() - self.started
         return 0
+
+    def disable_automatic_timing(self) -> None:
+        self.enable_automatic_timing_flag = False
+
+    def enable_automatic_timing(self) -> None:
+        self.enable_automatic_timing_flag = True
 
     def get_time_since_stopped(self) -> float:
         if self.stopped:
-            return time.time() - self.stopped
+            return time.perf_counter() - self.stopped
         return 999999
 
     def timer_running(self) -> bool:
         return bool(self.started and not self.stopped)
 
     def start_timer(self) -> None:
+        logger.debug("Starting timer")
         self.stopped = None
-        self.started = time.time()
+        self.started = time.perf_counter()
 
     def stop_timer(self, *, subtract_time: float = 0) -> None:
-        self.stopped = time.time() - subtract_time
+        logger.debug("Stopping timer")
+        self.stopped = time.perf_counter() - subtract_time
 
     def reset_timer(self) -> None:
         self.stopped = None
@@ -81,6 +91,11 @@ class BrewingTimer(threading.Thread):
 
     def run(self) -> None:
         while not self._stop_event.is_set():
+
+            # Skip timer thread while automatic pumping e.g. brew shot routine
+            if not self.enable_automatic_timing_flag:
+                time.sleep(1)
+                continue
 
             if (
                 not self.timer_running()
