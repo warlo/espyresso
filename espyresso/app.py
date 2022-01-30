@@ -18,7 +18,13 @@ from espyresso.temperature_thread import TemperatureThread
 from espyresso.timer import BrewingTimer
 from espyresso.utils import WaveQueue
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(
+    filename=config.LOG_FILE,
+    filemode="a",
+    format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S%z",
+    level=logging.DEBUG,
+)
 
 logger = logging.getLogger(__name__)
 

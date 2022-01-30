@@ -9,6 +9,7 @@ if DEBUG:
 
     sys.modules["pigpio"] = MagicMock()
 
+LOG_FILE = "espyresso.log"
 TSIC_GPIO = 24
 BOILER_PWM_GPIO = 12
 
