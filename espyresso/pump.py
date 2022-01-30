@@ -2,7 +2,7 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Optional
 
 import pigpio
 
@@ -40,17 +40,17 @@ class Pump:
         self.pumping = pumping
         self.reset_started_time = reset_started_time
 
-        self.started_brew = None
-        self.stopped_brew = None
+        self.started_brew: Optional[float] = None
+        self.stopped_brew: Optional[float] = None
         self.brewing_timer = brewing_timer
 
-        self.started_preinfuse = None
-        self.stopped_preinfuse = None
+        self.started_preinfuse: Optional[float] = None
+        self.stopped_preinfuse: Optional[float] = None
 
         self.set_pwm_value(1)
         self.brew_thread = threading.Thread(target=self.brew_shot_routine)
 
-    def toggle_pump(self):
+    def toggle_pump(self) -> None:
         self.pumping = not self.pumping
         if not self.pumping:
             self.pigpio_pi.write(self.pump_out_gpio, 0)
@@ -58,19 +58,19 @@ class Pump:
             self.reset_started_time()
             self.pigpio_pi.write(self.pump_out_gpio, 1)
 
-    def stop_pump(self):
+    def stop_pump(self) -> None:
         self.pigpio_pi.write(self.pump_out_gpio, 0)
         self.boiler.set_pwm_override(None)
         self.pumping = False
 
-    def get_time_since_started_preinfuse(self):
+    def get_time_since_started_preinfuse(self) -> float:
         if self.stopped_preinfuse and self.started_preinfuse:
             return self.stopped_preinfuse - self.started_preinfuse
         if self.started_preinfuse and self.pumping:
             return time.perf_counter() - self.started_preinfuse
         return 0
 
-    def brew_shot(self):
+    def brew_shot(self) -> None:
         if self.brew_thread.is_alive():
             self.brewing_timer.stop_timer()
             self.stop_pump()
@@ -79,7 +79,7 @@ class Pump:
             self.reset_started_time()
             self.brew_thread.start()
 
-    def brew_shot_routine(self):
+    def brew_shot_routine(self) -> None:
         logger.debug("Starting brew shot routine!")
 
         # If already pumping then reset the routine
@@ -142,7 +142,7 @@ class Pump:
         if not self.stopped_preinfuse:
             self.stopped_preinfuse = time.perf_counter()
 
-    def set_pwm_value(self, value):
+    def set_pwm_value(self, value: float) -> None:
         if value < 0.0:
             value = 0.0
         elif value > 1.0:
@@ -150,7 +150,7 @@ class Pump:
 
         self.pwm.set_value(value)
 
-    def log_shot(self):
+    def log_shot(self) -> None:
         preinfuse_ml = (self.stopped_preinfuse or 0) - (self.started_preinfuse or 0)
         shot_log = (
             f"\n{time.strftime('%Y-%m-%dT%H:%M:%S%z')};"

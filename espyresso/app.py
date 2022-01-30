@@ -84,10 +84,6 @@ class Espyresso:
             brewing_timer=self.brewing_timer,
         )
 
-        self.pid = PID()
-        self.pid.set_pid_gains(config.KP, config.KI, config.KD)
-        self.pid.set_integrator_limits(config.IMIN, config.IMAX)
-
         self.temp_queue = WaveQueue(
             90,
             100,
@@ -97,11 +93,11 @@ class Espyresso:
             Y_MAX=config.TEMP_Y_MAX,
             target_y=config.TARGET_TEMP,
         )
-        self.temperature_thread = TemperatureThread(
+        self.temperature = TemperatureThread(
             get_started_time=self.get_started_time,
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
-            pid=self.pid,
+            flow=self.flow,
             add_to_queue=self.temp_queue.add_to_queue,
         )
 
@@ -141,19 +137,20 @@ class Espyresso:
         self.reset_started_time()
 
         self.display.start()
-        self.temperature_thread.start()
+
+        self.temperature.start()
         self.ranger.start()
         self.brewing_timer.start()
 
         self.display.join()
-        self.temperature_thread.join()
+        self.temperature.join()
         self.ranger.join()
         self.brewing_timer.join()
 
     def stop(self) -> None:
         self.brewing_timer.stop()
         self.ranger.stop()
-        self.temperature_thread.stop()
+        self.temperature.stop()
         self.display.stop()
         self.boiler.stop()
 

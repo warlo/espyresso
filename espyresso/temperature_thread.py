@@ -6,16 +6,17 @@ import time
 from typing import TYPE_CHECKING, Callable
 
 from espyresso import config
-from espyresso.tsic import Measurement, TsicInputChannel
+from espyresso.pid import PID
+from espyresso.tsic import TsicInputChannel
 
 logger = logging.getLogger(__name__)
+
 
 if TYPE_CHECKING:
     from pigpio import pi
 
     from espyresso.boiler import Boiler
-    from espyresso.pid import PID
-    from espyresso.pump import Pump
+    from espyresso.flow import Flow
 
 
 class TemperatureThread(threading.Thread):
@@ -24,7 +25,7 @@ class TemperatureThread(threading.Thread):
         *args,
         pigpio_pi: "pi",
         boiler: "Boiler",
-        pid: "PID",
+        flow: "Flow",
         get_started_time: Callable,
         add_to_queue: Callable,
         **kwargs,
@@ -33,7 +34,9 @@ class TemperatureThread(threading.Thread):
 
         self.boiler = boiler
 
-        self.pid = pid
+        self.pid = PID()
+        self.pid.set_pid_gains(config.KP, config.KI, config.KD)
+        self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
         self.tsic = TsicInputChannel(pigpio_pi=pigpio_pi, gpio=config.TSIC_GPIO)
 
@@ -82,7 +85,7 @@ class TemperatureThread(threading.Thread):
                 self.add_to_queue(latest_measurement.degree_celsius)
                 lock.release()
 
-                logger.debug(f"Temp: {round(temp, 2)} - PID: {pid_value}")
+                logger.debug(f"Temp: {round(temp, 2)} - PID {self.pid}: {pid_value}")
 
     def stop(self):
         logger.debug("temperature_thread stopping")

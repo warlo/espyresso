@@ -1,19 +1,23 @@
 import logging
+from typing import TYPE_CHECKING, Callable
 
 from espyresso import config
 from espyresso.pwm import PWM
 
 logger = logging.getLogger(__name__)
 
+if TYPE_CHECKING:
+    from pigpio import pi
+
 
 class Boiler:
     def __init__(
         self,
-        pigpio_pi=None,
-        pwm_gpio=None,
-        reset_started_time=None,
-        boiling=False,
-        add_to_queue=None,
+        pigpio_pi: "pi",
+        pwm_gpio: int,
+        reset_started_time: Callable,
+        add_to_queue: Callable,
+        boiling: bool = False,
     ):
         logger.debug(f"Boiler INIT: gpio {pwm_gpio} boiling {boiling}")
 
