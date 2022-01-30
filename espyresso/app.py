@@ -39,7 +39,7 @@ class Espyresso:
 
         self.flow_queue = WaveQueue(
             0,
-            2,
+            3,
             X_MIN=config.FLOW_X_MIN,
             X_MAX=config.FLOW_X_MAX,
             Y_MIN=config.FLOW_Y_MIN,

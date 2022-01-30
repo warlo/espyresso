@@ -1,3 +1,4 @@
+import math
 from collections import deque
 
 from espyresso.config import ZOOM
@@ -39,7 +40,7 @@ class WaveQueue(deque[float]):
         self.append(new_value)
 
         if new_value > self.high:
-            self.high = int(new_value)
+            self.high = int(math.ceil(new_value))
         elif new_value < self.low:
             self.low = int(new_value)
 
@@ -49,7 +50,7 @@ class WaveQueue(deque[float]):
         if int(popped) >= self.low:
             self.low = int(min(min(self), self.min_low))
         elif int(popped) >= self.high:
-            self.high = int(max(max(self), self.max_high))
+            self.high = int(math.ceil(max(max(self), self.max_high)))
 
 
 def linear_transform(x: float, a: float, b: float, c: float, d: float) -> float:
