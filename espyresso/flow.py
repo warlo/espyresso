@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Optional
 
 import pigpio
 
+from espyresso import config
+
 if TYPE_CHECKING:
     from pigpio import pi
 
@@ -14,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class Flow:
-    def __init__(self, pigpio_pi: "pi", flow_in_gpio: int, flow_queue: "WaveQueue"):
+    def __init__(self, pigpio_pi: "pi", flow_queue: "WaveQueue"):
         logger.debug("Flow initializing")
         self.pigpio_pi = pigpio_pi
-        self.flow_in_gpio = flow_in_gpio
+        self.flow_in_gpio = config.FLOW_IN_GPIO
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
         self.pigpio_pi.callback(
             self.flow_in_gpio, pigpio.RISING_EDGE, self.pulse_callback

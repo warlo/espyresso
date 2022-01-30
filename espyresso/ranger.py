@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Deque
 
 import pigpio
 
+from espyresso import config
 from espyresso.utils import linear_transform
 
 logger = logging.getLogger(__name__)
@@ -21,13 +22,11 @@ class Ranger(threading.Thread):
         self,
         *args,
         pigpio_pi: "pi",
-        ranger_trigger_out_gpio: int,
-        ranger_echo_in_gpio: int,
         **kwargs,
     ):
         self.pigpio_pi = pigpio_pi
-        self.ranger_echo_in_gpio = ranger_echo_in_gpio
-        self.ranger_trigger_out_gpio = ranger_trigger_out_gpio
+        self.ranger_echo_in_gpio = config.RANGER_ECHO_IN
+        self.ranger_trigger_out_gpio = config.RANGER_TRIGGER_OUT
 
         self.pigpio_pi.set_mode(self.ranger_echo_in_gpio, pigpio.INPUT)
         self.pigpio_pi.set_mode(self.ranger_trigger_out_gpio, pigpio.OUTPUT)

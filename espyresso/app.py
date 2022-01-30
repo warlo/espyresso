@@ -47,7 +47,6 @@ class Espyresso:
         )
         self.flow = Flow(
             pigpio_pi=self.pigpio_pi,
-            flow_in_gpio=config.FLOW_IN_GPIO,
             flow_queue=self.flow_queue,
         )
         self.brewing_timer = BrewingTimer(flow=self.flow)
@@ -64,21 +63,14 @@ class Espyresso:
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
             boiling=config.DEBUG,
-            pwm_gpio=config.BOILER_PWM_GPIO,
             reset_started_time=self.reset_started_time,
             add_to_queue=self.boiler_queue.add_to_queue,
         )
-        self.ranger = Ranger(
-            pigpio_pi=self.pigpio_pi,
-            ranger_echo_in_gpio=config.RANGER_ECHO_IN,
-            ranger_trigger_out_gpio=config.RANGER_TRIGGER_OUT,
-        )
+        self.ranger = Ranger(pigpio_pi=self.pigpio_pi)
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
             flow=self.flow,
-            pump_pwm_gpio=config.PUMP_PWM_GPIO,
-            pump_out_gpio=config.PUMP_OUT_GPIO,
             reset_started_time=self.reset_started_time,
             brewing_timer=self.brewing_timer,
         )
@@ -119,8 +111,6 @@ class Espyresso:
             boiler=self.boiler,
             pump=self.pump,
             display=self.display,
-            button_one=config.BUTTON_ONE_GPIO,
-            button_two=config.BUTTON_TWO_GPIO,
             turn_off_system=self.turn_off_system,
         )
 

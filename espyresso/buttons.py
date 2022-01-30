@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Callable
 
 import pigpio
 
+from espyresso import config
+
 if TYPE_CHECKING:
     from pigpio import pi
 
@@ -19,13 +21,11 @@ class Buttons:
         boiler: "Boiler",
         pump: "Pump",
         display: "Display",
-        button_one: int,
-        button_two: int,
         turn_off_system: Callable
     ):
         self.pigpio_pi = pigpio_pi
-        self.button_one = button_one
-        self.button_two = button_two
+        self.button_one = config.BUTTON_ONE_GPIO
+        self.button_two = config.BUTTON_TWO_GPIO
         self.boiler = boiler
         self.pump = pump
         self.display = display

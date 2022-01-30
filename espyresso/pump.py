@@ -24,8 +24,6 @@ class Pump:
         pigpio_pi: pigpio.pi,
         boiler: "Boiler",
         flow: "Flow",
-        pump_out_gpio: int,
-        pump_pwm_gpio: int,
         reset_started_time: Callable,
         brewing_timer: "BrewingTimer",
         pumping=False,
@@ -33,10 +31,10 @@ class Pump:
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
         self.flow = flow
-        self.pump_out_gpio = pump_out_gpio
+        self.pump_out_gpio = config.PUMP_OUT_GPIO
         self.pigpio_pi.set_mode(self.pump_out_gpio, pigpio.OUTPUT)
 
-        self.pwm = PWM(pigpio_pi, pump_pwm_gpio, 1000)
+        self.pwm = PWM(pigpio_pi, config.PUMP_PWM_GPIO, 1000)
         self.pumping = pumping
         self.reset_started_time = reset_started_time
 

@@ -14,14 +14,13 @@ class Boiler:
     def __init__(
         self,
         pigpio_pi: "pi",
-        pwm_gpio: int,
         reset_started_time: Callable,
         add_to_queue: Callable,
         boiling: bool = False,
     ):
-        logger.debug(f"Boiler INIT: gpio {pwm_gpio} boiling {boiling}")
+        logger.debug(f"Boiler INIT: gpio {config.BOILER_PWM_GPIO} boiling {boiling}")
 
-        self.pwm = PWM(pigpio_pi, pwm_gpio, 2)
+        self.pwm = PWM(pigpio_pi, config.BOILER_PWM_GPIO, 2)
         self.boiling = boiling
         self.reset_started_time = reset_started_time
 
