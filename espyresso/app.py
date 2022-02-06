@@ -18,7 +18,7 @@ from espyresso.timer import BrewingTimer
 from espyresso.utils import WaveQueue
 
 logging.basicConfig(
-    filename=config.LOG_FILE,
+    filename=f"log/{time.strftime('%Y-%m-%d-%H:%M')}.log",
     filemode="a",
     format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S%z",
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 class Espyresso:
     def __init__(self, pigpio_pi=None):
         self.started_time = time.perf_counter()
+        logger.debug("STARTING ESPYRESSO")
 
         self.pigpio_pi = pigpio_pi
         if not self.pigpio_pi:
