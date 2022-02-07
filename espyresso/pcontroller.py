@@ -254,13 +254,13 @@ class PController:
         print("maxAllowablePowerForElement", maxAllowablePowerForElement)
 
         print("heaterPower0", self.heaterPower)
-        self.heaterPower = min(1350.0, self.heaterPower)
+        self.heaterPower = min(config.MAX_BOILER_POWER, self.heaterPower)
         print("heaterPower1", self.heaterPower)
         self.heaterPower = min(maxAllowablePowerForElement, self.heaterPower)
         print("heaterPower2", self.heaterPower)
         self.heaterPower = max(0.0, self.heaterPower)
         print("heaterPower3", self.heaterPower)
-        normalizedHeaterPower = self.heaterPower / 1350
+        normalizedHeaterPower = self.heaterPower / config.MAX_BOILER_POWER
         normalizedHeaterPower = max(normalizedHeaterPower, 0.0)
         normalizedHeaterPower = min(normalizedHeaterPower, 1.0)
         print("heaterPower normalized", normalizedHeaterPower)

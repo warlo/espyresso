@@ -63,6 +63,9 @@ ZOOM = 2
 
 # characteristics of the temperature controller
 
+MAX_BOILER_POWER = 1350.0
+# W the boiler can use
+
 BREW_SETPOINT = 95.0
 
 ELEMENT_MAX_TEMPERATURE = 190.0
