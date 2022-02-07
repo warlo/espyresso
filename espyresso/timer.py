@@ -50,7 +50,6 @@ class BrewingTimer(threading.Thread):
         super().__init__(*args, **kwargs)
 
     def get_time_since_started(self) -> float:
-        logger.debug(f"TIME since started {self.started}, {self.stopped}")
         if self.stopped and self.started:
             return self.stopped - self.started
         if self.started:
