@@ -63,7 +63,8 @@ class Display(threading.Thread):
         self.WHITE = (255, 255, 255)
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
-        self.BLUE = (0, 0, 255)
+        self.LIGHT_BLUE = (173, 216, 230)
+        self.ORANGE = (255, 140, 0)
 
         self.notification: str = ""
 
@@ -80,13 +81,13 @@ class Display(threading.Thread):
         super().__init__(*args, **kwargs)
 
     def generate_coordinate(
-        self, temp, index, Y_MIN, Y_MAX, low, high
+        self, value, index, Y_MIN, Y_MAX, low, high
     ) -> tuple[int, float]:
-        return (index, round(linear_transform(temp, low, high, Y_MAX, Y_MIN)))
+        return (index, round(linear_transform(value, low, high, Y_MAX, Y_MIN)))
 
     def generate_coordinates(
         self,
-        queue: WaveQueue,
+        values: list[float],
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
@@ -96,9 +97,9 @@ class Display(threading.Thread):
     ) -> list[tuple[int, float]]:
         return [
             self.generate_coordinate(
-                temp, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
+                value, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
             )
-            for index, temp in enumerate(queue)
+            for index, value in enumerate(values)
         ]
 
     def draw_notification(self) -> None:
@@ -113,11 +114,11 @@ class Display(threading.Thread):
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: Optional[float] = None,
+        target_y: bool = False,
     ):
         if target_y:
             self.draw_target_line(
-                target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
+                config.TARGET_TEMP, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
             )
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
         self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
@@ -158,7 +159,7 @@ class Display(threading.Thread):
             if rounded:
                 step = round(step)
             label = self.small_font.render("{}".format(str(step)), 1, self.WHITE)
-            self.screen.blit(label, (X_MIN - 24, y_val - 16))  # Number on Y-axis step
+            self.screen.blit(label, (X_MIN - 24, y_val - 8))  # Number on Y-axis step
 
             # Transparent line
             horizontal_line = pygame.Surface((X_MAX - X_MIN, 1), flags=pygame.SRCALPHA)
@@ -167,9 +168,14 @@ class Display(threading.Thread):
             )  # You can change the 100 depending on what transparency it is.
             self.screen.blit(horizontal_line, (X_MIN, y_val))  # Line on Y-axis
 
-    def draw_degrees(self, degrees: float = 0) -> None:
-        label = self.big_font.render(f"{round(degrees, 1)}\u00B0C", 1, self.WHITE)
-        self.screen.blit(label, (max(0, (100 - int(label.get_rect().width))), 0))
+    def draw_degrees(self, degrees: tuple[float, ...]) -> None:
+        sorted_degrees = sorted(degrees, reverse=True)
+
+        for i, degree in enumerate(sorted_degrees):
+            label = self.medium_font.render(f"{round(degree, 1)}\u00B0C", 1, self.WHITE)
+            self.screen.blit(
+                label, (max(0, (100 - int(label.get_rect().width))), 28 * i)
+            )
 
     def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:
         time_label = self.small_font.render(f"Time:  {time_left}", 1, self.WHITE)
@@ -228,14 +234,18 @@ class Display(threading.Thread):
         low: int,
         high: int,
     ) -> None:
-        points = self.generate_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, low, high)
-        if not points:
-            return
+        for i in range(len(queue[0]) if len(queue) > 0 else 0):
+            points = self.generate_coordinates(
+                [tup[i] for tup in queue], X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
+            )
+            if not points:
+                return
 
-        previous_point = points[0]
-        for point in points[1:]:
-            pygame.draw.line(self.screen, self.GREEN, previous_point, point)
-            previous_point = point
+            color = [self.GREEN, self.LIGHT_BLUE, self.ORANGE][i]
+            previous_point = points[0]
+            for point in points[1:]:
+                pygame.draw.line(self.screen, color, previous_point, point)
+                previous_point = point
 
     def stop(self) -> None:
         logger.debug("Display stopping")
@@ -251,7 +261,9 @@ class Display(threading.Thread):
             )
             self.screen.fill(self.BLACK)
             self.draw_degrees(
-                self.wave_queues["temp"][-1] if self.wave_queues.get("temp") else 0
+                self.wave_queues["temp"][-1]
+                if self.wave_queues.get("temp")
+                else (0, 0, 0)
             )
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
             self.draw_preinfuse_timer(
@@ -278,7 +290,7 @@ class Display(threading.Thread):
 
     def test_display(self):
         # run the game loop
-        import random
+        # import random
         import time
 
         v = 25
@@ -291,9 +303,9 @@ class Display(threading.Thread):
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         print("Pos: %sx%s\n" % pygame.mouse.get_pos())
                 v += 1
-                self.wave_queues["temp"].add_to_queue(random.randint(94, 96))
-                self.wave_queues["flow"].add_to_queue(random.randint(1, 2))
-                self.wave_queues["boiler"].add_to_queue(random.randint(20, 80))
+                # self.wave_queues["temp"].add_to_queue(random.randint(94, 96))
+                # self.wave_queues["flow"].add_to_queue(random.randint(1, 2))
+                # self.wave_queues["boiler"].add_to_queue(random.randint(20, 80))
                 time.sleep(0.1)
         except Exception:
             logger.exception("EXC")
@@ -322,7 +334,7 @@ if __name__ == "__main__":
             X_MAX=config.TEMP_X_MAX,
             Y_MIN=config.TEMP_Y_MIN,
             Y_MAX=config.TEMP_Y_MAX,
-            target_y=config.TARGET_TEMP,
+            target_y=True,
         ),
         "flow": WaveQueue(
             0,

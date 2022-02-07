@@ -47,7 +47,7 @@ class Flow:
         self.pulse_count += 1
         if ml_per_sec := self.get_millilitres_per_sec():
             logger.debug("Flow pulse with ml per sec: {ml_per_sec}")
-            self.flow_queue.add_to_queue(ml_per_sec)
+            self.flow_queue.add_to_queue(tuple((ml_per_sec,)))
         self.last_pulse_time = time.perf_counter()
 
     def get_time_since_last_pulse(self) -> Optional[float]:

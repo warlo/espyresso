@@ -65,7 +65,7 @@ class Boiler:
             value = 1.0
 
         self.pwm.set_value(value)
-        self.add_to_queue(round(value * 100, 1))
+        self.add_to_queue(tuple((round(value * 100, 1),)))
 
     def stop(self):
         logger.debug("Boiler stopping")

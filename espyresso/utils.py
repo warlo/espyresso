@@ -4,7 +4,7 @@ from collections import deque
 from espyresso.config import ZOOM
 
 
-class WaveQueue(deque[float]):
+class WaveQueue(deque[tuple[float, ...]]):
     def __init__(
         self,
         low: int,
@@ -15,8 +15,8 @@ class WaveQueue(deque[float]):
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: float = None,
-        **kwargs
+        target_y: bool = False,
+        **kwargs,
     ) -> None:
         self.low = low
         self.high = high
@@ -32,25 +32,41 @@ class WaveQueue(deque[float]):
         self.length = X_MAX - X_MIN
         return super().__init__(*args, **kwargs)
 
-    def add_to_queue(self, new_value: float):
+    def get_min(self):
+        min_val = self.high
+        for val in self:
+            if (new_min := min(val)) < min_val:
+                min_val = new_min
+        return min(min_val, self.min_low)
+
+    def get_max(self):
+        max_val = self.low
+        for val in self:
+            if (new_max := max(val)) > max_val:
+                max_val = new_max
+        return math.ceil(max(max_val, self.max_high))
+
+    def add_to_queue(self, new_value: tuple[float, ...]):
         popped = None
         if len(self) >= self.length / ZOOM:
             popped = self.popleft()
 
         self.append(new_value)
 
-        if new_value > self.high:
-            self.high = int(math.ceil(new_value))
-        elif new_value < self.low:
-            self.low = int(new_value)
+        if (new_high := max(new_value)) > self.high:
+            self.high = int(math.ceil(new_high))
+        elif (new_low := min(new_value)) < self.low:
+            self.low = int(new_low)
 
         if not popped:
             return
 
-        if int(popped) >= self.low:
-            self.low = int(min(min(self), self.min_low))
-        elif int(popped) >= self.high:
-            self.high = int(math.ceil(max(max(self), self.max_high)))
+        if int(min(popped)) <= self.low:
+            self.low = int(self.get_min())
+
+        if math.ceil(max(popped)) >= self.high:
+            self.high = int(self.get_max())
+        # self.high = int(self.get_max())
 
 
 def linear_transform(x: float, a: float, b: float, c: float, d: float) -> float:
