@@ -9,7 +9,7 @@ if DEBUG:
 
     sys.modules["pigpio"] = MagicMock()
 
-LOG_FILE = "espyresso.log"
+LOG_FILE = "log/espyresso.log"
 SHOT_COUNT_FILE = "shot_count.txt"
 
 TSIC_GPIO = 24

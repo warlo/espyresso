@@ -92,7 +92,6 @@ class Pump:
 
         # Hard-code boiler to 30% during preinfuse and start pump at 0.5 PWM (2-3 bars?)
         self.set_pwm_value(0.5)
-        self.boiler.set_pwm_override(0.30)
         self.toggle_pump()
 
         # Set started preinfuse time
@@ -112,9 +111,6 @@ class Pump:
         # Start brewing timer
         self.brewing_timer.reset_timer()
         self.brewing_timer.start_timer()
-
-        # Hard-code boiler to 25%
-        self.boiler.set_pwm_override(0.25)
 
         while self.pumping and self.flow.get_millilitres() < (30 + 36):
             time_passed = self.brewing_timer.get_time_since_started()
