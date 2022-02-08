@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
 import time
+from typing import TYPE_CHECKING
 
 from espyresso import config
 
+if TYPE_CHECKING:
+    from espyresso.flow import Flow
+
 
 class PController:
-    def __init__(self, initial_temperature: float) -> None:
+    def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
         self.elementTemp = initial_temperature
         self.shellTemp = self.elementTemp
@@ -26,6 +30,7 @@ class PController:
         self.pumpPowerRate = 0.0
         self.heaterPower = 0.0
         self.lastBoilerPidTime: float = 0.0
+        self.flow = flow
 
     def update(self, temperature: float) -> tuple[float, tuple[float, ...]]:
         print("\n")
@@ -36,7 +41,8 @@ class PController:
         self.lastBoilerPidTime = current_time
         print("lastBoilerPidTime:", self.lastBoilerPidTime)
 
-        self.flowRate = 0
+        self.flowRate = self.flow.get_millilitres_per_sec() or 0
+        print("FLOWRATE", self.flowRate)
 
         # TODO: verify flow
         waterToFlowPower = (
