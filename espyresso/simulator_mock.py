@@ -79,7 +79,7 @@ class FlowSimulator(PigpioSimulator):
         time.sleep(10)
         last_flow = time.perf_counter()
         while SIMULATOR_RUNNING:
-            time.sleep(0.2)
+            time.sleep(0.3)
             self.callback(0, 0, 0)
             if time.perf_counter() - last_flow > 10:
                 time.sleep(10)
@@ -110,8 +110,8 @@ def get_callback(espyresso_mock):
 
         if gpio == config.FLOW_IN_GPIO:
             logger.debug("FLOW gpio")
-            # flow_sim = FlowSimulator(gpio, edge, callback)
-            # flow_sim.start()
+            flow_sim = FlowSimulator(gpio, edge, callback)
+            flow_sim.start()
 
         if gpio == config.RANGER_ECHO_IN and edge == pigpio.RISING_EDGE:
             ranger_sim = RangerRiseSimulator(gpio, edge, callback)

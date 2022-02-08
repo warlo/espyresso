@@ -42,7 +42,7 @@ class TemperatureThread(threading.Thread):
         # self.pid = PID()
         # self.pid.set_pid_gains(config.KP, config.KI, config.KD)
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
-        self.pcontroller = PController(initial_temperature=22.0)
+        self.pcontroller = PController(initial_temperature=22.0, flow=self.flow)
 
         self._stop_event = threading.Event()
 
@@ -53,13 +53,8 @@ class TemperatureThread(threading.Thread):
 
     def update_boiler_value(self, pid_value: float) -> None:
 
-        flow_ml_per_sec = self.flow.get_millilitres_per_sec() or 0
-        flow_term = min(flow_ml_per_sec / 10, 0.25)
-
-        value = pid_value + flow_term
-        logger.debug(
-            f"Updating boiler: value {value}; pid {pid_value}; flow_term {flow_term}"
-        )
+        value = pid_value
+        logger.debug(f"Updating boiler: value {value}; pcontroller {pid_value}")
         self.boiler.set_value(value)
 
     def run(self):
@@ -92,7 +87,7 @@ class TemperatureThread(threading.Thread):
                 prev_timestamp = latest_measurement.seconds_since_epoch
 
                 temp = latest_measurement.degree_celsius
-                heater_value, temp_tuple = self.pcontroller.update(temp)
+                heater_value, temp_tuple = self.pcontroller.update(temperature=temp)
                 self.update_boiler_value(heater_value)
 
                 lock = threading.RLock()

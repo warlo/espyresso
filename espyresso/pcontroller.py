@@ -32,7 +32,7 @@ class PController:
         self.lastBoilerPidTime: float = 0.0
         self.flow = flow
 
-    def update(self, temperature: float) -> tuple[float, tuple[float, ...]]:
+    def update(self, *, temperature: float) -> tuple[float, tuple[float, ...]]:
         print("\n")
         current_time = time.perf_counter()
         print("CURRENT_TIME:", current_time)
