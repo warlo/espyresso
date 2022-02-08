@@ -33,7 +33,8 @@ class Flow:
         self.pulse_count: int = 0
 
         self.last_pulse_count: int = 0
-        self.last_pulse_time: Optional[float] = None
+        self.prev_pulse_time: Optional[float] = None
+        self.newest_pulse_time: Optional[float] = None
 
     def reset_pulse_count(self) -> None:
         self.pulse_count = 0
@@ -45,15 +46,20 @@ class Flow:
 
         self.last_pulse_count = self.pulse_count
         self.pulse_count += 1
-        if ml_per_sec := self.get_millilitres_per_sec():
-            logger.debug("Flow pulse with ml per sec: {ml_per_sec}")
+        ml_per_sec = self.get_millilitres_per_sec()
+        self.prev_pulse_time, self.newest_pulse_time = (
+            self.newest_pulse_time,
+            time.perf_counter(),
+        )
+
+        if ml_per_sec:
+            logger.debug(f"Flow pulse with ml per sec: {ml_per_sec}")
             self.flow_queue.add_to_queue(tuple((ml_per_sec,)))
-        self.last_pulse_time = time.perf_counter()
 
     def get_time_since_last_pulse(self) -> Optional[float]:
-        if not self.last_pulse_time:
+        if not self.newest_pulse_time:
             return None
-        return time.perf_counter() - self.last_pulse_time
+        return time.perf_counter() - self.newest_pulse_time
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -62,10 +68,7 @@ class Flow:
         return self.get_pulse_count() / self.counts_per_liter
 
     def get_litres_diff(self) -> float:
-        pulse_count = self.get_pulse_count()
-        pulse_diff = pulse_count - self.last_pulse_count
-
-        return pulse_diff / self.counts_per_liter
+        return 1 / self.counts_per_liter
 
     def get_millilitres(self) -> float:
         return self.get_litres() * 1000
@@ -74,10 +77,13 @@ class Flow:
         return self.get_litres_diff() * 1000
 
     def get_millilitres_per_sec(self) -> Optional[float]:
-        if not self.last_pulse_time:
+        if not self.prev_pulse_time or not self.newest_pulse_time:
             return None
 
-        current_time = time.perf_counter()
-        time_diff = current_time - self.last_pulse_time
+        # Give 0 if over 1 sec since last pulses
+        if time.perf_counter() - self.newest_pulse_time > 1:
+            return 0
+
+        time_diff = self.newest_pulse_time - self.prev_pulse_time
 
         return max(self.get_millilitres_diff() / time_diff, 0)
