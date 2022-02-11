@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, List, Tuple
 
 import pygame
 
@@ -82,19 +82,19 @@ class Display(threading.Thread):
 
     def generate_coordinate(
         self, value, index, Y_MIN, Y_MAX, low, high
-    ) -> tuple[int, float]:
+    ) -> Tuple[int, float]:
         return (index, round(linear_transform(value, low, high, Y_MAX, Y_MIN)))
 
     def generate_coordinates(
         self,
-        values: list[float],
+        values: List[float],
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
         Y_MAX: int,
         low: int,
         high: int,
-    ) -> list[tuple[int, float]]:
+    ) -> List[Tuple[int, float]]:
         return [
             self.generate_coordinate(
                 value, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
@@ -141,7 +141,7 @@ class Display(threading.Thread):
             (high * number_of_steps - low * number_of_steps) / number_of_steps
         )
 
-        steps: list[tuple[float, int]] = []
+        steps: List[Tuple[float, int]] = []
         rounded = True
         for i in range(low * number_of_steps, high * number_of_steps, range_steps):
             closest_step = i / number_of_steps
@@ -168,7 +168,7 @@ class Display(threading.Thread):
             )  # You can change the 100 depending on what transparency it is.
             self.screen.blit(horizontal_line, (X_MIN, y_val))  # Line on Y-axis
 
-    def draw_degrees(self, degrees: tuple[float, ...]) -> None:
+    def draw_degrees(self, degrees: Tuple[float, ...]) -> None:
         sorted_degrees = sorted(degrees, reverse=True)
 
         for i, degree in enumerate(sorted_degrees):

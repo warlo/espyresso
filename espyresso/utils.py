@@ -1,10 +1,11 @@
 import math
 from collections import deque
+from typing import Tuple
 
 from espyresso.config import ZOOM
 
 
-class WaveQueue(deque[tuple[float, ...]]):
+class WaveQueue(deque[Tuple[float, ...]]):
     def __init__(
         self,
         low: int,
@@ -48,7 +49,7 @@ class WaveQueue(deque[tuple[float, ...]]):
                 max_val = new_max
         return math.ceil(max(max_val, self.max_high))
 
-    def add_to_queue(self, new_value: tuple[float, ...]):
+    def add_to_queue(self, new_value: Tuple[float, ...]):
         popped = None
         if len(self) >= self.length / ZOOM:
             popped = self.popleft()

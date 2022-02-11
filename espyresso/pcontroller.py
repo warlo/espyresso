@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Tuple
 
 from espyresso import config
 
@@ -35,8 +35,8 @@ class PController:
         self.lastBoilerPidTime: float = 0.0
         self.flow = flow
 
-    def update(self, *, temperature: float) -> tuple[float, tuple[float, ...]]:
-        logger.debug(f"\n")
+    def update(self, *, temperature: float) -> Tuple[float, Tuple[float, ...]]:
+        logger.debug("\n")
         current_time = time.perf_counter()
         logger.debug(f"CURRENT_TIME: {current_time}")
         deltaTime = current_time - self.lastBoilerPidTime
