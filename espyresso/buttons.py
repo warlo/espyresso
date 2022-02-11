@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import TYPE_CHECKING, Callable
 
@@ -13,6 +14,9 @@ if TYPE_CHECKING:
     from espyresso.pump import Pump
 
 
+logger = logging.getLogger(__name__)
+
+
 class Buttons:
     def __init__(
         self,
@@ -21,7 +25,7 @@ class Buttons:
         boiler: "Boiler",
         pump: "Pump",
         display: "Display",
-        turn_off_system: Callable
+        turn_off_system: Callable,
     ):
         self.pigpio_pi = pigpio_pi
         self.button_one = config.BUTTON_ONE_GPIO
@@ -37,25 +41,33 @@ class Buttons:
         self.pigpio_pi.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
         self.pigpio_pi.callback(
-            self.button_one, pigpio.RISING_EDGE, self.callback_button_one
+            self.button_one, pigpio.RISING_EDGE, self.rising_button_one
+        )
+        self.pigpio_pi.callback(
+            self.button_one, pigpio.FALLING_EDGE, self.falling_button_one
         )
         self.pigpio_pi.callback(
             self.button_two, pigpio.RISING_EDGE, self.callback_button_two
         )
 
-    def callback_button_one(self, gpio, level, tick) -> None:
-        timestamp = time.perf_counter()
-        while True:
-            seconds = time.perf_counter() - timestamp
-            if not self.pigpio_pi.read(self.button_one):
-                if seconds > 0.25:
-                    self.pump.brew_shot()
-                return
-            time.sleep(0.2)
+    def rising_button_one(self, gpio, level, tick) -> None:
+        logger.debug("Button one rising")
+        self.button_one_timestamp = time.perf_counter()
+
+    def falling_button_one(self, gpio, level, tick) -> None:
+        time_diff = time.perf_counter() - self.button_one_timestamp
+        logger.debug(f"Button one falling: {time_diff}")
+
+        if time_diff > 5:
+            return
+
+        if time_diff > 0.25:
+            self.pump.brew_shot()
 
     def callback_button_two(self, gpio, level, tick) -> None:
         timestamp = time.perf_counter()
-        while True:
+        seconds = 0.0
+        while seconds < 5:
             seconds = time.perf_counter() - timestamp
             self.display.notification = str(int(seconds) + 1)
             if seconds >= 2:
