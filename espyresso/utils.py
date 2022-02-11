@@ -35,14 +35,16 @@ class WaveQueue(deque[tuple[float, ...]]):
     def get_min(self):
         min_val = self.high
         for val in self:
-            if (new_min := min(val)) < min_val:
+            new_min = min(val)
+            if new_min < min_val:
                 min_val = new_min
         return min(min_val, self.min_low)
 
     def get_max(self):
         max_val = self.low
         for val in self:
-            if (new_max := max(val)) > max_val:
+            new_max = max(val)
+            if new_max > max_val:
                 max_val = new_max
         return math.ceil(max(max_val, self.max_high))
 
@@ -53,9 +55,11 @@ class WaveQueue(deque[tuple[float, ...]]):
 
         self.append(new_value)
 
-        if (new_high := max(new_value)) > self.high:
+        new_high = max(new_value)
+        new_low = min(new_value)
+        if new_high > self.high:
             self.high = int(math.ceil(new_high))
-        elif (new_low := min(new_value)) < self.low:
+        elif new_low < self.low:
             self.low = int(new_low)
 
         if not popped:
