@@ -70,7 +70,7 @@ ZOOM = 2
 MAX_BOILER_POWER = 1350.0
 # W the boiler can use
 
-BREW_SETPOINT = TARGET_TEMP + 1.0
+BREW_SETPOINT = TARGET_TEMP
 
 ELEMENT_MAX_TEMPERATURE = 190.0
 # °C the thermal fuses melt at 172°C and elements are about 20K hotter than fuse mountings
