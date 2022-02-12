@@ -109,7 +109,7 @@ class PController:
         logger.debug(f"elementToBodyPower: {elementToBodyPower}")
 
         # Now work out the temperature, which comes from power that didn't go into heat loss or heating the incoming water.
-        logger.debug(f"\nTEMP:")
+        logger.debug("\nTEMP:")
         self.brewHeadTemp += (
             deltaTime
             * (

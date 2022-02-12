@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, List, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
 
 import pygame
 
@@ -32,7 +32,7 @@ class Display(threading.Thread):
         ranger: "Ranger",
         flow: "Flow",
         get_started_time: Callable[[], float],
-        wave_queues: dict[str, WaveQueue],
+        wave_queues: Dict[str, WaveQueue],
         **kwargs,
     ):
         os.environ["SDL_FBDEV"] = "/dev/fb1"
@@ -234,9 +234,10 @@ class Display(threading.Thread):
         low: int,
         high: int,
     ) -> None:
-        for i in range(len(queue[0]) if len(queue) > 0 else 0):
+        queue_list = list(queue)
+        for i in range(len(queue_list[0]) if len(queue_list) > 0 else 0):
             points = self.generate_coordinates(
-                [tup[i] for tup in queue], X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
+                [tup[i] for tup in queue_list], X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
             )
             if not points:
                 return
