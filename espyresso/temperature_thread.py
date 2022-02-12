@@ -87,8 +87,13 @@ class TemperatureThread(threading.Thread):
                 prev_timestamp = latest_measurement.seconds_since_epoch
 
                 temp = latest_measurement.degree_celsius
-                heater_value, temp_tuple = self.pcontroller.update(temperature=temp)
+                heater_value = 1
+                _, temp_tuple = self.pcontroller.update(temperature=temp)
+                if temp >= 110:
+                    heater_value = 0
                 self.update_boiler_value(heater_value)
+                with open("power.log", "a+") as f:
+                    f.write(f"{temp},{prev_timestamp}")
 
                 lock = threading.RLock()
                 lock.acquire()
