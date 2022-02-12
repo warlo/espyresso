@@ -112,7 +112,18 @@ class Pump:
         self.brewing_timer.reset_timer()
         self.brewing_timer.start_timer()
 
-        while self.pumping and self.flow.get_millilitres() < (30 + 36):
+        while self.pumping:
+            current_ml = self.flow.get_millilitres()
+
+            # 36 ml in cup, and 30 ml error in puck / pressure
+            if current_ml > 66:
+                break
+
+            # Gradually reduce pump pressure before end
+            if current_ml > (66 - 5):
+                self.set_pwm_value(min(0.3, (66 - current_ml) / 5))
+                break
+
             time_passed = self.brewing_timer.get_time_since_started()
 
             # Gradually increase pump PWM to 100% over 5sec
