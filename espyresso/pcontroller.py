@@ -161,7 +161,7 @@ class PController:
         logger.debug(f"bodyTemp: {self.bodyTemp}")
 
         # SET ELEMENT TEMP
-        self.elementTemp = temperature
+        self.shellTemp = temperature
         logger.debug(f"ELEMENTTEMP SET: {self.elementTemp}")
 
         # arrange heater power so that the average boiler energy will be correct in 2 seconds (if possible)
