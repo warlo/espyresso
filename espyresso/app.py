@@ -22,7 +22,7 @@ logging.basicConfig(
     filemode="a",
     format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
     datefmt="%Y-%m-%dT%H:%M:%S%z",
-    level=logging.DEBUG,
+    level=logging.DEBUG if config.DEBUG else logging.INFO,
 )
 
 logger = logging.getLogger(__name__)
