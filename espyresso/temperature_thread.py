@@ -87,13 +87,11 @@ class TemperatureThread(threading.Thread):
                 prev_timestamp = latest_measurement.seconds_since_epoch
 
                 temp = latest_measurement.degree_celsius
-                heater_value = 1
-                _, temp_tuple = self.pcontroller.update(temperature=temp)
-                if temp >= 110:
-                    heater_value = 0
+                heater_value, temp_tuple = self.pcontroller.update(temperature=temp)
                 self.update_boiler_value(heater_value)
-                with open("power.log", "a+") as f:
-                    f.write(f"{temp},{prev_timestamp}")
+
+                if config.LOG_POWER:
+                    self.log_power(temp, prev_timestamp, heater_value)
 
                 lock = threading.RLock()
                 lock.acquire()
@@ -103,6 +101,10 @@ class TemperatureThread(threading.Thread):
                 logger.debug(
                     f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}"
                 )
+
+    def log_power(self, temp, timestamp, heater_value):
+        with open(config.LOG_POWER_FILE, "a+") as f:
+            f.write(f"{temp},{timestamp},{heater_value}")
 
     def stop(self):
         logger.debug("temperature_thread stopping")

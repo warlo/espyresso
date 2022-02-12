@@ -12,6 +12,8 @@ if DEBUG:
     sys.modules["pigpio"] = MagicMock()
 
 LOG_FILE = "log/espyresso.log"
+LOG_POWER = False
+LOG_POWER_FILE = "log/power.log"
 SHOT_STAT_FILE = "shot_stat.txt"
 
 TSIC_GPIO = 24
