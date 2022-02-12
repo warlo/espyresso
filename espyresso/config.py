@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+from sys import platform
 
-DEBUG = True
+# DEBUG if Mac
+DEBUG = platform == "darwin"
 
 if DEBUG:
     import sys
@@ -10,7 +12,7 @@ if DEBUG:
     sys.modules["pigpio"] = MagicMock()
 
 LOG_FILE = "log/espyresso.log"
-SHOT_COUNT_FILE = "shot_count.txt"
+SHOT_STAT_FILE = "shot_stat.txt"
 
 TSIC_GPIO = 24
 BOILER_PWM_GPIO = 12

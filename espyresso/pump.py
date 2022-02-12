@@ -145,12 +145,18 @@ class Pump:
         self.pwm.set_value(value)
 
     def log_shot(self) -> None:
+        shot_time = self.brewing_timer.get_time_since_started()
+
+        # Skip seemingly invalid shots
+        if not (5 < shot_time < 45):
+            return
+
         preinfuse_ml = (self.stopped_preinfuse or 0) - (self.started_preinfuse or 0)
         shot_log = (
             f"\n{time.strftime('%Y-%m-%dT%H:%M:%S%z')};"
-            f"Time: {self.brewing_timer.get_time_since_started()};"
+            f"Time: {shot_time};"
             f"Shot mL {self.flow.get_millilitres()};"
             f"Preinfuse mL: {preinfuse_ml};"
         )
-        with open(config.SHOT_COUNT_FILE, "a") as f:
+        with open(config.SHOT_STAT_FILE, "a") as f:
             f.write(shot_log)
