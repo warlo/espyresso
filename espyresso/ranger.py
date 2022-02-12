@@ -70,3 +70,6 @@ class Ranger(threading.Thread):
 
     def get_current_distance(self) -> float:
         return statistics.median(self.history) if self.history else 0
+
+    def has_enough_water(self) -> bool:
+        return (self.get_current_distance() > 10)

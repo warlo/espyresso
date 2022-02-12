@@ -74,6 +74,7 @@ class Espyresso:
             flow=self.flow,
             reset_started_time=self.reset_started_time,
             brewing_timer=self.brewing_timer,
+            ranger=self.ranger,
         )
 
         self.temp_queue = WaveQueue(

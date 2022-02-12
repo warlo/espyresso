@@ -12,6 +12,7 @@ from espyresso.pwm import PWM
 if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
+    from espyresso.ranger import Ranger
     from espyresso.timer import BrewingTimer
 
 
@@ -26,6 +27,7 @@ class Pump:
         flow: "Flow",
         reset_started_time: Callable,
         brewing_timer: "BrewingTimer",
+        ranger: "Ranger",
         pumping=False,
     ):
         self.pigpio_pi = pigpio_pi
@@ -41,6 +43,7 @@ class Pump:
         self.started_brew: Optional[float] = None
         self.stopped_brew: Optional[float] = None
         self.brewing_timer = brewing_timer
+        self.ranger = ranger
 
         self.started_preinfuse: Optional[float] = None
         self.stopped_preinfuse: Optional[float] = None
@@ -79,6 +82,9 @@ class Pump:
 
     def brew_shot_routine(self) -> None:
         logger.debug("Starting brew shot routine!")
+
+        if not self.ranger.has_enough_water():
+            return
 
         # If already pumping then reset the routine
         if self.pumping:
