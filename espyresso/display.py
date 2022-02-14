@@ -242,7 +242,7 @@ class Display(threading.Thread):
             if not points:
                 return
 
-            color = [self.GREEN, self.LIGHT_BLUE, self.ORANGE][i]
+            color = [self.GREEN, self.LIGHT_BLUE, self.ORANGE, self.WHITE][i]
             previous_point = points[0]
             for point in points[1:]:
                 pygame.draw.line(self.screen, color, previous_point, point)

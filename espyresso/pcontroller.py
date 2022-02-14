@@ -35,7 +35,12 @@ class PController:
         self.lastBoilerPidTime: float = 0.0
         self.flow = flow
 
-    def update(self, *, temperature: float) -> Tuple[float, Tuple[float, ...]]:
+    def update(
+        self, *, temperature: float, boiling: bool
+    ) -> Tuple[float, Tuple[float, ...]]:
+        if not boiling:
+            return 0, (temperature, 0, 0, 0)
+
         logger.debug("\n")
         current_time = time.perf_counter()
         logger.debug(f"CURRENT_TIME: {current_time}")
@@ -280,4 +285,5 @@ class PController:
             self.shellTemp,
             self.waterTemp,
             self.elementTemp,
+            self.brewHeadTemp,
         )
