@@ -87,7 +87,9 @@ class TemperatureThread(threading.Thread):
                 prev_timestamp = latest_measurement.seconds_since_epoch
 
                 temp = latest_measurement.degree_celsius
-                heater_value, temp_tuple = self.pcontroller.update(temperature=temp)
+                heater_value, temp_tuple = self.pcontroller.update(
+                    temperature=temp, boiling=self.boiler.boiling
+                )
                 self.update_boiler_value(heater_value)
 
                 if config.LOG_POWER:
