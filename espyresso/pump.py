@@ -86,6 +86,9 @@ class Pump:
         if not self.ranger.has_enough_water():
             return
 
+        if not self.boiler.boiling:
+            return
+
         # If already pumping then reset the routine
         if self.pumping:
             return self.reset_routine()
@@ -122,11 +125,11 @@ class Pump:
             current_ml = self.flow.get_millilitres()
 
             # 36 ml in cup, and 30 ml error in puck / pressure
-            if current_ml > 66:
+            if not self.flow.learning_mode and current_ml > 66:
                 break
 
             # Gradually reduce pump pressure before end
-            if current_ml > (66 - 5):
+            if not self.flow.learning_mode and current_ml > (66 - 5):
                 self.set_pwm_value(min(0.3, (66 - current_ml) / 5))
                 break
 
@@ -149,6 +152,8 @@ class Pump:
         self.set_pwm_value(1)
         self.boiler.set_pwm_override(None)
         self.brewing_timer.stop_timer()
+        logger.info(f"Time for shot {self.brewing_timer.get_time_since_started()}")
+        logger.info(f"Pulse count for shot {self.flow.get_pulse_count()}")
         self.brewing_timer.enable_automatic_timing()
         if not self.stopped_preinfuse:
             self.stopped_preinfuse = time.perf_counter()

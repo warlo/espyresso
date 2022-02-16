@@ -26,6 +26,7 @@ class Flow:
         )
 
         self.counts_per_liter = 2100  # Original 1925
+        self.learning_mode = True
 
         self.flow_queue = flow_queue
 
