@@ -185,9 +185,8 @@ class PController:
         self.bodyTemp += delta_to_apply
         self.shellTemp += delta_to_apply
         self.modeledSensorTemp += delta_to_apply
-        if self.shellTemp > 90:
-            self.waterTemp += delta_to_apply
-            self.brewHeadTemp += delta_to_apply
+        self.waterTemp += delta_to_apply
+        self.brewHeadTemp += delta_to_apply
 
         # arrange heater power so that the average boiler energy will be correct in 2 seconds (if possible)
         # the error term handles boiler shell and water - other known power sinks are added explicitly
