@@ -39,8 +39,6 @@ class PController:
     def update(
         self, *, temperature: float, boiling: bool
     ) -> Tuple[float, Tuple[float, ...]]:
-        if not boiling:
-            return 0, (temperature, 0, 0, 0, 0, 0)
 
         logger.debug("\n")
         current_time = time.perf_counter()
@@ -176,7 +174,7 @@ class PController:
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
-        delta_to_apply = (temperature - self.modeledSensorTemp) / 40.0
+        delta_to_apply = (temperature - self.modeledSensorTemp) / 70.0
         print(f"delta_to_apply: {delta_to_apply}")
         print(f"diff: {temperature - self.modeledSensorTemp}")
 
@@ -187,6 +185,16 @@ class PController:
         self.modeledSensorTemp += delta_to_apply
         self.waterTemp += delta_to_apply
         self.brewHeadTemp += delta_to_apply
+
+        if not boiling:
+            return 0, (
+                self.shellTemp,
+                self.waterTemp,
+                self.elementTemp,
+                self.brewHeadTemp,
+                self.modeledSensorTemp,
+                temperature,
+            )
 
         # arrange heater power so that the average boiler energy will be correct in 2 seconds (if possible)
         # the error term handles boiler shell and water - other known power sinks are added explicitly
