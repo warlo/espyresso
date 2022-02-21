@@ -184,10 +184,10 @@ class Display(threading.Thread):
 
         for i, degree in enumerate(sorted_degrees):
             label = self.small_font.render(
-                f"{round(degree, 1)}\u00B0C", 1, self.colors[i]
+                f"{round(degree, 1)}\u00B0C", 1, self.colors[degrees.index(degree)]
             )
             self.screen.blit(
-                label, (max(0, (100 - int(label.get_rect().width))), 28 * i)
+                label, (max(0, (100 - int(label.get_rect().width))), 12 * i)
             )
 
     def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:

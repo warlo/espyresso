@@ -40,7 +40,7 @@ class PController:
         self, *, temperature: float, boiling: bool
     ) -> Tuple[float, Tuple[float, ...]]:
         if not boiling:
-            return 0, (temperature, 0, 0, 0)
+            return 0, (temperature, 0, 0, 0, 0, 0)
 
         logger.debug("\n")
         current_time = time.perf_counter()
