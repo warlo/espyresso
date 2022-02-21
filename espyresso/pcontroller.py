@@ -16,11 +16,12 @@ class PController:
     def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
         self.elementTemp = initial_temperature
-        self.shellTemp = self.elementTemp
+        self.shellTemp = initial_temperature
 
         self.ambientTemp = min(self.shellTemp, config.AMBIENT_TEMPERATURE)
 
-        self.waterTemp = self.shellTemp
+        self.waterTemp = initial_temperature
+        self.modeledSensorTemp = initial_temperature
 
         # based on heat transfer coefficients to and from brewhead, we can caluculate its steady state temp - use that
         self.brewHeadTemp = (
@@ -165,9 +166,28 @@ class PController:
         )
         logger.debug(f"bodyTemp: {self.bodyTemp}")
 
-        # SET ELEMENT TEMP
-        self.shellTemp = temperature
-        logger.debug(f"ELEMENTTEMP SET: {self.elementTemp}")
+        self.modeledSensorTemp += (
+            deltaTime
+            * ((self.elementTemp - self.modeledSensorTemp) * config.SENSOR_XFER_COEFF)
+            / config.SENSOR_HEAT_CAPACITY
+        )
+
+        print(f"modeledSensorTemp: {self.modeledSensorTemp},{temperature}")
+
+        # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
+        # Slowly correct towards this temperature and noise will average out.
+        delta_to_apply = (temperature - self.modeledSensorTemp) / 10.0
+        print(f"delta_to_apply: {delta_to_apply}")
+        print(f"diff: {temperature - self.modeledSensorTemp}")
+
+        # Add delta to all thermal masses
+        self.elementTemp += delta_to_apply
+        self.bodyTemp += delta_to_apply
+        self.shellTemp += delta_to_apply
+        self.modeledSensorTemp += delta_to_apply
+        if self.shellTemp > 90:
+            self.waterTemp += delta_to_apply
+            self.brewHeadTemp += delta_to_apply
 
         # arrange heater power so that the average boiler energy will be correct in 2 seconds (if possible)
         # the error term handles boiler shell and water - other known power sinks are added explicitly
