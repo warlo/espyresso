@@ -176,7 +176,7 @@ class PController:
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
-        delta_to_apply = (temperature - self.modeledSensorTemp) / 10.0
+        delta_to_apply = (temperature - self.modeledSensorTemp) / 40.0
         print(f"delta_to_apply: {delta_to_apply}")
         print(f"diff: {temperature - self.modeledSensorTemp}")
 
