@@ -174,17 +174,20 @@ class PController:
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
-        delta_to_apply = (temperature - self.modeledSensorTemp) / 70.0
-        print(f"delta_to_apply: {delta_to_apply}")
+        # delta_to_apply = (temperature - self.modeledSensorTemp) / 70.0
+        # delta_to_apply = 0
+        # print(f"delta_to_apply: {delta_to_apply}")
         print(f"diff: {temperature - self.modeledSensorTemp}")
 
         # Add delta to all thermal masses
-        self.elementTemp += delta_to_apply
-        self.bodyTemp += delta_to_apply
-        self.shellTemp += delta_to_apply
-        self.modeledSensorTemp += delta_to_apply
-        self.waterTemp += delta_to_apply
-        self.brewHeadTemp += delta_to_apply
+        # self.elementTemp += delta_to_apply
+        # self.bodyTemp += delta_to_apply
+        # self.shellTemp += delta_to_apply
+        # self.modeledSensorTemp += delta_to_apply
+        # self.waterTemp += delta_to_apply
+        # self.brewHeadTemp += delta_to_apply
+
+        self.shellTemp = temperature
 
         if not boiling:
             return 0, (
