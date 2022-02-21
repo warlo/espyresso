@@ -48,7 +48,7 @@ class Pump:
         self.started_preinfuse: Optional[float] = None
         self.stopped_preinfuse: Optional[float] = None
 
-        self.set_pwm_value(1)
+        self.set_pwm_value(0.7)
         self.brew_thread = threading.Thread(target=self.brew_shot_routine)
 
     def toggle_pump(self) -> None:
@@ -137,7 +137,7 @@ class Pump:
 
             # Gradually increase pump PWM to 100% over 5sec
             if time_passed < 5:
-                self.set_pwm_value(0.5 + 0.5 * (time_passed / 5))
+                self.set_pwm_value(0.5 + 0.2 * (time_passed / 5))
             if time_passed > 45:
                 return self.reset_routine()
 
@@ -149,7 +149,7 @@ class Pump:
         if self.pumping:
             self.toggle_pump()
         self.log_shot()
-        self.set_pwm_value(1)
+        self.set_pwm_value(0.7)
         self.boiler.set_pwm_override(None)
         self.brewing_timer.stop_timer()
         logger.info(f"Time for shot {self.brewing_timer.get_time_since_started()}")
