@@ -63,8 +63,19 @@ class Display(threading.Thread):
         self.WHITE = (255, 255, 255)
         self.RED = (255, 0, 0)
         self.GREEN = (0, 255, 0)
-        self.LIGHT_BLUE = (173, 216, 230)
+        self.LIGHT_BLUE = (0, 255, 255)
+        self.BLUE = (0, 0, 255)
         self.ORANGE = (255, 140, 0)
+        self.YELLOW = (255, 255, 0)
+        self.PINK = (255, 0, 255)
+        self.colors = [
+            self.GREEN,
+            self.BLUE,
+            self.YELLOW,
+            self.WHITE,
+            self.PINK,
+            self.LIGHT_BLUE,
+        ]
 
         self.notification: str = ""
 
@@ -172,7 +183,9 @@ class Display(threading.Thread):
         sorted_degrees = sorted(degrees, reverse=True)
 
         for i, degree in enumerate(sorted_degrees):
-            label = self.medium_font.render(f"{round(degree, 1)}\u00B0C", 1, self.WHITE)
+            label = self.small_font.render(
+                f"{round(degree, 1)}\u00B0C", 1, self.colors[i]
+            )
             self.screen.blit(
                 label, (max(0, (100 - int(label.get_rect().width))), 28 * i)
             )
@@ -242,7 +255,7 @@ class Display(threading.Thread):
             if not points:
                 return
 
-            color = [self.GREEN, self.LIGHT_BLUE, self.ORANGE, self.WHITE][i]
+            color = self.colors[i]
             previous_point = points[0]
             for point in points[1:]:
                 pygame.draw.line(self.screen, color, previous_point, point)

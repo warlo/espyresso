@@ -305,4 +305,6 @@ class PController:
             self.waterTemp,
             self.elementTemp,
             self.brewHeadTemp,
+            self.modeledSensorTemp,
+            temperature,
         )
