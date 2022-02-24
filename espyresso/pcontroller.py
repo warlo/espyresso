@@ -177,14 +177,15 @@ class PController:
         delta_to_apply = (temperature - self.modeledSensorTemp) / 10
         # print(f"delta_to_apply: {delta_to_apply}")
         print(f"diff: {temperature - self.modeledSensorTemp}")
+        print(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
 
         # Add delta to all thermal masses
         self.elementTemp += delta_to_apply
-        self.bodyTemp += delta_to_apply
         self.shellTemp += delta_to_apply
         self.modeledSensorTemp += delta_to_apply
-        # self.waterTemp += delta_to_apply
-        # self.brewHeadTemp += delta_to_apply
+        self.bodyTemp += delta_to_apply
+        self.waterTemp += delta_to_apply
+        self.brewHeadTemp += delta_to_apply
 
         # self.shellTemp = temperature
 
