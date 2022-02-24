@@ -1,6 +1,6 @@
 import math
 from collections import deque
-from typing import Tuple
+from typing import List, Tuple
 
 from espyresso.config import ZOOM
 
@@ -29,9 +29,13 @@ class WaveQueue(deque):
         self.X_MAX = X_MAX
         self.Y_MIN = Y_MIN
         self.Y_MAX = Y_MAX
+        self.queue_labels: List[str] = []
 
         self.length = X_MAX - X_MIN
         return super().__init__(*args, **kwargs)
+
+    def set_labels(self, labels: List[str]):
+        self.queue_labels = labels
 
     def get_min(self):
         min_val = self.high

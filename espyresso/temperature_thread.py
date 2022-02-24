@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
+    from espyresso.utils import WaveQueue
 
 
 class TemperatureThread(threading.Thread):
@@ -29,7 +30,7 @@ class TemperatureThread(threading.Thread):
         boiler: "Boiler",
         flow: "Flow",
         get_started_time: Callable,
-        add_to_queue: Callable,
+        temp_queue: "WaveQueue",
         **kwargs,
     ):
         self.get_started_time = get_started_time
@@ -42,11 +43,24 @@ class TemperatureThread(threading.Thread):
         # self.pid = PID()
         # self.pid.set_pid_gains(config.KP, config.KI, config.KD)
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
-        self.pcontroller = PController(initial_temperature=22.0, flow=self.flow)
+        self.pcontroller = PController(
+            initial_temperature=22.0,
+            flow=self.flow,
+        )
+        self.temp_queue = temp_queue
+        self.temp_queue.set_labels(
+            [
+                "shellTemp",
+                "waterTemp",
+                "elementTemp",
+                "bodyTemp",
+                "brewHeadTemp",
+                "modeledSensorTemp",
+                "temperature",
+            ]
+        )
 
         self._stop_event = threading.Event()
-
-        self.add_to_queue = add_to_queue
 
         self.lock = threading.RLock()
         super().__init__(*args, **kwargs)
@@ -97,7 +111,7 @@ class TemperatureThread(threading.Thread):
 
                 lock = threading.RLock()
                 lock.acquire()
-                self.add_to_queue(temp_tuple)
+                self.temp_queue.add_to_queue(temp_tuple)
                 lock.release()
 
                 logger.debug(

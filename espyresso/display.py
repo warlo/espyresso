@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
 
 import pygame
 
@@ -70,11 +70,12 @@ class Display(threading.Thread):
         self.PINK = (255, 0, 255)
         self.colors = [
             self.GREEN,
+            self.LIGHT_BLUE,
+            self.ORANGE,
             self.BLUE,
-            self.YELLOW,
             self.WHITE,
             self.PINK,
-            self.LIGHT_BLUE,
+            self.YELLOW,
         ]
 
         self.notification: str = ""
@@ -179,12 +180,18 @@ class Display(threading.Thread):
             )  # You can change the 100 depending on what transparency it is.
             self.screen.blit(horizontal_line, (X_MIN, y_val))  # Line on Y-axis
 
-    def draw_degrees(self, degrees: Tuple[float, ...]) -> None:
+    def draw_degrees(self, queue: Optional[WaveQueue]) -> None:
+        if not queue:
+            return
+        degrees = queue[-1]
         sorted_degrees = sorted(degrees, reverse=True)
 
         for i, degree in enumerate(sorted_degrees):
+            initial_index = degrees.index(degree)
             label = self.small_font.render(
-                f"{round(degree, 1)}\u00B0C", 1, self.colors[degrees.index(degree)]
+                f"{queue.queue_labels[initial_index]}: {round(degree, 1)}\u00B0C",
+                1,
+                self.colors[initial_index],
             )
             self.screen.blit(
                 label, (max(0, (100 - int(label.get_rect().width))), 12 * i)
@@ -274,11 +281,7 @@ class Display(threading.Thread):
                 - (time.perf_counter() - self.get_started_time())
             )
             self.screen.fill(self.BLACK)
-            self.draw_degrees(
-                self.wave_queues["temp"][-1]
-                if self.wave_queues.get("temp")
-                else (0, 0, 0)
-            )
+            self.draw_degrees(self.wave_queues.get("temp", None))
             self.draw_boiling_label(self.boiler.get_boiling(), time_left)
             self.draw_preinfuse_timer(
                 time_since_started=self.pump.get_time_since_started_preinfuse()

@@ -91,7 +91,7 @@ class Espyresso:
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
             flow=self.flow,
-            add_to_queue=self.temp_queue.add_to_queue,
+            temp_queue=self.temp_queue,
         )
 
         self.display = Display(
