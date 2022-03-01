@@ -170,14 +170,14 @@ class PController:
             / config.SENSOR_HEAT_CAPACITY
         )
 
-        print(f"modeledSensorTemp: {self.modeledSensorTemp},{temperature}")
+        logger.debug(f"modeledSensorTemp: {self.modeledSensorTemp},{temperature}")
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
         delta_to_apply = (temperature - self.modeledSensorTemp) / 10
-        # print(f"delta_to_apply: {delta_to_apply}")
-        print(f"diff: {temperature - self.modeledSensorTemp}")
-        print(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
+        logger.debug(f"diff: {temperature - self.modeledSensorTemp}")
+        logger.debug(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
+
 
         # Add delta to all thermal masses
         self.modeledSensorTemp += delta_to_apply
