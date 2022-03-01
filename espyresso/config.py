@@ -166,3 +166,6 @@ self.coef.append(best_coef)
 print("best coef", best_coef, config.SENSOR_XFER_COEFF)
 print("avg", sum(self.coef) / len(self.coef), self.coef)
 """
+# SENSOR_XFER_COEFF = 0.017899826668980535
+# SENSOR_XFER_COEFF = 0.0340
+SENSOR_XFER_COEFF = 0.02656

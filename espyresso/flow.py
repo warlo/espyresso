@@ -91,7 +91,7 @@ class Flow:
 
         pulse_rate = 1 / (self.newest_pulse_time - self.prev_pulse_time)
 
-        return self.get_mls_per_pulse(pulse_rate) or 0
+        return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
 
     @staticmethod
     def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
