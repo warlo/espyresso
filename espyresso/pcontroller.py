@@ -180,12 +180,14 @@ class PController:
         print(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
 
         # Add delta to all thermal masses
-        self.elementTemp += delta_to_apply
-        self.shellTemp += delta_to_apply
         self.modeledSensorTemp += delta_to_apply
-        self.waterTemp += delta_to_apply
-        self.bodyTemp += delta_to_apply
-        self.brewHeadTemp += delta_to_apply
+        self.elementTemp += delta_to_apply
+
+        if self.brewHeadTemp > 80:
+            self.shellTemp += delta_to_apply
+            self.waterTemp += delta_to_apply
+            self.bodyTemp += delta_to_apply
+            self.brewHeadTemp += delta_to_apply
 
         # self.shellTemp = temperature
 
