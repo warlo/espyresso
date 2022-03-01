@@ -140,14 +140,40 @@ espyresso_mock.callback = get_callback(espyresso_mock)
 espyresso_mock.stop = stop_threads
 
 
+def get_log_data(logfile) -> List[Tuple[float, float, float]]:
+
+    with open(logfile) as f:
+        power_log = [line.split(",") for line in f.read().strip("\n").split("\n")]
+
+    sliced_data = []
+    start = float(power_log[0][1])
+    for y, x, z in power_log:
+
+        # Normalize time on x-axis
+        x_val = float(x) - start
+
+        # Slice on 300sec
+        if x_val >= 300:
+            break
+
+        # Make floats from strings and make heater_value to percentage
+        sliced_data.append((float(y), x_val, float(z) * 100))
+
+    return sliced_data
+
+
 class MeasureWaiting:
-    def __init__(self, tsic, boiler: Boiler, *args):
+    def __init__(
+        self, tsic, boiler: Boiler, log_data: List[Tuple[float, float, float]], *args
+    ):
         super().__init__(*args)
         self.tsic = tsic
         self.boiler = boiler
 
         self.current_temp = 20
-        self.preheated = False
+        self.prev_val = 0
+
+        self.temp_iter = iter(log_data)
 
     def __enter__(self):
         pass
@@ -157,15 +183,13 @@ class MeasureWaiting:
 
     def wait(self, *args):
 
-        temp_increase_per_sec = 2.33333333
-        temp_decrease_per_sec = 1
-        hz = 5
-        time.sleep(1 / hz)
+        next_val = next(self.temp_iter)
+        self.boiler.boiling = next_val[2] > 0
+        diff = next_val[1] - self.prev_val
+        time.sleep(diff)
+        self.prev_val = next_val[1]
 
-        self.current_temp += (
-            self.boiler.pwm.value * temp_increase_per_sec / hz
-            - temp_decrease_per_sec / hz
-        )
+        self.current_temp = next_val[0]
 
         self.tsic.return_value.measurement = Measurement(
             self.current_temp, time.perf_counter()
@@ -174,8 +198,15 @@ class MeasureWaiting:
 
 def get_espyresso_simulator():
     with patch("espyresso.temperature_thread.TsicInputChannel") as mocked_cls:
+        log_file = "power-orig2.log"
+        log_data = get_log_data(log_file)
+
+        mocked_cls.return_value.measure_once.return_value = Measurement(
+            log_data[0][0], log_data[0][1]
+        )
+
         espyresso = Espyresso(pigpio_pi=espyresso_mock)
         mocked_cls.return_value._measure_waiting = MeasureWaiting(
-            mocked_cls, espyresso.boiler
+            mocked_cls, espyresso.boiler, log_data
         )
         return espyresso
