@@ -184,10 +184,8 @@ class PController:
         self.shellTemp += delta_to_apply
         self.modeledSensorTemp += delta_to_apply
         self.waterTemp += delta_to_apply
-
-        if self.shellTemp > 90:
-            self.bodyTemp += delta_to_apply
-            self.brewHeadTemp += delta_to_apply
+        self.bodyTemp += delta_to_apply
+        self.brewHeadTemp += delta_to_apply
 
         # self.shellTemp = temperature
 
