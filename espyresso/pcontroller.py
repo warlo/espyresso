@@ -192,8 +192,8 @@ class PController:
         if not boiling:
             return 0, (
                 self.shellTemp,
-                self.waterTemp,
                 self.elementTemp,
+                self.waterTemp,
                 self.bodyTemp,
                 self.brewHeadTemp,
                 self.modeledSensorTemp,
@@ -314,8 +314,8 @@ class PController:
 
         return min(normalizedHeaterPower, 1.0), (
             self.shellTemp,
-            self.waterTemp,
             self.elementTemp,
+            self.waterTemp,
             self.bodyTemp,
             self.brewHeadTemp,
             self.modeledSensorTemp,

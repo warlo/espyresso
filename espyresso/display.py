@@ -70,8 +70,8 @@ class Display(threading.Thread):
         self.PINK = (255, 0, 255)
         self.colors = [
             self.GREEN,
-            self.LIGHT_BLUE,
             self.ORANGE,
+            self.LIGHT_BLUE,
             self.BLUE,
             self.WHITE,
             self.PINK,

@@ -73,8 +73,9 @@ class Flow:
         logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
 
         self.total_volume += mls
+        average_rate = self.total_volume / (self.newest_pulse_time - self.pulse_start)
 
-        self.flow_queue.add_to_queue(tuple((flow_rate,)))
+        self.flow_queue.add_to_queue(tuple((flow_rate, average_rate)))
 
     def get_time_since_last_pulse(self) -> Optional[float]:
         if not self.newest_pulse_time:
