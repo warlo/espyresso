@@ -44,6 +44,7 @@ class TemperatureThread(threading.Thread):
         # self.pid.set_pid_gains(config.KP, config.KI, config.KD)
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
         initial_temperature = self.tsic.measure_once(timeout=5).degree_celsius
+        logger.warning("INITIAL TEMP", initial_temperature)
         if not initial_temperature:
             initial_temperature = 22.0
         self.pcontroller = PController(
