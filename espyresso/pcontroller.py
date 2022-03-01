@@ -183,7 +183,8 @@ class PController:
         self.modeledSensorTemp += delta_to_apply
         self.elementTemp += delta_to_apply
 
-        if self.brewHeadTemp > 80:
+        steadystate = 96 > self.waterTemp > 94
+        if steadystate:
             self.shellTemp += delta_to_apply
             self.waterTemp += delta_to_apply
             self.bodyTemp += delta_to_apply
