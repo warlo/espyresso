@@ -57,7 +57,6 @@ class Flow:
             self.newest_pulse_time = current_time
             return None
 
-        self.lock.acquire()
         self.pulse_count += 1
         self.prev_pulse_time, self.newest_pulse_time = (
             self.newest_pulse_time,
@@ -74,7 +73,6 @@ class Flow:
         self.total_volume += flow_rate
 
         self.flow_queue.add_to_queue(tuple((flow_rate,)))
-        self.lock.release()
 
     def get_time_since_last_pulse(self) -> Optional[float]:
         if not self.newest_pulse_time:
