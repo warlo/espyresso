@@ -63,14 +63,16 @@ class Flow:
             time.perf_counter(),
         )
 
+        pulse_rate = self.get_pulse_rate()
+        mls = self.get_mls_per_pulse(pulse_rate)
         flow_rate = self.get_flow_rate()
 
-        if not flow_rate:
+        if not flow_rate or not mls:
             return
 
         logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
 
-        self.total_volume += flow_rate
+        self.total_volume += mls
 
         self.flow_queue.add_to_queue(tuple((flow_rate,)))
 
@@ -86,12 +88,16 @@ class Flow:
         return self.total_volume
 
     def get_flow_rate(self) -> Optional[float]:
+        pulse_rate = self.get_pulse_rate()
+
+        return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
+
+    def get_pulse_rate(self) -> float:
         if not self.prev_pulse_time or not self.newest_pulse_time:
             return 0
 
         pulse_rate = 1 / (self.newest_pulse_time - self.prev_pulse_time)
-
-        return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
+        return pulse_rate
 
     @staticmethod
     def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
