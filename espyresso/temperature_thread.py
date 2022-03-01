@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from espyresso.flow import Flow
     from espyresso.utils import WaveQueue
 
+LOG_POWER_FILE = f"log/power-{time.strftime('%X')}.log"
+
 
 class TemperatureThread(threading.Thread):
     def __init__(
@@ -43,8 +45,10 @@ class TemperatureThread(threading.Thread):
         # self.pid = PID()
         # self.pid.set_pid_gains(config.KP, config.KI, config.KD)
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
+
         initial_temperature = self.tsic.measure_once(timeout=5).degree_celsius
-        logger.warning("INITIAL TEMP", initial_temperature)
+        logger.warning("INITIAL TEMP: %s", str(initial_temperature))
+
         if not initial_temperature:
             initial_temperature = 22.0
         self.pcontroller = PController(
@@ -55,8 +59,8 @@ class TemperatureThread(threading.Thread):
         self.temp_queue.set_labels(
             [
                 "shellTemp",
-                "waterTemp",
                 "elementTemp",
+                "waterTemp",
                 "bodyTemp",
                 "brewHeadTemp",
                 "modeledSensorTemp",
@@ -123,7 +127,7 @@ class TemperatureThread(threading.Thread):
                 )
 
     def log_power(self, temp, timestamp, heater_value):
-        with open(config.LOG_POWER_FILE, "a+") as f:
+        with open(LOG_POWER_FILE, "a+") as f:
             f.write(f"{temp},{timestamp},{heater_value}\n")
 
     def stop(self):
