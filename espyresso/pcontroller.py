@@ -33,7 +33,7 @@ class PController:
 
         self.pumpPowerRate = 0.0
         self.heaterPower = 0.0
-        self.lastBoilerPidTime: float = 0.0
+        self.lastBoilerPidTime: float = time.perf_counter()
         self.flow = flow
 
     def update(
