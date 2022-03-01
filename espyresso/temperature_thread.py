@@ -124,7 +124,7 @@ class TemperatureThread(threading.Thread):
 
     def log_power(self, temp, timestamp, heater_value):
         with open(config.LOG_POWER_FILE, "a+") as f:
-            f.write(f"{temp},{timestamp},{heater_value}")
+            f.write(f"{temp},{timestamp},{heater_value}\n")
 
     def stop(self):
         logger.debug("temperature_thread stopping")
