@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import logging
+import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
@@ -25,37 +26,55 @@ class Flow:
             self.flow_in_gpio, pigpio.RISING_EDGE, self.pulse_callback
         )
 
-        self.counts_per_liter = 2100  # Original 1925
         self.learning_mode = True
+        self.total_volume: float = 0.0
+        self.pulse_count = 0
 
         self.flow_queue = flow_queue
 
         self.pulse_start: float = time.perf_counter()
-        self.pulse_count: int = 0
 
-        self.last_pulse_count: int = 0
         self.prev_pulse_time: Optional[float] = None
         self.newest_pulse_time: Optional[float] = None
+        self.lock = threading.RLock()
 
     def reset_pulse_count(self) -> None:
+        self.total_volume = 0.0
         self.pulse_count = 0
-        self.last_pulse_count = 0
+        self.prev_pulse_time = None
+        self.newest_pulse_time = None
         self.pulse_start = time.perf_counter()
         self.flow_queue.clear()
 
     def pulse_callback(self, gpio: int, level: int, tick: int) -> None:
 
-        self.last_pulse_count = self.pulse_count
+        # Skip sub 20ms erratic pulses
+        current_time = time.perf_counter()
+        if (
+            self.newest_pulse_time
+            and current_time - self.newest_pulse_time < config.FLOW_METER_DEBOUNCE_TIME
+        ):
+            self.newest_pulse_time = current_time
+            return None
+
+        self.lock.acquire()
         self.pulse_count += 1
-        ml_per_sec = self.get_millilitres_per_sec()
         self.prev_pulse_time, self.newest_pulse_time = (
             self.newest_pulse_time,
             time.perf_counter(),
         )
 
-        if ml_per_sec:
-            logger.debug(f"Flow pulse with ml per sec: {ml_per_sec}")
-            self.flow_queue.add_to_queue(tuple((ml_per_sec,)))
+        flow_rate = self.get_flow_rate()
+
+        if not flow_rate:
+            return
+
+        logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
+
+        self.total_volume += flow_rate
+
+        self.flow_queue.add_to_queue(tuple((flow_rate,)))
+        self.lock.release()
 
     def get_time_since_last_pulse(self) -> Optional[float]:
         if not self.newest_pulse_time:
@@ -65,26 +84,76 @@ class Flow:
     def get_pulse_count(self) -> int:
         return self.pulse_count
 
-    def get_litres(self) -> float:
-        return self.get_pulse_count() / self.counts_per_liter
-
-    def get_litres_diff(self) -> float:
-        return 1 / self.counts_per_liter
-
     def get_millilitres(self) -> float:
-        return self.get_litres() * 1000
+        return self.total_volume
 
-    def get_millilitres_diff(self) -> float:
-        return self.get_litres_diff() * 1000
-
-    def get_millilitres_per_sec(self) -> Optional[float]:
+    def get_flow_rate(self) -> Optional[float]:
         if not self.prev_pulse_time or not self.newest_pulse_time:
-            return None
-
-        # Give 0 if over 1 sec since last pulses
-        if time.perf_counter() - self.newest_pulse_time > 1:
             return 0
 
-        time_diff = self.newest_pulse_time - self.prev_pulse_time
+        pulse_rate = 1 / (self.newest_pulse_time - self.prev_pulse_time)
 
-        return max(self.get_millilitres_diff() / time_diff, 0)
+        return self.get_mls_per_pulse(pulse_rate) or 0
+
+    @staticmethod
+    def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
+        pulse_rates = [
+            0.755,
+            1.006,
+            1.257,
+            1.508,
+            1.759,
+            2.010,
+            2.261,
+            2.512,
+            2.763,
+            3.014,
+            3.265,
+            3.516,
+            3.767,
+            4.018,
+            4.269,
+            4.520,
+            4.771,
+            5.022,
+            5.273,
+            5.524,
+            5.775,
+        ]
+        ml_per_pulse = [
+            0.884,
+            0.688,
+            0.591,
+            0.539,
+            0.506,
+            0.484,
+            0.470,
+            0.464,
+            0.466,
+            0.469,
+            0.473,
+            0.477,
+            0.477,
+            0.472,
+            0.467,
+            0.466,
+            0.466,
+            0.469,
+            0.471,
+            0.473,
+            0.475,
+        ]
+        interval = (pulse_rates[-1] - pulse_rates[0]) / (len(pulse_rates) - 1)
+
+        # interpolate to get flowrate
+        index = int(round((pulse_rate - pulse_rates[0]) / interval))
+        if index < 0:
+            return None
+        if index >= len(pulse_rates) - 1:
+            return ml_per_pulse[-1]
+        return (
+            ml_per_pulse[index]
+            + (ml_per_pulse[index + 1] - ml_per_pulse[index])
+            * (pulse_rate - pulse_rates[index])
+            / interval
+        )

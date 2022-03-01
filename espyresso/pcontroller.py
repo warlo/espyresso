@@ -48,7 +48,7 @@ class PController:
         self.lastBoilerPidTime = current_time
         logger.debug(f"lastBoilerPidTime: {self.lastBoilerPidTime}")
 
-        self.flowRate = self.flow.get_millilitres_per_sec() or 0
+        self.flowRate = self.flow.get_flow_rate() or 0
         logger.debug(f"FLOWRATE {self.flowRate}")
 
         # TODO: verify flow
@@ -183,9 +183,11 @@ class PController:
         self.elementTemp += delta_to_apply
         self.shellTemp += delta_to_apply
         self.modeledSensorTemp += delta_to_apply
-        self.bodyTemp += delta_to_apply
         self.waterTemp += delta_to_apply
-        self.brewHeadTemp += delta_to_apply
+
+        if self.shellTemp > 90:
+            self.bodyTemp += delta_to_apply
+            self.brewHeadTemp += delta_to_apply
 
         # self.shellTemp = temperature
 
