@@ -97,6 +97,10 @@ class Flow:
         if not self.prev_pulse_time or not self.newest_pulse_time:
             return 0
 
+        time_since_pulse = self.get_time_since_last_pulse()
+        if time_since_pulse and time_since_pulse > 0.5:
+            return 0
+
         pulse_rate = 1 / (self.newest_pulse_time - self.prev_pulse_time)
         return pulse_rate
 
