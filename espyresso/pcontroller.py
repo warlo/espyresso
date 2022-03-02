@@ -178,7 +178,6 @@ class PController:
         logger.debug(f"diff: {temperature - self.modeledSensorTemp}")
         logger.debug(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
 
-
         # Add delta to all thermal masses
         self.modeledSensorTemp += delta_to_apply
         self.elementTemp += delta_to_apply

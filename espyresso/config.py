@@ -154,15 +154,25 @@ SENSOR_XFER_COEFF = (
 
 """
 # Calculate best SENSOR_XFER_COEFF
-best_coef = (
-    (temperature - self.modeledSensorTemp)
-    * config.SENSOR_HEAT_CAPACITY
-    / (deltaTime * (self.elementTemp - self.modeledSensorTemp))
-)
-best_coef = max(0, best_coef)
-self.coef.append(best_coef)
-print("best coef", best_coef, config.SENSOR_XFER_COEFF)
-print("avg", sum(self.coef) / len(self.coef), self.coef)
+
+if self.prev_temp:
+    best_coef = (
+        (temperature - self.prev_temp)
+        * config.SENSOR_HEAT_CAPACITY
+        / (deltaTime * (self.elementTemp - self.prev_temp))
+    )
+
+    self.coef.append(best_coef)
+    print("BEST_SENSOR_XFER_COEFF", best_coef, config.SENSOR_XFER_COEFF)
+    print("AVG", sum(self.coef) / len(self.coef))
+    logger.warning(
+        "BEST_SENSOR_XFER_COEFF: %s (now: %s)",
+        best_coef,
+        config.SENSOR_XFER_COEFF,
+    )
+    logger.warning("AVG %s", sum(self.coef) / len(self.coef))
+
+self.prev_temp = temperature
 """
 # SENSOR_XFER_COEFF = 0.017899826668980535
 # SENSOR_XFER_COEFF = 0.0340
