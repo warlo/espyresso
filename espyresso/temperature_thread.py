@@ -113,7 +113,7 @@ class TemperatureThread(threading.Thread):
 
                 temp = latest_measurement.degree_celsius
                 heater_value, temp_tuple = self.pcontroller.update(
-                    temperature=temp, boiling=self.boiler.boiling
+                    temperature=temp, boiling=self.boiler.get_boiling()
                 )
                 self.update_boiler_value(heater_value)
 
