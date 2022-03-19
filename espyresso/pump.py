@@ -94,11 +94,15 @@ class Pump:
         logger.debug("Starting pulse pump routine!")
 
         started = time.perf_counter()
+        self.toggle_pump()
         while (
-            time.perf_counter() - started < 120
+            self.pumping
+            and time.perf_counter() - started < 120
             and self.temperature.get_latest_brewhead_temperature() < 80
         ):
-            self.toggle_pump()
+            self.set_pwm_value(0.5)
+            time.sleep(1)
+            self.set_pwm_value(0)
             time.sleep(1)
 
         self.stop_pump()
