@@ -49,9 +49,9 @@ class PController:
         logger.debug(f"lastBoilerPidTime: {self.lastBoilerPidTime}")
 
         self.flowRate = self.flow.get_flow_rate() or 0
-        # Max flow rate
-        self.flowRate = self.flowRate if self.flowRate < 3 else 3
         logger.debug(f"FLOWRATE {self.flowRate}")
+        # Max flow rate
+        self.flowRate = self.flowRate if self.flowRate < 2.5 else 2.5
 
         # TODO: verify flow
         waterToFlowPower = (

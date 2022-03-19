@@ -54,6 +54,7 @@ class Flow:
             self.newest_pulse_time
             and current_time - self.newest_pulse_time < config.FLOW_METER_DEBOUNCE_TIME
         ):
+            logger.warning("Skipping sub 20ms flow pulse")
             self.newest_pulse_time = current_time
             return None
 
@@ -70,6 +71,7 @@ class Flow:
         if not flow_rate or not mls:
             return
 
+        logger.info(f"Pulse rate, mls, flow_rate: {pulse_rate} {mls} {flow_rate}")
         logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
 
         self.total_volume += mls
