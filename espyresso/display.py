@@ -120,7 +120,7 @@ class Display(threading.Thread):
         self.notification_updated = time.perf_counter()
 
     def draw_notification(self) -> None:
-        if self.notification or self.notification_updated - time.perf_counter() > 5:
+        if not self.notification or self.notification_updated - time.perf_counter() > 5:
             return
 
         label = self.big_font.render(f"{self.notification}", 1, self.WHITE)
