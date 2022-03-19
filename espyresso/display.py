@@ -79,6 +79,7 @@ class Display(threading.Thread):
         ]
 
         self.notification: str = ""
+        self.notification_updated = time.perf_counter()
 
         self.boiler = boiler
         self.brewing_timer = brewing_timer
@@ -114,7 +115,14 @@ class Display(threading.Thread):
             for index, value in enumerate(values)
         ]
 
+    def set_notification(self, notification: str) -> None:
+        self.notification = notification
+        self.notification_updated = time.perf_counter()
+
     def draw_notification(self) -> None:
+        if self.notification or self.notification_updated - time.perf_counter() > 5:
+            return
+
         label = self.big_font.render(f"{self.notification}", 1, self.WHITE)
         self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
 
@@ -290,8 +298,7 @@ class Display(threading.Thread):
                 time_since_started=self.brewing_timer.get_time_since_started()
             )
             self.draw_flow(millilitres=self.flow.get_millilitres())
-            if self.notification:
-                self.draw_notification()
+            self.draw_notification()
             for queue in self.wave_queues.values():
                 self.draw_waveform(
                     queue=queue,

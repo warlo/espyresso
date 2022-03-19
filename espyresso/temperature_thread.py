@@ -73,6 +73,9 @@ class TemperatureThread(threading.Thread):
         self.lock = threading.RLock()
         super().__init__(*args, **kwargs)
 
+    def get_latest_brewhead_temperature(self) -> float:
+        return self.pcontroller.brewHeadTemp
+
     def update_boiler_value(self, pid_value: float) -> None:
 
         value = pid_value

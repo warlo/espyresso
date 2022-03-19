@@ -2,7 +2,7 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 import pigpio
 
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.ranger import Ranger
+    from espyresso.temperature_thread import TemperatureThread
     from espyresso.timer import BrewingTimer
 
 
@@ -24,6 +25,7 @@ class Pump:
         self,
         pigpio_pi: pigpio.pi,
         boiler: "Boiler",
+        temperature: "TemperatureThread",
         flow: "Flow",
         reset_started_time: Callable,
         brewing_timer: "BrewingTimer",
@@ -32,6 +34,7 @@ class Pump:
     ):
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
+        self.temperature = temperature
         self.flow = flow
         self.pump_out_gpio = config.PUMP_OUT_GPIO
         self.pigpio_pi.set_mode(self.pump_out_gpio, pigpio.OUTPUT)
@@ -49,7 +52,7 @@ class Pump:
         self.stopped_preinfuse: Optional[float] = None
 
         self.set_pwm_value(0.7)
-        self.brew_thread = threading.Thread(target=self.brew_shot_routine)
+        self.pump_thread = threading.Thread(target=self.brew_shot_routine)
 
     def toggle_pump(self) -> None:
         self.pumping = not self.pumping
@@ -71,23 +74,53 @@ class Pump:
             return time.perf_counter() - self.started_preinfuse
         return 0
 
-    def brew_shot(self) -> None:
-        if self.brew_thread.is_alive():
-            self.brewing_timer.stop_timer()
-            self.stop_pump()
-        else:
-            self.brew_thread = threading.Thread(target=self.brew_shot_routine)
-            self.reset_started_time()
-            self.brew_thread.start()
+    def pulse_pump(self) -> Tuple[bool, Optional[str]]:
+        if self.pump_thread.is_alive():
+            self.reset_routine()
+            return True, None
+
+        if not self.ranger.has_enough_water():
+            return False, "Not enough water"
+
+        if not self.boiler.boiling:
+            return False, "Not boiling"
+
+        self.pump_thread = threading.Thread(target=self.pulse_pump_routine)
+        self.reset_started_time()
+        self.pump_thread.start()
+        return True, None
+
+    def pulse_pump_routine(self) -> None:
+        logger.debug("Starting pulse pump routine!")
+
+        started = time.perf_counter()
+        while (
+            time.perf_counter() - started < 120
+            and self.temperature.get_latest_brewhead_temperature() < 80
+        ):
+            self.toggle_pump()
+            time.sleep(1)
+
+        self.stop_pump()
+
+    def brew_shot(self) -> Tuple[bool, Optional[str]]:
+        if self.pump_thread.is_alive():
+            self.reset_routine()
+            return True, None
+
+        if not self.ranger.has_enough_water():
+            return False, "Not enough water"
+
+        if not self.boiler.boiling:
+            return False, "Not boiling"
+
+        self.pump_thread = threading.Thread(target=self.brew_shot_routine)
+        self.reset_started_time()
+        self.pump_thread.start()
+        return True, None
 
     def brew_shot_routine(self) -> None:
         logger.debug("Starting brew shot routine!")
-
-        if not self.ranger.has_enough_water():
-            return
-
-        if not self.boiler.boiling:
-            return
 
         # If already pumping then reset the routine
         if self.pumping:
@@ -145,13 +178,12 @@ class Pump:
 
         return self.reset_routine()
 
-    def reset_routine(self):
-        if self.pumping:
-            self.toggle_pump()
+    def reset_routine(self) -> None:
+        self.stop_pump()
+        self.brewing_timer.stop_timer()
         self.log_shot()
         self.set_pwm_value(0.7)
         self.boiler.set_pwm_override(None)
-        self.brewing_timer.stop_timer()
         logger.info(f"Time for shot {self.brewing_timer.get_time_since_started()}")
         logger.info(f"Pulse count for shot {self.flow.get_pulse_count()}")
         self.brewing_timer.enable_automatic_timing()

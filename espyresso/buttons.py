@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.display import Display
     from espyresso.pump import Pump
+    from espyresso.temperature_thread import TemperatureThread
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ class Buttons:
         *,
         pigpio_pi: "pi",
         boiler: "Boiler",
+        temperature: "TemperatureThread",
         pump: "Pump",
         display: "Display",
         turn_off_system: Callable,
@@ -31,6 +33,7 @@ class Buttons:
         self.button_one = config.BUTTON_ONE_GPIO
         self.button_two = config.BUTTON_TWO_GPIO
         self.boiler = boiler
+        self.temperature = temperature
         self.pump = pump
         self.display = display
         self.turn_off_system = turn_off_system
@@ -61,15 +64,20 @@ class Buttons:
         if time_diff > 5:
             return
 
-        if time_diff > 0.25:
-            self.pump.brew_shot()
+        if time_diff > 0.25 and self.temperature.get_latest_brewhead_temperature() < 80:
+            _, notification = self.pump.pulse_pump()
+            self.display.set_notification(notification or "")
+
+        if time_diff > 0.25 and self.temperature.get_latest_brewhead_temperature() > 80:
+            _, notification = self.pump.brew_shot()
+            self.display.set_notification(notification or "")
 
     def callback_button_two(self, gpio, level, tick) -> None:
         timestamp = time.perf_counter()
         seconds = 0.0
         while seconds < 5:
             seconds = time.perf_counter() - timestamp
-            self.display.notification = str(int(seconds) + 1)
+            self.display.set_notification(str(int(seconds) + 1))
             if seconds >= 2:
                 self.turn_off_system()
             elif not self.pigpio_pi.read(self.button_two):

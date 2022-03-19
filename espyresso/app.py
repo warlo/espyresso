@@ -68,14 +68,6 @@ class Espyresso:
             add_to_queue=self.boiler_queue.add_to_queue,
         )
         self.ranger = Ranger(pigpio_pi=self.pigpio_pi)
-        self.pump = Pump(
-            pigpio_pi=self.pigpio_pi,
-            boiler=self.boiler,
-            flow=self.flow,
-            reset_started_time=self.reset_started_time,
-            brewing_timer=self.brewing_timer,
-            ranger=self.ranger,
-        )
 
         self.temp_queue = WaveQueue(
             90,
@@ -92,6 +84,15 @@ class Espyresso:
             boiler=self.boiler,
             flow=self.flow,
             temp_queue=self.temp_queue,
+        )
+        self.pump = Pump(
+            pigpio_pi=self.pigpio_pi,
+            boiler=self.boiler,
+            temperature=self.temperature,
+            flow=self.flow,
+            reset_started_time=self.reset_started_time,
+            brewing_timer=self.brewing_timer,
+            ranger=self.ranger,
         )
 
         self.display = Display(
@@ -111,6 +112,7 @@ class Espyresso:
         self.buttons = Buttons(
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
+            temperature=self.temperature,
             pump=self.pump,
             display=self.display,
             turn_off_system=self.turn_off_system,
