@@ -49,6 +49,8 @@ class PController:
         logger.debug(f"lastBoilerPidTime: {self.lastBoilerPidTime}")
 
         self.flowRate = self.flow.get_flow_rate() or 0
+        # Max flow rate
+        self.flowRate = self.flowRate if self.flowRate < 3 else 3
         logger.debug(f"FLOWRATE {self.flowRate}")
 
         # TODO: verify flow
@@ -145,7 +147,7 @@ class PController:
             / (config.SPEC_HEAT_ALUMINIUM * config.MASS_BOILER_SHELL / 2.0)
         )
         logger.debug(f"shellTemp: {self.shellTemp}")
-        self.elementTemp += (
+        elementTempDelta = (
             deltaTime
             * (
                 self.heaterPower
@@ -156,6 +158,7 @@ class PController:
             )
             / (config.SPEC_HEAT_ALUMINIUM * config.MASS_BOILER_SHELL / 2.0)
         )
+        self.elementTemp += elementTempDelta
         logger.debug(f"elementTemp: {self.elementTemp}")
         self.bodyTemp += (
             deltaTime
@@ -182,7 +185,13 @@ class PController:
         self.modeledSensorTemp += delta_to_apply
         self.elementTemp += delta_to_apply
 
-        steadystate = 96 > self.waterTemp > 94
+        # only correct other masses when close to steady state otherwise it can diverge
+        # wildly due to modelling errors
+        steadystate = (
+            94 < self.waterTemp < 96
+            and (elementTempDelta + delta_to_apply) < deltaTime * 0.5
+        )
+        logger.debug(f"steadystate {steadystate}")
         if steadystate:
             self.shellTemp += delta_to_apply
             self.waterTemp += delta_to_apply
