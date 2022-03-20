@@ -93,6 +93,9 @@ class Pump:
     def pulse_pump_routine(self) -> None:
         logger.debug("Starting pulse pump routine!")
 
+        # Disable automatic BrewingTimer
+        self.brewing_timer.disable_automatic_timing()
+
         started = time.perf_counter()
         self.toggle_pump()
         while (
