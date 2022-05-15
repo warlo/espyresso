@@ -94,7 +94,14 @@ class Display(threading.Thread):
         super().__init__(*args, **kwargs)
 
     def generate_coordinate(
-        self, value, index, Y_MIN, Y_MAX, low, high
+        self,
+        *,
+        index: int,
+        value: float,
+        low: int,
+        high: int,
+        Y_MIN: int,
+        Y_MAX: int,
     ) -> Tuple[int, float]:
         return (index, round(linear_transform(value, low, high, Y_MAX, Y_MIN)))
 
@@ -110,7 +117,12 @@ class Display(threading.Thread):
     ) -> List[Tuple[int, float]]:
         return [
             self.generate_coordinate(
-                value, X_MIN + index * config.ZOOM, Y_MIN, Y_MAX, low, high
+                index=X_MIN + index * config.ZOOM,
+                value=value,
+                low=low,
+                high=high,
+                Y_MIN=Y_MIN,
+                Y_MAX=Y_MAX,
             )
             for index, value in enumerate(values)
         ]
