@@ -138,10 +138,10 @@ class Espyresso:
         self.display.join()
         self.temperature.join()
         self.ranger.join()
-        self.brewing_timer.join()
+        # self.brewing_timer.join()
 
     def stop(self) -> None:
-        self.brewing_timer.stop()
+        # self.brewing_timer.stop()
         self.ranger.stop()
         self.temperature.stop()
         self.display.stop()
