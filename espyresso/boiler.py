@@ -37,6 +37,10 @@ class Boiler:
     def get_boiling(self):
         return self.boiling
 
+    def turn_off_boiler(self):
+        self.boiling = False
+        self.pwm.set_value(0)
+
     def toggle_boiler(self):
         self.boiling = not self.get_boiling()
         if not self.boiling:

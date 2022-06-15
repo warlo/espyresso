@@ -13,7 +13,7 @@ from espyresso.display import Display
 from espyresso.flow import Flow
 from espyresso.pump import Pump
 from espyresso.ranger import Ranger
-from espyresso.temperature_thread import TemperatureThread
+from espyresso.temperature import Temperature
 from espyresso.timer import BrewingTimer
 from espyresso.utils import WaveQueue
 
@@ -78,7 +78,7 @@ class Espyresso:
             Y_MAX=config.TEMP_Y_MAX,
             target_y=config.TARGET_TEMP,
         )
-        self.temperature = TemperatureThread(
+        self.temperature = Temperature(
             get_started_time=self.get_started_time,
             pigpio_pi=self.pigpio_pi,
             boiler=self.boiler,
@@ -133,10 +133,9 @@ class Espyresso:
 
         self.temperature.start()
         self.ranger.start()
-        self.brewing_timer.start()
+        # self.brewing_timer.start()
 
         self.display.join()
-        self.temperature.join()
         self.ranger.join()
         # self.brewing_timer.join()
 

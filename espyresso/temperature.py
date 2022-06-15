@@ -9,7 +9,7 @@ from espyresso import config
 from espyresso.pcontroller import PController
 
 # from espyresso.pid import PID
-from espyresso.tsic import TsicInputChannel
+from espyresso.tsic import Measurement, TsicInputChannel
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 LOG_POWER_FILE = f"log/power-{time.strftime('%X')}.log"
 
 
-class TemperatureThread(threading.Thread):
+class Temperature:
     def __init__(
         self,
         *args,
@@ -47,6 +47,7 @@ class TemperatureThread(threading.Thread):
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
         initial_temperature = self.tsic.measure_once(timeout=5).degree_celsius
+        self.prev_timestamp = time.perf_counter()
         logger.warning("INITIAL TEMP: %s", str(initial_temperature))
 
         if not initial_temperature:
@@ -68,10 +69,7 @@ class TemperatureThread(threading.Thread):
             ]
         )
 
-        self._stop_event = threading.Event()
-
         self.lock = threading.RLock()
-        super().__init__(*args, **kwargs)
 
     def get_latest_brewhead_temperature(self) -> float:
         return self.pcontroller.brewHeadTemp
@@ -82,52 +80,44 @@ class TemperatureThread(threading.Thread):
         logger.debug(f"Updating boiler: value {value}; pcontroller {pid_value}")
         self.boiler.set_value(value)
 
-    def run(self):
-        with self.tsic:
-            prev_timestamp = None
-            while not self._stop_event.is_set():
-                if (
-                    time.perf_counter() - self.get_started_time()
-                    > config.TURN_OFF_SECONDS
-                    and self.boiler.get_boiling()
-                ):
-                    # Turn off boiler after 10 minutes
-                    self.boiler.toggle_boiler()
+    def start(self) -> None:
+        self.tsic.start(callback=self.callback)
 
-                with self.tsic._measure_waiting:
-                    self.tsic._measure_waiting.wait(5)
+    def callback(self, measurement: Measurement) -> None:
+        if (
+            time.perf_counter() - self.get_started_time() > config.TURN_OFF_SECONDS
+            and self.boiler.get_boiling()
+        ):
+            # Turn off boiler after 10 minutes
+            self.boiler.turn_off_boiler()
 
-                latest_measurement = self.tsic.measurement
+        if (
+            self.prev_timestamp == measurement.seconds_since_epoch
+            or measurement.degree_celsius is None
+            or measurement.seconds_since_epoch is None
+        ):
+            logger.warning(
+                f"Undefined or no new temperature measurement: "
+                f"{self.prev_timestamp}, {measurement}"
+            )
+            return
 
-                if (
-                    prev_timestamp == latest_measurement.seconds_since_epoch
-                    or latest_measurement.degree_celsius is None
-                ):
-                    logger.warning(
-                        f"Undefined or no new temperature measurement: "
-                        f"{prev_timestamp}, {latest_measurement}"
-                    )
-                    continue
+        self.prev_timestamp = measurement.seconds_since_epoch
 
-                prev_timestamp = latest_measurement.seconds_since_epoch
+        temp = measurement.degree_celsius
+        heater_value, temp_tuple = self.pcontroller.update(
+            temperature=temp, boiling=self.boiler.get_boiling()
+        )
+        self.update_boiler_value(heater_value)
 
-                temp = latest_measurement.degree_celsius
-                heater_value, temp_tuple = self.pcontroller.update(
-                    temperature=temp, boiling=self.boiler.get_boiling()
-                )
-                self.update_boiler_value(heater_value)
+        if config.LOG_POWER:
+            self.log_power(temp, self.prev_timestamp, heater_value)
 
-                if config.LOG_POWER:
-                    self.log_power(temp, prev_timestamp, heater_value)
+        self.lock.acquire()
+        self.temp_queue.add_to_queue(temp_tuple)
+        self.lock.release()
 
-                lock = threading.RLock()
-                lock.acquire()
-                self.temp_queue.add_to_queue(temp_tuple)
-                lock.release()
-
-                logger.debug(
-                    f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}"
-                )
+        logger.debug(f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}")
 
     def log_power(self, temp, timestamp, heater_value):
         with open(LOG_POWER_FILE, "a+") as f:
@@ -137,5 +127,4 @@ class TemperatureThread(threading.Thread):
         logger.debug("temperature_thread stopping")
         self.boiler.set_value(0)
         self.tsic.stop()
-        self._stop_event.set()
         logger.debug("temperature_thread stopped")

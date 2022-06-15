@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.ranger import Ranger
-    from espyresso.temperature_thread import TemperatureThread
+    from espyresso.temperature import Temperature
     from espyresso.timer import BrewingTimer
 
 
@@ -25,7 +25,7 @@ class Pump:
         self,
         pigpio_pi: pigpio.pi,
         boiler: "Boiler",
-        temperature: "TemperatureThread",
+        temperature: "Temperature",
         flow: "Flow",
         reset_started_time: Callable,
         brewing_timer: "BrewingTimer",

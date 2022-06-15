@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.display import Display
     from espyresso.pump import Pump
-    from espyresso.temperature_thread import TemperatureThread
+    from espyresso.temperature import Temperature
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ class Buttons:
         *,
         pigpio_pi: "pi",
         boiler: "Boiler",
-        temperature: "TemperatureThread",
+        temperature: "Temperature",
         pump: "Pump",
         display: "Display",
         turn_off_system: Callable,
