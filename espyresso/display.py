@@ -80,6 +80,7 @@ class Display(threading.Thread):
 
         self.notification: str = ""
         self.notification_updated = time.perf_counter()
+        self.notification_timer: Optional[float] = None
 
         self.boiler = boiler
         self.brewing_timer = brewing_timer
@@ -127,15 +128,25 @@ class Display(threading.Thread):
             for index, value in enumerate(values)
         ]
 
+    def start_notification_timer(self, provided_time: Optional[float] = None) -> None:
+        self.notification_timer = provided_time or time.perf_counter()
+
+    def stop_notification_timer(self) -> None:
+        self.notification_timer = None
+
     def set_notification(self, notification: str) -> None:
         self.notification = notification
         self.notification_updated = time.perf_counter()
 
     def draw_notification(self) -> None:
-        if not self.notification or self.notification_updated - time.perf_counter() > 5:
+        notification = self.notification
+        if self.notification_timer:
+            notification = str(int(time.perf_counter() - self.notification_timer))
+
+        if not notification or self.notification_updated - time.perf_counter() > 5:
             return
 
-        label = self.big_font.render(f"{self.notification}", 1, self.WHITE)
+        label = self.big_font.render(f"{notification}", 1, self.WHITE)
         self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
 
     def draw_waveform(

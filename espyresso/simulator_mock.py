@@ -124,8 +124,8 @@ def get_callback(espyresso_mock):
             ranger_sim.start()
 
         if gpio == config.BUTTON_ONE_GPIO:
-            button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
-            button_one_sim.start()
+            # button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
+            # button_one_sim.start()
             pass
 
     return gpio_callback
@@ -142,7 +142,7 @@ espyresso_mock.callback = get_callback(espyresso_mock)
 espyresso_mock.stop = stop_threads
 
 
-def get_log_data(logfile) -> List[Tuple[float, float, float]]:
+def get_log_data(logfile: str) -> List[Tuple[float, float, float]]:
 
     with open(logfile) as f:
         power_log = [line.split(",") for line in f.read().strip("\n").split("\n")]
@@ -164,42 +164,31 @@ def get_log_data(logfile) -> List[Tuple[float, float, float]]:
     return sliced_data
 
 
-class MeasureWaiting:
-    def __init__(
-        self, tsic, boiler: Boiler, log_data: List[Tuple[float, float, float]], *args
-    ):
-        super().__init__(*args)
-        self.tsic = tsic
-        self.boiler = boiler
+class TemperatureSimulator(threading.Thread):
+    name: str
 
+    def __init__(self, log_data, callback, *args, **kwargs):
+        self.temp_iter = iter(log_data)
         self.current_temp = 20
         self.prev_val = 0
+        self.callback = callback
+        super().__init__(*args, **kwargs)
 
-        self.temp_iter = iter(log_data)
+    def run(self):
+        while SIMULATOR_RUNNING:
+            next_val = next(self.temp_iter)
+            diff = next_val[1] - self.prev_val
+            time.sleep(diff)
+            self.prev_val = next_val[1]
 
-    def __enter__(self):
-        pass
+            self.current_temp = next_val[0]
 
-    def __exit__(self, *args):
-        pass
-
-    def wait(self, *args):
-
-        next_val = next(self.temp_iter)
-        self.boiler.boiling = next_val[2] > 0
-        diff = next_val[1] - self.prev_val
-        time.sleep(diff)
-        self.prev_val = next_val[1]
-
-        self.current_temp = next_val[0]
-
-        self.tsic.return_value.measurement = Measurement(
-            self.current_temp, time.perf_counter()
-        )
+            measurement = Measurement(self.current_temp, time.perf_counter())
+            self.callback(measurement)
 
 
 def get_espyresso_simulator():
-    with patch("espyresso.temperature_thread.TsicInputChannel") as mocked_cls:
+    with patch("espyresso.temperature.TsicInputChannel") as mocked_cls:
         log_file = "power-orig2.log"
         log_data = get_log_data(log_file)
 
@@ -208,7 +197,8 @@ def get_espyresso_simulator():
         )
 
         espyresso = Espyresso(pigpio_pi=espyresso_mock)
-        mocked_cls.return_value._measure_waiting = MeasureWaiting(
-            mocked_cls, espyresso.boiler, log_data
-        )
+        temp_simulator = TemperatureSimulator(log_data, espyresso.temperature.callback)
+        temp_simulator.start()
+        espyresso.display.start_notification_timer()
+
         return espyresso
