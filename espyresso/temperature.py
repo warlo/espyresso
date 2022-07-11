@@ -3,7 +3,7 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from espyresso import config
 from espyresso.pcontroller import PController
@@ -27,26 +27,31 @@ LOG_POWER_FILE = f"log/power-{time.strftime('%X')}.log"
 class Temperature:
     def __init__(
         self,
-        *args,
+        *args: Any,
         pigpio_pi: "pi",
         boiler: "Boiler",
         flow: "Flow",
-        get_started_time: Callable,
+        get_started_time: Callable[[], float],
         temp_queue: "WaveQueue",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.get_started_time = get_started_time
 
         self.boiler = boiler
         self.flow = flow
 
-        self.tsic = TsicInputChannel(pigpio_pi=pigpio_pi, gpio=config.TSIC_GPIO)
+        self.tsic = TsicInputChannel(
+            pigpio_pi=pigpio_pi, gpio=config.TSIC_GPIO
+        )  # type: ignore
 
         # self.pid = PID()
         # self.pid.set_pid_gains(config.KP, config.KI, config.KD)
         # self.pid.set_integrator_limits(config.IMIN, config.IMAX)
 
-        initial_temperature = self.tsic.measure_once(timeout=5).degree_celsius
+        initial_temperature = self.tsic.measure_once(
+            timeout=5
+        ).degree_celsius  # type: ignore
+
         self.prev_timestamp = time.perf_counter()
         logger.warning("INITIAL TEMP: %s", str(initial_temperature))
 
@@ -81,7 +86,7 @@ class Temperature:
         self.boiler.set_value(value)
 
     def start(self) -> None:
-        self.tsic.start(callback=self.callback)
+        self.tsic.start(callback=self.callback)  # type: ignore
 
     def callback(self, measurement: Measurement) -> None:
         if (
@@ -119,12 +124,12 @@ class Temperature:
 
         logger.debug(f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}")
 
-    def log_power(self, temp, timestamp, heater_value):
+    def log_power(self, temp: float, timestamp: float, heater_value: float) -> None:
         with open(LOG_POWER_FILE, "a+") as f:
             f.write(f"{temp},{timestamp},{heater_value}\n")
 
-    def stop(self):
+    def stop(self) -> None:
         logger.debug("temperature_thread stopping")
         self.boiler.set_value(0)
-        self.tsic.stop()
+        self.tsic.stop()  # type: ignore
         logger.debug("temperature_thread stopped")

@@ -4,7 +4,7 @@ import logging
 import statistics
 import threading
 import time
-from typing import TYPE_CHECKING, Deque
+from typing import TYPE_CHECKING, Any, Deque
 
 import pigpio
 
@@ -20,10 +20,10 @@ if TYPE_CHECKING:
 class Ranger(threading.Thread):
     def __init__(
         self,
-        *args,
+        *args: Any,
         pigpio_pi: "pi",
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         self.pigpio_pi = pigpio_pi
         self.ranger_echo_in_gpio = config.RANGER_ECHO_IN
         self.ranger_trigger_out_gpio = config.RANGER_TRIGGER_OUT
@@ -38,16 +38,16 @@ class Ranger(threading.Thread):
         self.done = threading.Event()
 
         self.history: Deque[float] = collections.deque(maxlen=10)
-        self.high = 0
-        self.low = 0
+        self.high: int = 0
+        self.low: int = 0
 
         self._stop_event = threading.Event()
         super().__init__(*args, **kwargs)
 
-    def rise(self, gpio, level, tick) -> None:
+    def rise(self, gpio: int, level: int, tick: int) -> None:
         self.high = tick
 
-    def fall(self, gpio, level, tick) -> None:
+    def fall(self, gpio: int, level: int, tick: int) -> None:
         self.low = tick - self.high
         self.done.set()
 

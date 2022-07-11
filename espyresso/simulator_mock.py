@@ -2,14 +2,13 @@ import logging
 import random
 import threading
 import time
-from typing import List, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
 import pigpio
 from mock import MagicMock, patch
 
 from espyresso import config
 from espyresso.app import Espyresso
-from espyresso.boiler import Boiler
 from espyresso.tsic import Measurement
 
 logger = logging.getLogger(__name__)
@@ -20,45 +19,49 @@ SIMULATOR_RUNNING = True
 class PigpioSimulator(threading.Thread):
     name: str
 
-    def __init__(self, gpio, edge, callback, *args, **kwargs):
+    def __init__(
+        self,
+        gpio: int,
+        edge: int,
+        callback: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.gpio = gpio
         self.edge = edge
         self.callback = callback
         self._stop_event = threading.Event()
 
-    def run(self):
+    def run(self) -> None:
         while SIMULATOR_RUNNING:
             time.sleep(0.5)
             logger.debug(f"Callback to: {self.name}")
             self.callback(0, 0, 0)
 
-    def stop(self):
+    def stop(self) -> None:
         self._stop_event.set()
 
 
 class ButtonOneSimulator(PigpioSimulator):
     name = "button_one"
 
-    def __init__(self, espyresso_mock, *args, **kwargs):
+    def __init__(self, espyresso_mock: MagicMock, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         print(espyresso_mock)
         self.espyresso_mock = espyresso_mock
         espyresso_mock.read = self.read
-        self.read_started = None
+        self.read_started: Optional[float] = None
 
-    def read(self, gpio):
+    def read(self, gpio: int) -> bool:
         if not self.read_started:
             self.read_started = time.perf_counter()
             return True
 
         print("READING", gpio)
-        if time.perf_counter() - self.read_started > 0.25:
-            return False
-        else:
-            return True
+        return time.perf_counter() - self.read_started > 0.25
 
-    def run(self):
+    def run(self) -> None:
 
         while SIMULATOR_RUNNING:
             print("BUTTON")
@@ -77,7 +80,7 @@ class ButtonOneSimulator(PigpioSimulator):
 class FlowSimulator(PigpioSimulator):
     name = "flow"
 
-    def run(self):
+    def run(self) -> None:
         time.sleep(3)
         last_flow = time.perf_counter()
         while SIMULATOR_RUNNING:
@@ -91,7 +94,7 @@ class FlowSimulator(PigpioSimulator):
 class RangerRiseSimulator(PigpioSimulator):
     name = "ranger-rise"
 
-    def run(self):
+    def run(self) -> None:
         while SIMULATOR_RUNNING:
             time.sleep(2)
             self.callback(0, 0, 10)
@@ -100,14 +103,16 @@ class RangerRiseSimulator(PigpioSimulator):
 class RangerFallSimulator(PigpioSimulator):
     name = "ranger-fall"
 
-    def run(self):
+    def run(self) -> None:
         while SIMULATOR_RUNNING:
             time.sleep(2)
             self.callback(0, 0, 5)
 
 
-def get_callback(espyresso_mock):
-    def gpio_callback(gpio, edge, callback):
+def get_callback(
+    espyresso_mock: MagicMock,
+) -> Callable[[int, int, Callable[..., Any]], None]:
+    def gpio_callback(gpio: int, edge: int, callback: Callable[..., Any]) -> None:
         logger.debug(f"GPIO {gpio}")
 
         if gpio == config.FLOW_IN_GPIO:
@@ -116,22 +121,22 @@ def get_callback(espyresso_mock):
             flow_sim.start()
 
         if gpio == config.RANGER_ECHO_IN and edge == pigpio.RISING_EDGE:
-            ranger_sim = RangerRiseSimulator(gpio, edge, callback)
-            ranger_sim.start()
+            ranger_rise_sim = RangerRiseSimulator(gpio, edge, callback)
+            ranger_rise_sim.start()
 
         if gpio == config.RANGER_ECHO_IN and edge == pigpio.FALLING_EDGE:
-            ranger_sim = RangerFallSimulator(gpio, edge, callback)
-            ranger_sim.start()
+            ranger_fall_sim = RangerFallSimulator(gpio, edge, callback)
+            ranger_fall_sim.start()
 
         if gpio == config.BUTTON_ONE_GPIO:
-            # button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
+            button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
             # button_one_sim.start()
             pass
 
     return gpio_callback
 
 
-def stop_threads():
+def stop_threads() -> None:
     global SIMULATOR_RUNNING
     SIMULATOR_RUNNING = False
     logger.debug("STOPPING SIMULATOR")
@@ -167,14 +172,20 @@ def get_log_data(logfile: str) -> List[Tuple[float, float, float]]:
 class TemperatureSimulator(threading.Thread):
     name: str
 
-    def __init__(self, log_data, callback, *args, **kwargs):
+    def __init__(
+        self,
+        log_data: List[Tuple[float, float, float]],
+        callback: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ):
         self.temp_iter = iter(log_data)
-        self.current_temp = 20
-        self.prev_val = 0
+        self.current_temp = 20.0
+        self.prev_val = 0.0
         self.callback = callback
         super().__init__(*args, **kwargs)
 
-    def run(self):
+    def run(self) -> None:
         while SIMULATOR_RUNNING:
             next_val = next(self.temp_iter)
             diff = next_val[1] - self.prev_val
@@ -187,7 +198,7 @@ class TemperatureSimulator(threading.Thread):
             self.callback(measurement)
 
 
-def get_espyresso_simulator():
+def get_espyresso_simulator() -> Espyresso:
     with patch("espyresso.temperature.TsicInputChannel") as mocked_cls:
         log_file = "power-orig2.log"
         log_data = get_log_data(log_file)

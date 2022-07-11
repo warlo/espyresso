@@ -16,7 +16,7 @@ from espyresso.utils import WaveQueue
         (1.7, 0.5111713147410358),
     ],
 )
-def test_mls_per_pulse(input, expected):
+def test_mls_per_pulse(input: float, expected: float) -> None:
 
     flow_queue = WaveQueue(
         0,

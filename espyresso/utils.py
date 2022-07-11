@@ -1,23 +1,23 @@
 import math
 from collections import deque
-from typing import List, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 from espyresso.config import ZOOM
 
 
-class WaveQueue(deque):
+class WaveQueue(deque[Tuple[float, ...]]):
     def __init__(
         self,
         low: int,
         high: int,
-        *args,
+        *args: Any,
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: bool = False,
-        **kwargs,
+        target_y: Optional[float] = None,
+        **kwargs: Any,
     ) -> None:
         self.low = low
         self.high = high
@@ -34,26 +34,26 @@ class WaveQueue(deque):
         self.length = X_MAX - X_MIN
         return super().__init__(*args, **kwargs)
 
-    def set_labels(self, labels: List[str]):
+    def set_labels(self, labels: List[str]) -> None:
         self.queue_labels = labels
 
-    def get_min(self):
-        min_val = self.high
+    def get_min(self) -> int:
+        min_val: Union[int, float] = self.high
         for val in self:
             new_min = min(val)
             if new_min < min_val:
                 min_val = new_min
-        return min(min_val, self.min_low)
+        return int(min(min_val, self.min_low))
 
-    def get_max(self):
-        max_val = self.low
+    def get_max(self) -> int:
+        max_val: Union[int, float] = self.low
         for val in self:
             new_max = max(val)
             if new_max > max_val:
                 max_val = new_max
         return math.ceil(max(max_val, self.max_high))
 
-    def add_to_queue(self, new_value: Tuple[float, ...]):
+    def add_to_queue(self, new_value: Tuple[float, ...]) -> None:
         popped = None
         if len(self) >= self.length / ZOOM:
             popped = self.popleft()
@@ -71,10 +71,10 @@ class WaveQueue(deque):
             return
 
         if int(min(popped)) <= self.low:
-            self.low = int(self.get_min())
+            self.low = self.get_min()
 
         if math.ceil(max(popped)) >= self.high:
-            self.high = int(self.get_max())
+            self.high = self.get_max()
         # self.high = int(self.get_max())
 
 

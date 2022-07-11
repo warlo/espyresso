@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import pigpio
 
@@ -27,7 +27,7 @@ class Buttons:
         temperature: "Temperature",
         pump: "Pump",
         display: "Display",
-        turn_off_system: Callable,
+        turn_off_system: Callable[[], None],
     ):
         self.pigpio_pi = pigpio_pi
         self.button_one = config.BUTTON_ONE_GPIO
@@ -56,11 +56,11 @@ class Buttons:
             self.button_two, pigpio.FALLING_EDGE, self.falling_button_two
         )
 
-    def rising_button_one(self, gpio, level, tick) -> None:
+    def rising_button_one(self, *args: Any, **kwargs: Any) -> None:
         logger.debug("Button one rising")
         self.button_one_timestamp = time.perf_counter()
 
-    def falling_button_one(self, gpio, level, tick) -> None:
+    def falling_button_one(self, *args: Any, **kwargs: Any) -> None:
         seconds = time.perf_counter() - self.button_one_timestamp
         logger.debug(f"Button one falling: {seconds}")
 
@@ -75,11 +75,11 @@ class Buttons:
             _, notification = self.pump.brew_shot()
             self.display.set_notification(notification or "")
 
-    def rising_button_two(self, *args, **kwargs) -> None:
+    def rising_button_two(self, *args: Any, **kwargs: Any) -> None:
         self.button_two_timestamp = time.perf_counter()
         self.display.start_notification_timer()
 
-    def falling_button_two(self, *args, **kwargs) -> None:
+    def falling_button_two(self, *args: Any, **kwargs: Any) -> None:
 
         self.display.stop_notification_timer()
         seconds = time.perf_counter() - self.button_two_timestamp

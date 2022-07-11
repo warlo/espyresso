@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import pygame
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class Display(threading.Thread):
     def __init__(
         self,
-        *args,
+        *args: Any,
         boiler: "Boiler",
         brewing_timer: "BrewingTimer",
         pump: "Pump",
@@ -33,8 +33,8 @@ class Display(threading.Thread):
         flow: "Flow",
         get_started_time: Callable[[], float],
         wave_queues: Dict[str, WaveQueue],
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
@@ -157,11 +157,11 @@ class Display(threading.Thread):
         Y_MIN: int,
         Y_MAX: int,
         steps: int = 10,
-        target_y: bool = False,
-    ):
+        target_y: Optional[float] = None,
+    ) -> None:
         if target_y:
             self.draw_target_line(
-                config.TARGET_TEMP, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
+                target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
             )
         self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
         self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
@@ -335,7 +335,7 @@ class Display(threading.Thread):
             pygame.display.update()
             time.sleep(0.1)
 
-    def test_display(self):
+    def test_display(self) -> None:
         # run the game loop
         # import random
         import time

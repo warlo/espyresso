@@ -2,7 +2,7 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ class Timer:
         self.stopped = None
         self.started = time.perf_counter()
 
-    def stop_timer(self, *, subtract_time=0) -> None:
+    def stop_timer(self, *, subtract_time: int = 0) -> None:
         self.stopped = time.perf_counter() - subtract_time
 
     def reset_timer(self) -> None:
@@ -40,7 +40,7 @@ class Timer:
 
 
 class BrewingTimer(threading.Thread):
-    def __init__(self, flow: "Flow", *args, **kwargs):
+    def __init__(self, flow: "Flow", *args: Any, **kwargs: Any) -> None:
         self._stop_event = threading.Event()
 
         self.flow = flow

@@ -2,7 +2,7 @@ from espyresso import config
 from espyresso.utils import WaveQueue
 
 
-def test_queue_lower_than_min():
+def test_queue_lower_than_min() -> None:
 
     temp_queue = WaveQueue(
         90,
@@ -19,7 +19,7 @@ def test_queue_lower_than_min():
     assert temp_queue.high == 100.0
 
 
-def test_queue_higher_than_max():
+def test_queue_higher_than_max() -> None:
 
     temp_queue = WaveQueue(
         90,
@@ -36,7 +36,7 @@ def test_queue_higher_than_max():
     assert temp_queue.high == 120.0
 
 
-def test_queue_popping_highest():
+def test_queue_popping_highest() -> None:
 
     temp_queue = WaveQueue(
         90,

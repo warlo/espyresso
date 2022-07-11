@@ -3,6 +3,7 @@ import os
 import signal
 import sys
 import time
+from typing import Any, Optional
 
 import pigpio
 
@@ -29,13 +30,14 @@ logger = logging.getLogger(__name__)
 
 
 class Espyresso:
-    def __init__(self, pigpio_pi=None):
+    def __init__(self, pigpio_pi: Optional[pigpio.pi] = None):
         self.started_time = time.perf_counter()
         logger.debug("STARTING ESPYRESSO")
 
-        self.pigpio_pi = pigpio_pi
-        if not self.pigpio_pi:
+        if not pigpio_pi:
             self.pigpio_pi = pigpio.pi()
+        else:
+            self.pigpio_pi = pigpio_pi
 
         self.flow_queue = WaveQueue(
             0,
@@ -161,12 +163,12 @@ class Espyresso:
         except Exception:
             logger.exception("Failed exiting")
 
-    def turn_off_system(self):
+    def turn_off_system(self) -> None:
         self.stop()
         logger.debug("Triggering shutdown")
         os.system("shutdown now -h")
 
-    def signal_handler(self, sig, frame):
+    def signal_handler(self, sig: int, *args: Any) -> None:
         if sig == 2:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
@@ -174,12 +176,12 @@ class Espyresso:
         self.exit()
 
 
-def handler(signum, frame):
+def handler(signum: int, *args: Any) -> None:
     """Why is systemd sending sighups?"""
     logger.warning(f"Got a {signum} signal. Doing nothing")
 
 
-def run():
+def run() -> None:
     if not config.DEBUG:
         espyresso = Espyresso()
     else:

@@ -1,5 +1,5 @@
 import logging
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 from espyresso import config
 from espyresso.pwm import PWM
@@ -14,8 +14,8 @@ class Boiler:
     def __init__(
         self,
         pigpio_pi: "pi",
-        reset_started_time: Callable,
-        add_to_queue: Callable,
+        reset_started_time: Callable[[], None],
+        add_to_queue: Callable[[Tuple[float, ...]], None],
         boiling: bool = False,
     ):
         logger.debug(f"Boiler INIT: gpio {config.BOILER_PWM_GPIO} boiling {boiling}")
@@ -24,7 +24,7 @@ class Boiler:
         self.boiling = boiling
         self.reset_started_time = reset_started_time
 
-        self.pwm_override = None
+        self.pwm_override: Optional[float] = None
         self.set_pwm_override(None)
         self.add_to_queue = add_to_queue
 
@@ -34,21 +34,21 @@ class Boiler:
 
         logger.debug("Boiler READY")
 
-    def get_boiling(self):
+    def get_boiling(self) -> bool:
         return self.boiling
 
-    def turn_off_boiler(self):
+    def turn_off_boiler(self) -> None:
         self.boiling = False
         self.pwm.set_value(0)
 
-    def toggle_boiler(self):
+    def toggle_boiler(self) -> None:
         self.boiling = not self.get_boiling()
         if not self.boiling:
             self.pwm.set_value(0)
         else:
             self.reset_started_time()
 
-    def set_pwm_override(self, value):
+    def set_pwm_override(self, value: Optional[float]) -> None:
         self.pwm_override = value
 
         if self.pwm_override:
@@ -56,7 +56,7 @@ class Boiler:
         else:
             self.pwm.set_value(0)
 
-    def set_value(self, value):
+    def set_value(self, value: float) -> None:
         if not self.get_boiling():
             return
 
@@ -71,7 +71,7 @@ class Boiler:
         self.pwm.set_value(value)
         self.add_to_queue(tuple((round(value * 100, 1),)))
 
-    def stop(self):
+    def stop(self) -> None:
         logger.debug("Boiler stopping")
         self.set_pwm_override(None)
         self.set_value(0)

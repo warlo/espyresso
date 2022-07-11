@@ -27,11 +27,11 @@ class Pump:
         boiler: "Boiler",
         temperature: "Temperature",
         flow: "Flow",
-        reset_started_time: Callable,
+        reset_started_time: Callable[[], None],
         brewing_timer: "BrewingTimer",
         ranger: "Ranger",
-        pumping=False,
-    ):
+        pumping: bool = False,
+    ) -> None:
         self.pigpio_pi = pigpio_pi
         self.boiler = boiler
         self.temperature = temperature
