@@ -38,8 +38,11 @@ class Boiler:
         return self.boiling
 
     def turn_off_boiler(self) -> None:
+        logger.debug("Boiler stopping")
         self.boiling = False
-        self.pwm.set_value(0)
+        self.set_pwm_override(None)
+        self.set_value(0)
+        logger.debug("Boiler stopped")
 
     def toggle_boiler(self) -> None:
         self.boiling = not self.get_boiling()
@@ -70,9 +73,3 @@ class Boiler:
 
         self.pwm.set_value(value)
         self.add_to_queue(tuple((round(value * 100, 1),)))
-
-    def stop(self) -> None:
-        logger.debug("Boiler stopping")
-        self.set_pwm_override(None)
-        self.set_value(0)
-        logger.debug("Boiler stopped")

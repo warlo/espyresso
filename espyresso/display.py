@@ -141,7 +141,9 @@ class Display(threading.Thread):
     def draw_notification(self) -> None:
         notification = self.notification
         if self.notification_timer:
-            notification = str(round(time.perf_counter() - self.notification_timer + 1, 1))
+            notification = str(
+                round(time.perf_counter() - self.notification_timer + 1, 1)
+            )
 
         if not notification or self.notification_updated - time.perf_counter() > 5:
             return
@@ -300,10 +302,7 @@ class Display(threading.Thread):
                 previous_point = point
 
     def stop(self) -> None:
-        logger.debug("Display stopping")
         self._stop_event.set()
-        pygame.quit()
-        logger.debug("Display stopped")
 
     def run(self) -> None:
         while not self._stop_event.is_set():
@@ -334,6 +333,8 @@ class Display(threading.Thread):
                 )
             pygame.display.update()
             time.sleep(0.1)
+        pygame.display.quit()
+        pygame.quit()
 
     def test_display(self) -> None:
         # run the game loop

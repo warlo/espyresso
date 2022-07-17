@@ -120,8 +120,6 @@ class Espyresso:
             turn_off_system=self.turn_off_system,
         )
 
-        self.running = True
-
     def reset_started_time(self) -> None:
         self.started_time = time.perf_counter()
 
@@ -141,17 +139,15 @@ class Espyresso:
         self.ranger.join()
         # self.brewing_timer.join()
 
+        logger.debug("Pigpio stopping")
+        self.pigpio_pi.stop()
+
     def stop(self) -> None:
         # self.brewing_timer.stop()
+        self.boiler.turn_off_boiler()
         self.ranger.stop()
         self.temperature.stop()
         self.display.stop()
-        self.boiler.stop()
-
-        self.running = False
-        time.sleep(1)
-        logger.debug("Pigpio stopping")
-        self.pigpio_pi.stop()
 
     def exit(self) -> None:
         self.stop()
@@ -166,7 +162,9 @@ class Espyresso:
     def turn_off_system(self) -> None:
         self.stop()
         logger.debug("Triggering shutdown")
+        print("SHUTDOWN")
         os.system("shutdown now -h")
+        print("AFTER SHUTDOWN")
 
     def signal_handler(self, sig: int, *args: Any) -> None:
         if sig == 2:
