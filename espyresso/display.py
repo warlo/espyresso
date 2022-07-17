@@ -141,7 +141,7 @@ class Display(threading.Thread):
     def draw_notification(self) -> None:
         notification = self.notification
         if self.notification_timer:
-            notification = str(int(time.perf_counter() - self.notification_timer))
+            notification = str(round(time.perf_counter() - self.notification_timer + 1, 1))
 
         if not notification or self.notification_updated - time.perf_counter() > 5:
             return
