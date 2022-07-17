@@ -5,7 +5,7 @@ from typing import Any, List, Optional, Tuple, Union
 from espyresso.config import ZOOM
 
 
-class WaveQueue(deque[Tuple[float, ...]]):
+class WaveQueue(deque):  # type: ignore
     def __init__(
         self,
         low: int,
