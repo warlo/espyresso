@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# mypy: ignore-errors
 
 """
 TSIC temperature sensor and ZACWire protocol support for Raspberry PI.
