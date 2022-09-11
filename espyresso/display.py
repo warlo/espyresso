@@ -267,8 +267,8 @@ class Display(threading.Thread):
         label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
         self.screen.blit(label, (140, 28))
 
-    def draw_scale_weight(self, scale_weight: int = 0) -> None:
-        label = self.small_font.render(f"{round(scale_weight / 10, 1)}g", 1, self.WHITE)
+    def draw_scale_weight(self, scale_weight: float = 0) -> None:
+        label = self.small_font.render(f"{scale_weight}g", 1, self.WHITE)
         self.screen.blit(label, (140, 42))
 
     def draw_target_line(

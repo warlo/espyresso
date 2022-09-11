@@ -88,8 +88,10 @@ class Espyresso:
             flow=self.flow,
             temp_queue=self.temp_queue,
         )
+        self.bluetooth_scale = BluetoothScale()
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
+            bluetooth_scale=self.bluetooth_scale,
             boiler=self.boiler,
             temperature=self.temperature,
             flow=self.flow,
@@ -97,8 +99,6 @@ class Espyresso:
             brewing_timer=self.brewing_timer,
             ranger=self.ranger,
         )
-
-        self.bluetooth_scale = BluetoothScale()
 
         self.display = Display(
             get_started_time=self.get_started_time,

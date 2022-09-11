@@ -10,6 +10,7 @@ from espyresso import config
 from espyresso.pwm import PWM
 
 if TYPE_CHECKING:
+    from espyresso.bluetooth import BluetoothScale
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.ranger import Ranger
@@ -24,6 +25,7 @@ class Pump:
     def __init__(
         self,
         pigpio_pi: pigpio.pi,
+        bluetooth_scale: "BluetoothScale",
         boiler: "Boiler",
         temperature: "Temperature",
         flow: "Flow",
@@ -33,6 +35,7 @@ class Pump:
         pumping: bool = False,
     ) -> None:
         self.pigpio_pi = pigpio_pi
+        self.bluetooth_scale = bluetooth_scale
         self.boiler = boiler
         self.temperature = temperature
         self.flow = flow
@@ -163,15 +166,17 @@ class Pump:
         self.brewing_timer.start_timer()
 
         while self.pumping:
-            current_ml = self.flow.get_millilitres()
+            # current_ml = self.flow.get_millilitres()
+            target_grams = 35
+            current_grams = self.bluetooth_scale.get_scale_weight()
 
             # 36 ml in cup, and 30 ml error in puck / pressure
-            if not self.flow.learning_mode and current_ml > 66:
+            if current_grams >= target_grams:
                 break
 
             # Gradually reduce pump pressure before end
-            if not self.flow.learning_mode and current_ml > (66 - 5):
-                self.set_pwm_value(min(0.3, (66 - current_ml) / 5))
+            if current_grams > (target_grams - 5):
+                self.set_pwm_value(min(0.3, (target_grams - current_grams) / 5))
                 break
 
             time_passed = self.brewing_timer.get_time_since_started()

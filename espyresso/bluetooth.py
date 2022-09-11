@@ -1,3 +1,4 @@
+import time
 from typing import TYPE_CHECKING, Optional
 
 from espyresso import config
@@ -9,13 +10,16 @@ if TYPE_CHECKING:
 
 
 class BluetoothScale:
+    current_weight_timestamp: float = 0
     current_weight: int = 0
     bleak_client: "BleakClient" = None
     stop_event: Optional["Event"] = None
     disconnect_event: Optional["Event"] = None
 
-    def get_scale_weight(self) -> int:
-        return self.current_weight
+    def get_scale_weight(self) -> float:
+        if time.perf_counter() - self.current_weight_timestamp > 5:
+            return 0
+        return self.current_weight / 10
 
     def start(self) -> None:
         import asyncio
@@ -42,6 +46,7 @@ class BluetoothScale:
         v_int = int.from_bytes(data[7:9], "little")
         # print("Callback", list(data), v_int)
         self.current_weight = v_int
+        self.current_weight_timestamp = time.perf_counter()
 
     async def notify(self) -> None:
         import asyncio
