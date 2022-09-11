@@ -109,6 +109,7 @@ class Pump:
             time.sleep(1)
 
         self.stop_pump()
+        self.set_pwm_value(0.75)
 
     def brew_shot(self) -> Tuple[bool, Optional[str]]:
         if self.pump_thread.is_alive():

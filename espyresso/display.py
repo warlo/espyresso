@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from espyresso.pump import Pump
     from espyresso.ranger import Ranger
     from espyresso.timer import BrewingTimer
+    from espyresso.bluetooth import BluetoothScale
 
 from espyresso.utils import WaveQueue, linear_transform
 
@@ -26,6 +27,7 @@ class Display(threading.Thread):
     def __init__(
         self,
         *args: Any,
+        bluetooth_scale: "BluetoothScale",
         boiler: "Boiler",
         brewing_timer: "BrewingTimer",
         pump: "Pump",
@@ -88,6 +90,7 @@ class Display(threading.Thread):
         self.ranger = ranger
         self.flow = flow
         self.get_started_time = get_started_time
+        self.bluetooth_scale = bluetooth_scale
 
         self._stop_event = threading.Event()
         self.wave_queues = wave_queues
@@ -264,6 +267,10 @@ class Display(threading.Thread):
         label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
         self.screen.blit(label, (140, 28))
 
+    def draw_scale_weight(self, scale_weight: int = 0) -> None:
+        label = self.small_font.render(f"{round(scale_weight / 10, 1)}g", 1, self.WHITE)
+        self.screen.blit(label, (140, 42))
+
     def draw_target_line(
         self,
         target: float,
@@ -320,6 +327,7 @@ class Display(threading.Thread):
                 time_since_started=self.brewing_timer.get_time_since_started()
             )
             self.draw_flow(millilitres=self.flow.get_millilitres())
+            self.draw_scale_weight(scale_weight=self.bluetooth_scale.get_scale_weight())
             self.draw_notification()
             for queue in self.wave_queues.values():
                 self.draw_waveform(

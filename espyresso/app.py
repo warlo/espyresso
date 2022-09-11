@@ -8,6 +8,7 @@ from typing import Any, Optional
 import pigpio
 
 from espyresso import config
+from espyresso.bluetooth import BluetoothScale
 from espyresso.boiler import Boiler
 from espyresso.buttons import Buttons
 from espyresso.display import Display
@@ -97,8 +98,11 @@ class Espyresso:
             ranger=self.ranger,
         )
 
+        self.bluetooth_scale = BluetoothScale()
+
         self.display = Display(
             get_started_time=self.get_started_time,
+            bluetooth_scale=self.bluetooth_scale,
             boiler=self.boiler,
             brewing_timer=self.brewing_timer,
             pump=self.pump,
