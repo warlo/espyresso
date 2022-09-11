@@ -51,14 +51,14 @@ class BluetoothScale:
     async def notify(self) -> None:
         import asyncio
 
-        self.disconnect_event = asyncio.Event()
         self.stop_event = asyncio.Event()
         while not self.stop_event.is_set():
-            if not self.disconnect_event.is_set():
+            if self.disconnect_event and self.disconnect_event.is_set():
                 print("Already connected")
                 await asyncio.sleep(5)
                 continue
 
+            self.disconnect_event = asyncio.Event()
             try:
                 async with self.bleak_client as client:
                     await client.start_notify(
