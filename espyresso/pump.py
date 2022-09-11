@@ -221,7 +221,8 @@ class Pump:
         shot_log = (
             f"\n{time.strftime('%Y-%m-%dT%H:%M:%S%z')};"
             f"Time: {shot_time};"
-            f"Shot mL {self.flow.get_millilitres()};"
+            f"Shot mL: {self.flow.get_millilitres()};"
+            f"Shot grams: {self.bluetooth_scale.get_scale_weight()};"
             f"Preinfuse mL: {preinfuse_ml};"
         )
         with open(config.SHOT_STAT_FILE, "a") as f:
