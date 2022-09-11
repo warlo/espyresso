@@ -177,7 +177,6 @@ class Pump:
             # Gradually reduce pump pressure before end
             if current_grams > (target_grams - 5):
                 self.set_pwm_value(min(0.3, (target_grams - current_grams) / 5))
-                break
 
             time_passed = self.brewing_timer.get_time_since_started()
 
