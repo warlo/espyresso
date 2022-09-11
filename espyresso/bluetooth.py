@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 
-import config
+from espyresso import config
 
 if TYPE_CHECKING:
     from asyncio import Event
