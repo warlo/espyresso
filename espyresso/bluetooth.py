@@ -28,9 +28,9 @@ class BluetoothScale:
         asyncio.run(self.notify())
 
     def stop(self) -> None:
-        import asyncio
-
-        asyncio.run(self.stop_notify())
+        print("Stop")
+        if self.stop_event is not None:
+            self.stop_event.set()
 
     def disconnected(self, client: "BleakClient") -> None:
         if not self.disconnect_event:
@@ -60,20 +60,9 @@ class BluetoothScale:
                         config.BLUETOOTH_NOTIFY_UUID, self.callback
                     )
                     await self.disconnect_event.wait()
+                    await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
             except Exception as e:
                 print("start_notify exception:", e)
                 pass
 
             self.disconnect_event = asyncio.Event()
-
-    async def stop_notify(self) -> None:
-
-        print("Stop")
-        if self.stop_event is not None:
-            self.stop_event.set()
-
-        try:
-            async with self.bleak_client as client:
-                await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
-        except Exception:
-            pass
