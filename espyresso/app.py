@@ -137,6 +137,7 @@ class Espyresso:
 
         self.temperature.start()
         self.ranger.start()
+        self.bluetooth_scale.start()
         # self.brewing_timer.start()
 
         self.display.join()
@@ -148,6 +149,7 @@ class Espyresso:
 
     def stop(self) -> None:
         # self.brewing_timer.stop()
+        self.bluetooth_scale.stop()
         self.boiler.turn_off_boiler()
         self.ranger.stop()
         self.temperature.stop()
