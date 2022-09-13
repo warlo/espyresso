@@ -96,7 +96,7 @@ class BrewingTimer(threading.Thread):
                 time.sleep(1)
                 continue
 
-            time_since_last_pulse = self.flow.get_time_since_last_pulse()
+            time_since_last_pulse = time.perf_counter() - self.flow.prev_pulse_time
             if (
                 not self.timer_running()
                 and (self.get_time_since_stopped() > 3)

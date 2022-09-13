@@ -215,7 +215,7 @@ class Pump:
             if time_passed < 5:
                 self.set_pwm_value(0.5 + 0.2 * (time_passed / 5))
             if time_passed > 45:
-                return self.reset_routine()
+                return self.reset_brew_routine()
 
             time.sleep(0.05)
 

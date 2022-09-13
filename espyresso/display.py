@@ -371,6 +371,8 @@ class Display(threading.Thread):
 if __name__ == "__main__":
     from mock import MagicMock
 
+    bluetooth_scale = MagicMock()
+    bluetooth_scale.get_scale_weight = lambda: 0
     boiler = MagicMock()
     boiler.pwm.get_display_value = lambda: 0
     pump = MagicMock()
@@ -413,6 +415,7 @@ if __name__ == "__main__":
     }
 
     dis = Display(
+        bluetooth_scale=bluetooth_scale,
         boiler=boiler,
         brewing_timer=brewing_timer,
         pump=pump,

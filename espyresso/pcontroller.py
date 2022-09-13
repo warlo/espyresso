@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class PController:
     def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
-        self.temp_setpoint = config.BREW_SETPOINT
+        self.temp_setpoint = config.TARGET_TEMP
 
         self.elementTemp = initial_temperature
         self.shellTemp = initial_temperature
@@ -38,8 +38,8 @@ class PController:
         self.lastBoilerPidTime: float = time.perf_counter()
         self.flow = flow
 
-    def set_target_temp(self, temperatue: float = config.BREW_SETPOINT) -> None:
-        self.temp_setpoint = temperatue
+    def set_target_temp(self, temperature: float) -> None:
+        self.temp_setpoint = temperature
 
     def update(
         self, *, temperature: float, boiling: bool
