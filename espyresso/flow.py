@@ -69,11 +69,12 @@ class Flow:
             self.second_half_period,
             current_time - self.prev_pulse_time,
         )
-        self.prev_pulse_time = current_time
 
         pulse_rate = self.get_pulse_rate_for_volume()
         ml_per_pulse = self.get_mls_per_pulse(pulse_rate)
         flow_rate = self.get_flow_rate()
+
+        self.prev_pulse_time = current_time
 
         if not flow_rate or not ml_per_pulse:
             return
@@ -100,9 +101,10 @@ class Flow:
         elif not self.first_half_period:
             pulse_rate = 0.5 / self.second_half_period
         else:
+            time_since_last_pulse = time.perf_counter() - self.prev_pulse_time
             pulse_rate = 1 / (
-                self.first_half_period
-                + max(time.perf_counter(), self.second_half_period)
+                max(time_since_last_pulse, self.first_half_period)
+                + self.second_half_period
             )
 
         return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
