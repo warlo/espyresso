@@ -34,15 +34,20 @@ class Flow:
 
         self.pulse_start: float = time.perf_counter()
 
-        self.prev_pulse_time: Optional[float] = None
-        self.newest_pulse_time: Optional[float] = None
+        self.prev_pulse_time: float = 0.0
+        self.prev_change_time: float = 0.0
+
+        self.first_half_period: Optional[float] = None
+        self.second_half_period: Optional[float] = None
         self.lock = threading.RLock()
 
     def reset_pulse_count(self) -> None:
         self.total_volume = 0.0
         self.pulse_count = 0
-        self.prev_pulse_time = None
-        self.newest_pulse_time = None
+        self.prev_pulse_time = 0.0
+        self.prev_change_time = 0.0
+        self.first_half_period = None
+        self.second_half_period = None
         self.pulse_start = time.perf_counter()
         self.flow_queue.clear()
 
@@ -51,38 +56,37 @@ class Flow:
         # Skip sub 20ms erratic pulses
         current_time = time.perf_counter()
         if (
-            self.newest_pulse_time
-            and current_time - self.newest_pulse_time < config.FLOW_METER_DEBOUNCE_TIME
+            self.prev_change_time
+            and current_time - self.prev_change_time < config.FLOW_METER_DEBOUNCE_TIME
         ):
             logger.warning("Skipping sub 20ms flow pulse")
-            self.newest_pulse_time = current_time
+            self.prev_change_time = current_time
             return None
 
         self.pulse_count += 1
-        self.prev_pulse_time, self.newest_pulse_time = (
-            self.newest_pulse_time,
-            time.perf_counter(),
-        )
 
-        pulse_rate = self.get_pulse_rate()
-        mls = self.get_mls_per_pulse(pulse_rate)
+        self.first_half_period, self.second_half_period = (
+            self.second_half_period,
+            current_time - self.prev_pulse_time,
+        )
+        self.prev_pulse_time = current_time
+
+        pulse_rate = self.get_pulse_rate_for_volume()
+        ml_per_pulse = self.get_mls_per_pulse(pulse_rate)
         flow_rate = self.get_flow_rate()
 
-        if not flow_rate or not mls:
+        if not flow_rate or not ml_per_pulse:
             return
 
-        logger.info(f"Pulse rate, mls, flow_rate: {pulse_rate} {mls} {flow_rate}")
+        logger.info(
+            f"Pulse rate, mls, flow_rate: {pulse_rate} {ml_per_pulse} {flow_rate}"
+        )
         logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
 
-        self.total_volume += mls
-        average_rate = self.total_volume / (self.newest_pulse_time - self.pulse_start)
+        self.total_volume += ml_per_pulse / 2.0
+        average_rate = self.total_volume / (self.prev_pulse_time - self.pulse_start)
 
         self.flow_queue.add_to_queue(tuple((flow_rate, average_rate)))
-
-    def get_time_since_last_pulse(self) -> Optional[float]:
-        if not self.newest_pulse_time:
-            return None
-        return time.perf_counter() - self.newest_pulse_time
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -91,19 +95,28 @@ class Flow:
         return self.total_volume
 
     def get_flow_rate(self) -> Optional[float]:
-        pulse_rate = self.get_pulse_rate()
+        if not self.second_half_period:
+            pulse_rate = 0.0
+        elif not self.first_half_period:
+            pulse_rate = 0.5 / self.second_half_period
+        else:
+            pulse_rate = 1 / (
+                self.first_half_period
+                + max(time.perf_counter(), self.second_half_period)
+            )
 
         return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
 
-    def get_pulse_rate(self) -> float:
-        if not self.prev_pulse_time or not self.newest_pulse_time:
+    def get_pulse_rate_for_volume(
+        self,
+    ) -> float:
+        if not self.second_half_period:
             return 0
 
-        time_since_pulse = self.get_time_since_last_pulse()
-        if time_since_pulse and time_since_pulse > 0.5:
-            return 0
-
-        pulse_rate = 1 / (self.newest_pulse_time - self.prev_pulse_time)
+        if not self.first_half_period:
+            pulse_rate = 0.5 / self.second_half_period
+        else:
+            pulse_rate = 1 / (self.first_half_period + self.second_half_period)
         return pulse_rate
 
     @staticmethod

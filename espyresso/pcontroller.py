@@ -51,7 +51,7 @@ class PController:
         self.flowRate = self.flow.get_flow_rate() or 0
         logger.debug(f"FLOWRATE {self.flowRate}")
         # Max flow rate
-        self.flowRate = self.flowRate if self.flowRate < 2.3 else 2.3
+        self.flowRate = self.flowRate if self.flowRate < 2.0 else 2.0
 
         # TODO: verify flow
         waterToFlowPower = (
