@@ -38,11 +38,8 @@ class PController:
         self.lastBoilerPidTime: float = time.perf_counter()
         self.flow = flow
 
-    def set_steam_temp(self) -> None:
-        self.temp_setpoint = config.TARGET_STEAM_TEMP
-
-    def set_brew_temp(self) -> None:
-        self.temp_setpoint = config.TARGET_TEMP
+    def set_target_temp(self, temperatue: float = config.BREW_SETPOINT) -> None:
+        self.temp_setpoint = temperatue
 
     def update(
         self, *, temperature: float, boiling: bool

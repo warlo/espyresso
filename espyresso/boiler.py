@@ -44,6 +44,10 @@ class Boiler:
         self.set_value(0)
         logger.debug("Boiler stopped")
 
+    def turn_on_boiler(self) -> None:
+        self.boiling = True
+        self.reset_started_time()
+
     def toggle_boiler(self) -> None:
         self.boiling = not self.get_boiling()
         if not self.boiling:

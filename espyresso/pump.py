@@ -133,16 +133,16 @@ class Pump:
         self.brewing_timer.disable_automatic_timing()
 
         started = time.perf_counter()
-        self.temperature.pcontroller.set_steam_temp()
-        self.toggle_pump()
+        self.temperature.set_steam_temp()
+        self.boiler.turn_on_boiler()
 
         while self.pumping and time.perf_counter() - started < 120:
-            self.set_pwm_value(0.3)
+            self.set_pwm_value(0.4)
             time.sleep(0.5)
             self.set_pwm_value(0)
             time.sleep(0.5)
 
-        self.temperature.pcontroller.set_brew_temp()
+        self.temperature.set_brew_temp()
         self.reset()
 
     def brew_shot(self) -> Tuple[bool, Optional[str]]:

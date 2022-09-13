@@ -76,6 +76,14 @@ class Temperature:
 
         self.lock = threading.RLock()
 
+    def set_steam_temp(self) -> None:
+        self.pcontroller.set_target_temp(config.TARGET_STEAM_TEMP)
+        self.temp_queue.target_y = config.TARGET_STEAM_TEMP
+
+    def set_brew_temp(self) -> None:
+        self.pcontroller.set_target_temp(config.TARGET_TEMP)
+        self.temp_queue.target_y = config.TARGET_TEMP
+
     def get_latest_brewhead_temperature(self) -> float:
         return self.pcontroller.brewHeadTemp
 
