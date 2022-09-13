@@ -35,6 +35,7 @@ SDA_GPIO = 2  # TODO: Add support for pressure meter
 SCL_GPIO = 3
 
 TARGET_TEMP = 95.0
+TARGET_STEAM_TEMP = 135.0
 KP = 0.0762
 KI = 0.0616
 KD = 0.905

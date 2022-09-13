@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 class PController:
     def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
+        self.temp_setpoint = config.BREW_SETPOINT
+
         self.elementTemp = initial_temperature
         self.shellTemp = initial_temperature
 
@@ -35,6 +37,12 @@ class PController:
         self.heaterPower = 0.0
         self.lastBoilerPidTime: float = time.perf_counter()
         self.flow = flow
+
+    def set_steam_temp(self) -> None:
+        self.temp_setpoint = config.TARGET_STEAM_TEMP
+
+    def set_brew_temp(self) -> None:
+        self.temp_setpoint = config.TARGET_TEMP
 
     def update(
         self, *, temperature: float, boiling: bool
@@ -216,7 +224,7 @@ class PController:
 
         # we want the water to reach target temperature in the next 15s so calculate the necessary average temperature of the shell
         desiredWaterInputPower = (
-            (config.BREW_SETPOINT - self.waterTemp)
+            (self.temp_setpoint - self.waterTemp)
             * config.SPEC_HEAT_WATER_100
             * config.BOILER_VOLUME
             / 15.0
@@ -238,13 +246,13 @@ class PController:
         maxStableAverageShellTemp = (
             (
                 brewHeadToAmbientPower * 20.0
-                - (self.waterTemp - config.BREW_SETPOINT)
+                - (self.waterTemp - self.temp_setpoint)
                 * config.SPEC_HEAT_WATER_100
                 * config.BOILER_VOLUME
             )
             / config.SPEC_HEAT_ALUMINIUM
             / config.MASS_BOILER_SHELL
-            + config.BREW_SETPOINT
+            + self.temp_setpoint
         )
         logger.debug(f"maxStableAverageShellTemp: {maxStableAverageShellTemp}")
         desiredAverageShellTemp = min(

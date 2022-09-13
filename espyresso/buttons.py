@@ -64,16 +64,19 @@ class Buttons:
         seconds = time.perf_counter() - self.button_one_timestamp
         logger.debug(f"Button one falling: {seconds}")
 
-        if seconds < 0.25 or seconds > 5:
+        if seconds < 0.25:
             return
 
-        if self.temperature.get_latest_brewhead_temperature() < 80:
-            _, notification = self.pump.pulse_pump()
-            self.display.set_notification(notification or "")
+        if seconds < 5:
+            if self.temperature.get_latest_brewhead_temperature() < 80:
+                _, notification = self.pump.pulse_pump()
+                self.display.set_notification(notification or "")
 
-        if self.temperature.get_latest_brewhead_temperature() > 80:
-            _, notification = self.pump.brew_shot()
-            self.display.set_notification(notification or "")
+            if self.temperature.get_latest_brewhead_temperature() > 80:
+                _, notification = self.pump.brew_shot()
+                self.display.set_notification(notification or "")
+        else:
+            self.pump.pulse_pump_steam_routine()
 
     def rising_button_two(self, *args: Any, **kwargs: Any) -> None:
         self.button_two_timestamp = time.perf_counter()

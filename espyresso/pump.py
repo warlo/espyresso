@@ -79,7 +79,7 @@ class Pump:
 
     def pulse_pump(self) -> Tuple[bool, Optional[str]]:
         if self.pump_thread.is_alive():
-            self.reset_routine()
+            self.reset()
             return True, None
 
         if not self.ranger.has_enough_water():
@@ -111,12 +111,43 @@ class Pump:
             self.set_pwm_value(0)
             time.sleep(1)
 
-        self.stop_pump()
-        self.set_pwm_value(0.75)
+        self.reset()
+
+    def pulse_pump_steam(self) -> Tuple[bool, Optional[str]]:
+        if self.pump_thread.is_alive():
+            self.reset()
+            return True, None
+
+        if not self.ranger.has_enough_water():
+            return False, "Not enough water"
+
+        self.pump_thread = threading.Thread(target=self.pulse_pump_steam_routine)
+        self.reset_started_time()
+        self.pump_thread.start()
+        return True, None
+
+    def pulse_pump_steam_routine(self) -> None:
+        logger.debug("Starting pulse pump steam routine!")
+
+        # Disable automatic BrewingTimer
+        self.brewing_timer.disable_automatic_timing()
+
+        started = time.perf_counter()
+        self.temperature.pcontroller.set_steam_temp()
+        self.toggle_pump()
+
+        while self.pumping and time.perf_counter() - started < 120:
+            self.set_pwm_value(0.3)
+            time.sleep(0.5)
+            self.set_pwm_value(0)
+            time.sleep(0.5)
+
+        self.temperature.pcontroller.set_brew_temp()
+        self.reset()
 
     def brew_shot(self) -> Tuple[bool, Optional[str]]:
         if self.pump_thread.is_alive():
-            self.reset_routine()
+            self.reset_brew_routine()
             return True, None
 
         if not self.ranger.has_enough_water():
@@ -135,7 +166,7 @@ class Pump:
 
         # If already pumping then reset the routine
         if self.pumping:
-            return self.reset_routine()
+            return self.reset_brew_routine()
 
         # Reset flow meter
         self.flow.reset_pulse_count()
@@ -188,14 +219,17 @@ class Pump:
 
             time.sleep(0.05)
 
-        return self.reset_routine()
+        return self.reset_brew_routine()
 
-    def reset_routine(self) -> None:
+    def reset(self) -> None:
         self.stop_pump()
-        self.brewing_timer.stop_timer()
-        self.log_shot()
         self.set_pwm_value(0.75)
         self.boiler.set_pwm_override(None)
+
+    def reset_brew_routine(self) -> None:
+        self.reset()
+        self.brewing_timer.stop_timer()
+        self.log_shot()
         logger.info(f"Time for shot {self.brewing_timer.get_time_since_started()}")
         logger.info(f"Pulse count for shot {self.flow.get_pulse_count()}")
         self.brewing_timer.enable_automatic_timing()
