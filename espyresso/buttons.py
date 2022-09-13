@@ -59,9 +59,11 @@ class Buttons:
     def rising_button_one(self, *args: Any, **kwargs: Any) -> None:
         logger.debug("Button one rising")
         self.button_one_timestamp = time.perf_counter()
+        self.display.start_notification_timer()
 
     def falling_button_one(self, *args: Any, **kwargs: Any) -> None:
         seconds = time.perf_counter() - self.button_one_timestamp
+        self.display.stop_notification_timer()
         logger.debug(f"Button one falling: {seconds}")
 
         if seconds < 0.25:
