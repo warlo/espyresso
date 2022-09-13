@@ -78,7 +78,7 @@ class Buttons:
                 _, notification = self.pump.brew_shot()
                 self.display.set_notification(notification or "")
         else:
-            self.pump.pulse_pump_steam_routine()
+            self.pump.pulse_pump_steam()
 
     def rising_button_two(self, *args: Any, **kwargs: Any) -> None:
         self.button_two_timestamp = time.perf_counter()
