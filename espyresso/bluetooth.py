@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import TYPE_CHECKING, Optional
 
@@ -7,6 +8,8 @@ if TYPE_CHECKING:
     from asyncio import Event
 
     from bleak.backends.bluezdbus.client import BleakClientBlueZDBus as BleakClient
+
+logger = logging.getLogger(__name__)
 
 
 class BluetoothScale:
@@ -32,7 +35,6 @@ class BluetoothScale:
         asyncio.run(self.notify())
 
     def stop(self) -> None:
-        print("Stop")
         if self.stop_event is not None:
             self.stop_event.set()
 
@@ -67,7 +69,6 @@ class BluetoothScale:
                     await self.disconnect_event.wait()
                     await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
             except Exception as e:
-                print("start_notify exception:", e)
-                pass
+                logger.debug(f"Exception raised when trying start_notify: {str(e)}")
 
             self.disconnect_event = asyncio.Event()
