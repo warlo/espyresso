@@ -82,10 +82,10 @@ ELEMENT_MAX_TEMPERATURE = 190.0
 SHELL_MAX_TEMPERATURE = 152.0
 # °C the temp probe circuit maxes out at about 155°C - don't exceed it or we're flying blind
 
-AMBIENT_TEMPERATURE = 20.0
+AMBIENT_TEMPERATURE = 22.0
 # °C this does not need to be exact
 
-RESERVOIR_TEMPERATURE = 20.0
+RESERVOIR_TEMPERATURE = 22.0
 # °C the reservoir gets heated a little by the machine over time - model this?
 
 LATENT_HEAT_VAPORISATION_100 = 2257.0
