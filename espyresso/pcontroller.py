@@ -53,14 +53,14 @@ class PController:
         self.lastBoilerPidTime = current_time
         logger.debug(f"lastBoilerPidTime: {self.lastBoilerPidTime}")
 
-        self.flowRate = self.flow.get_flow_rate() or 0
-        logger.debug(f"FLOWRATE {self.flowRate}")
+        flow_rate = self.flow.get_flow_rate() or 0
+        logger.debug(f"FLOWRATE {flow_rate}")
         # Max flow rate
-        self.flowRate = self.flowRate if self.flowRate < 2.0 else 2.0
+        flow_rate = flow_rate if flow_rate < 2.0 else 2.0
 
         # TODO: verify flow
         waterToFlowPower = (
-            self.flowRate
+            flow_rate
             * (self.waterTemp - config.RESERVOIR_TEMPERATURE)
             * config.SPEC_HEAT_WATER_100
         )
@@ -102,7 +102,7 @@ class PController:
         # TODO: FLOW POWER?
         waterFlowToBrewHeadPower = (
             (self.waterTemp - self.brewHeadTemp)
-            * self.flowRate
+            * flow_rate
             * config.SPEC_HEAT_WATER_100
         )
         logger.debug(f"waterFlowToBrewHeadPower: {waterFlowToBrewHeadPower}")
@@ -239,7 +239,7 @@ class PController:
         logger.debug(f"desiredAverageShellTemp: {desiredAverageShellTemp}")
 
         # TODO: Flow 0
-        if self.flowRate > 1.0:
+        if flow_rate > 1.0:
             desiredAverageShellTemp = self.waterTemp + desiredWaterInputPower / 25.0
 
         # now clip the temperature so that it won't take more than 20s to lose excess heat to ambient
