@@ -182,7 +182,9 @@ class PController:
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
-        delta_to_apply = (temperature - self.modeledSensorTemp) / 10
+        delta_to_apply = (temperature - self.modeledSensorTemp) / (
+            deltaTime * config.MPC_SMOOTHING
+        )
         logger.debug(f"diff: {temperature - self.modeledSensorTemp}")
         logger.debug(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
 
@@ -194,7 +196,8 @@ class PController:
         # wildly due to modelling errors
         steadystate = (
             94 < self.waterTemp < 96
-            and (elementTempDelta + delta_to_apply) < deltaTime * 0.5
+            and abs(elementTempDelta + delta_to_apply)
+            < deltaTime * config.MPC_STEADY_STATE
         )
         logger.debug(f"steadystate {steadystate}")
         if steadystate:
