@@ -2,7 +2,8 @@
 from sys import platform
 
 # DEBUG if Mac
-DEBUG = platform == "darwin"
+PLATFORM = platform
+DEBUG = PLATFORM == "darwin"
 
 if DEBUG:
     import sys

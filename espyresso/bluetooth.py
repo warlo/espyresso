@@ -25,9 +25,20 @@ class BluetoothScale:
         return self.current_weight / 10
 
     def start(self) -> None:
+        if config.DEBUG:
+            # Skip bluetooth in debug
+            return
+
         import asyncio
 
-        from bleak.backends.bluezdbus.client import BleakClientBlueZDBus as BleakClient
+        if config.PLATFORM == "darwin":
+            from bleak.backends.corebluetooth.client import (
+                BleakClientCoreBluetooth as BleakClient,
+            )
+        else:
+            from bleak.backends.bluezdbus.client import (
+                BleakClientBlueZDBus as BleakClient,
+            )
 
         self.bleak_client = BleakClient(
             config.BLUETOOTH_SCALE_ADDRESS, disconnected_callback=self.disconnected
