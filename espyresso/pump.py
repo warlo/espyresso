@@ -118,8 +118,8 @@ class Pump:
             self.reset()
             return True, None
 
-        if not self.ranger.has_enough_water():
-            return False, "Not enough water"
+        # if not self.ranger.has_enough_water():
+        #    return False, "Not enough water"
 
         self.pump_thread = threading.Thread(target=self.pulse_pump_steam_routine)
         self.reset_started_time()

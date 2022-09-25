@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from espyresso.ranger import Ranger
     from espyresso.timer import BrewingTimer
     from espyresso.bluetooth import BluetoothScale
+    from espyresso.buttons import Buttons
 
 from espyresso.utils import WaveQueue, linear_transform
 
@@ -29,6 +30,7 @@ class Display(threading.Thread):
         *args: Any,
         bluetooth_scale: "BluetoothScale",
         boiler: "Boiler",
+        buttons: "Buttons",
         brewing_timer: "BrewingTimer",
         pump: "Pump",
         ranger: "Ranger",
@@ -85,6 +87,7 @@ class Display(threading.Thread):
         self.notification_timer: Optional[float] = None
 
         self.boiler = boiler
+        self.buttons = buttons
         self.brewing_timer = brewing_timer
         self.pump = pump
         self.ranger = ranger
@@ -97,8 +100,8 @@ class Display(threading.Thread):
 
         super().__init__(*args, **kwargs)
 
+    @staticmethod
     def generate_coordinate(
-        self,
         *,
         index: int,
         value: float,
@@ -142,14 +145,10 @@ class Display(threading.Thread):
         self.notification_updated = time.perf_counter()
 
     def draw_notification(self) -> None:
-        notification = self.notification
-        if self.notification_timer:
-            notification = str(
-                round(time.perf_counter() - self.notification_timer + 1, 1)
-            )
+        notification = self.buttons.get_notification()
 
-        if not notification or self.notification_updated - time.perf_counter() > 5:
-            return
+        if not notification:
+            return None
 
         label = self.big_font.render(f"{notification}", 1, self.WHITE)
         self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
@@ -375,6 +374,7 @@ if __name__ == "__main__":
     bluetooth_scale.get_scale_weight = lambda: 0
     boiler = MagicMock()
     boiler.pwm.get_display_value = lambda: 0
+    buttons = MagicMock()
     pump = MagicMock()
     pump.get_time_since_started_preinfuse = lambda: 0
     brewing_timer = MagicMock()
@@ -417,6 +417,7 @@ if __name__ == "__main__":
     dis = Display(
         bluetooth_scale=bluetooth_scale,
         boiler=boiler,
+        buttons=buttons,
         brewing_timer=brewing_timer,
         pump=pump,
         ranger=ranger,

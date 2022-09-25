@@ -100,10 +100,20 @@ class Espyresso:
             ranger=self.ranger,
         )
 
+        self.buttons = Buttons(
+            pigpio_pi=self.pigpio_pi,
+            boiler=self.boiler,
+            temperature=self.temperature,
+            pump=self.pump,
+            turn_off_system=self.turn_off_system,
+        )
+
+        # self.pump.pulse_pump_steam()
         self.display = Display(
             get_started_time=self.get_started_time,
             bluetooth_scale=self.bluetooth_scale,
             boiler=self.boiler,
+            buttons=self.buttons,
             brewing_timer=self.brewing_timer,
             pump=self.pump,
             ranger=self.ranger,
@@ -113,15 +123,6 @@ class Espyresso:
                 "flow": self.flow_queue,
                 "boiler": self.boiler_queue,
             },
-        )
-
-        self.buttons = Buttons(
-            pigpio_pi=self.pigpio_pi,
-            boiler=self.boiler,
-            temperature=self.temperature,
-            pump=self.pump,
-            display=self.display,
-            turn_off_system=self.turn_off_system,
         )
 
     def reset_started_time(self) -> None:

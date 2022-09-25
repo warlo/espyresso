@@ -129,9 +129,9 @@ def get_callback(
             ranger_fall_sim.start()
 
         if gpio == config.BUTTON_ONE_GPIO:
-            button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
-            # button_one_sim.start()
             pass
+            # button_one_sim = ButtonOneSimulator(espyresso_mock, gpio, edge, callback)
+            # button_one_sim.start()
 
     return gpio_callback
 
