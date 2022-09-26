@@ -134,19 +134,18 @@ class Espyresso:
     def start(self) -> None:
         self.reset_started_time()
 
-        self.display.start()
-
         self.temperature.start()
         self.ranger.start()
         self.bluetooth_scale.start()
         # self.brewing_timer.start()
+        self.display.start()
 
-        self.display.join()
         self.ranger.join()
         # self.brewing_timer.join()
 
         logger.debug("Pigpio stopping")
         self.pigpio_pi.stop()
+        sys.exit(0)
 
     def stop(self) -> None:
         # self.brewing_timer.stop()
@@ -159,12 +158,6 @@ class Espyresso:
     def exit(self) -> None:
         self.stop()
         logger.debug("EXITING: Stopped all")
-        time.sleep(1)
-        try:
-            logger.debug("SYS EXIT 0")
-            sys.exit(0)
-        except Exception:
-            logger.exception("Failed exiting")
 
     def turn_off_system(self) -> None:
         self.stop()
@@ -178,7 +171,7 @@ class Espyresso:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
-        self.exit()
+        self.stop()
 
 
 def handler(signum: int, *args: Any) -> None:

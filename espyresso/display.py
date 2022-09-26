@@ -24,7 +24,7 @@ from espyresso.utils import WaveQueue, linear_transform
 logger = logging.getLogger(__name__)
 
 
-class Display(threading.Thread):
+class Display:
     def __init__(
         self,
         *args: Any,
@@ -97,8 +97,6 @@ class Display(threading.Thread):
 
         self._stop_event = threading.Event()
         self.wave_queues = wave_queues
-
-        super().__init__(*args, **kwargs)
 
     @staticmethod
     def generate_coordinate(
@@ -310,8 +308,23 @@ class Display(threading.Thread):
     def stop(self) -> None:
         self._stop_event.set()
 
-    def run(self) -> None:
+    def start(self) -> None:
         while not self._stop_event.is_set():
+
+            for event in pygame.event.get():
+                x, _ = pygame.mouse.get_pos()
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if x < 160:
+                        self.buttons.rising_button_one()
+                    else:
+                        self.buttons.rising_button_two()
+
+                if event.type == pygame.MOUSEBUTTONUP:
+                    if x < 160:
+                        self.buttons.falling_button_one()
+                    else:
+                        self.buttons.falling_button_two()
+
             time_left = int(
                 config.TURN_OFF_SECONDS
                 - (time.perf_counter() - self.get_started_time())
@@ -340,6 +353,7 @@ class Display(threading.Thread):
                 )
             pygame.display.update()
             time.sleep(0.1)
+
         pygame.display.quit()
         pygame.quit()
 

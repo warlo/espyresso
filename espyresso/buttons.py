@@ -135,6 +135,7 @@ class Buttons:
             return
 
         seconds = time.perf_counter() - self.button_two_timestamp
+        self.button_two_timestamp = None
 
         if seconds < 0.25:
             return
