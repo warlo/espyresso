@@ -132,16 +132,6 @@ class Display:
             for index, value in enumerate(values)
         ]
 
-    def start_notification_timer(self, provided_time: Optional[float] = None) -> None:
-        self.notification_timer = provided_time or time.perf_counter()
-
-    def stop_notification_timer(self) -> None:
-        self.notification_timer = None
-
-    def set_notification(self, notification: str) -> None:
-        self.notification = notification
-        self.notification_updated = time.perf_counter()
-
     def draw_notification(self) -> None:
         notification = self.buttons.get_notification()
 

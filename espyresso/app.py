@@ -162,9 +162,8 @@ class Espyresso:
     def turn_off_system(self) -> None:
         self.stop()
         logger.debug("Triggering shutdown")
-        print("SHUTDOWN")
+        time.sleep(3)
         os.system("shutdown now -h")
-        print("AFTER SHUTDOWN")
 
     def signal_handler(self, sig: int, *args: Any) -> None:
         if sig == 2:

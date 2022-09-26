@@ -210,6 +210,5 @@ def get_espyresso_simulator() -> Espyresso:
         espyresso = Espyresso(pigpio_pi=espyresso_mock)
         temp_simulator = TemperatureSimulator(log_data, espyresso.temperature.callback)
         temp_simulator.start()
-        espyresso.display.start_notification_timer()
 
         return espyresso
