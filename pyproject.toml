@@ -5,3 +5,31 @@ profile = "black"
 ignore_missing_imports = true
 strict = true
 exclude = "venv"
+
+[tool.poetry]
+name = "espyresso"
+version = "0.1.0"
+description = ""
+authors = ["Hans-Wilhelm Warlo <5417271+warlo@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pigpio = "^1.78"
+pygame = { version = "1.9.6", optional = true }
+
+[tool.poetry.extras]
+pygame = ["pygame"]
+
+
+[tool.poetry.group.dev.dependencies]
+mypy = "^1.2.0"
+black = "^23.3.0"
+mock = "^5.0.2"
+types-mock = "^5.0.0.6"
+pytest = "^7.3.1"
+ruff = "^0.0.262"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
