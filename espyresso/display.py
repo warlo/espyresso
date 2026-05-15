@@ -256,17 +256,20 @@ class Display:
         if not queue:
             return
         degrees = queue[-1]
-        sorted_degrees = sorted(degrees, reverse=True)
+        # Sort *indices* by descending value. Sorting by value and then
+        # looking up via list.index() collapses duplicates onto the first
+        # match (e.g. all thermal masses at room temperature on a cold
+        # boot), hiding every series after the first.
+        order = sorted(range(len(degrees)), key=lambda k: -degrees[k])
 
-        for i, degree in enumerate(sorted_degrees):
-            initial_index = degrees.index(degree)
+        for row, idx in enumerate(order):
             label = self._render(
-                f"{queue.queue_labels[initial_index]}: {round(degree, 1)}\u00B0C",
+                f"{queue.queue_labels[idx]}: {round(degrees[idx], 1)}\u00B0C",
                 12,
-                self.colors[initial_index],
+                self.colors[idx],
             )
             self.screen.blit(
-                label, (max(0, (100 - int(label.get_rect().width))), 12 * i)
+                label, (max(0, (100 - int(label.get_rect().width))), 12 * row)
             )
 
     def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:

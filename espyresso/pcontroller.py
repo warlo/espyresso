@@ -51,14 +51,14 @@ class PController:
 
         logger.debug("\n")
         current_time = time.perf_counter()
-        logger.debug(f"CURRENT_TIME: {current_time}")
+        logger.debug("CURRENT_TIME: %s", current_time)
         deltaTime = current_time - self.lastBoilerPidTime
-        logger.debug(f"deltaTime: {deltaTime}")
+        logger.debug("deltaTime: %s", deltaTime)
         self.lastBoilerPidTime = current_time
-        logger.debug(f"lastBoilerPidTime: {self.lastBoilerPidTime}")
+        logger.debug("lastBoilerPidTime: %s", self.lastBoilerPidTime)
 
         flow_rate = self.flow.get_flow_rate() or 0
-        logger.debug(f"FLOWRATE {flow_rate}")
+        logger.debug("FLOWRATE %s", flow_rate)
         # Max flow rate
         flow_rate = flow_rate if flow_rate < 2.0 else 2.0
 
@@ -68,13 +68,13 @@ class PController:
             * (self.waterTemp - config.RESERVOIR_TEMPERATURE)
             * config.SPEC_HEAT_WATER_100
         )
-        logger.debug(f"waterToFlowPower: {waterToFlowPower}")
+        logger.debug("waterToFlowPower: %s", waterToFlowPower)
 
         # How much power is lost to the atmosphere from the brew head?
         brewHeadToAmbientPower = (
             self.brewHeadTemp - self.ambientTemp
         ) * config.BREWHEAD_AMBIENT_XFER_COEFF
-        logger.debug(f"brewHeadToAmbientPower: {brewHeadToAmbientPower}")
+        logger.debug("brewHeadToAmbientPower: %s", brewHeadToAmbientPower)
 
         # How much power is transferred from the boiler to the water?
         shellToWaterPower = (
@@ -82,13 +82,13 @@ class PController:
             * config.BOILER_WATER_XFER_COEFF_NOFLOW
             / 2.0
         )
-        logger.debug(f"shellToWaterPower: {shellToWaterPower}")
+        logger.debug("shellToWaterPower: %s", shellToWaterPower)
         elementToWaterPower = (
             (self.elementTemp - self.waterTemp)
             * config.BOILER_WATER_XFER_COEFF_NOFLOW
             / 2.0
         )
-        logger.debug(f"elementToWaterPower: {elementToWaterPower}")
+        logger.debug("elementToWaterPower: %s", elementToWaterPower)
 
         # How much power is transferred from the boiler to the brew head?
         shellToBrewHeadPower = (
@@ -96,32 +96,32 @@ class PController:
             * config.BOILER_BREWHEAD_XFER_COEFF
             / 2.0
         )
-        logger.debug(f"shellToBrewHeadPower: {shellToBrewHeadPower}")
+        logger.debug("shellToBrewHeadPower: %s", shellToBrewHeadPower)
         elementToBrewHeadPower = (
             (self.elementTemp - self.brewHeadTemp)
             * config.BOILER_BREWHEAD_XFER_COEFF
             / 2.0
         )
-        logger.debug(f"elementToBrewHeadPower: {elementToBrewHeadPower}")
+        logger.debug("elementToBrewHeadPower: %s", elementToBrewHeadPower)
         # TODO: FLOW POWER?
         waterFlowToBrewHeadPower = (
             (self.waterTemp - self.brewHeadTemp)
             * flow_rate
             * config.SPEC_HEAT_WATER_100
         )
-        logger.debug(f"waterFlowToBrewHeadPower: {waterFlowToBrewHeadPower}")
+        logger.debug("waterFlowToBrewHeadPower: %s", waterFlowToBrewHeadPower)
         elementToShellPower = (
             self.elementTemp - self.shellTemp
         ) * config.ELEMENT_SHELL_XFER_COEFF
-        logger.debug(f"elementToShellPower: {elementToShellPower}")
+        logger.debug("elementToShellPower: %s", elementToShellPower)
         shellToBodyPower = (
             (self.shellTemp - self.bodyTemp) * config.BOILER_BODY_XFER_COEFF / 2.0
         )
-        logger.debug(f"shellToBodyPower: {shellToBodyPower}")
+        logger.debug("shellToBodyPower: %s", shellToBodyPower)
         elementToBodyPower = (
             (self.elementTemp - self.bodyTemp) * config.BOILER_BODY_XFER_COEFF / 2.0
         )
-        logger.debug(f"elementToBodyPower: {elementToBodyPower}")
+        logger.debug("elementToBodyPower: %s", elementToBodyPower)
 
         # Now work out the temperature, which comes from power that didn't go into heat loss or heating the incoming water.
         logger.debug("\nTEMP:")
@@ -138,13 +138,13 @@ class PController:
                 * (config.MASS_BREW_HEAD + config.MASS_PORTAFILTER)
             )
         )
-        logger.debug(f"brewHeadTemp: {self.brewHeadTemp}")
+        logger.debug("brewHeadTemp: %s", self.brewHeadTemp)
         self.waterTemp += (
             deltaTime
             * (shellToWaterPower + elementToWaterPower - waterToFlowPower)
             / (config.SPEC_HEAT_WATER_100 * config.BOILER_VOLUME)
         )
-        logger.debug(f"waterTemp: {self.waterTemp}")
+        logger.debug("waterTemp: %s", self.waterTemp)
         self.shellTemp += (
             deltaTime
             * (
@@ -155,7 +155,7 @@ class PController:
             )
             / (config.SPEC_HEAT_ALUMINIUM * config.MASS_BOILER_SHELL / 2.0)
         )
-        logger.debug(f"shellTemp: {self.shellTemp}")
+        logger.debug("shellTemp: %s", self.shellTemp)
         elementTempDelta = (
             deltaTime
             * (
@@ -168,13 +168,13 @@ class PController:
             / (config.SPEC_HEAT_ALUMINIUM * config.MASS_BOILER_SHELL / 2.0)
         )
         self.elementTemp += elementTempDelta
-        logger.debug(f"elementTemp: {self.elementTemp}")
+        logger.debug("elementTemp: %s", self.elementTemp)
         self.bodyTemp += (
             deltaTime
             * (shellToBodyPower + elementToBodyPower)
             / config.HEAT_CAPACITY_BODY
         )
-        logger.debug(f"bodyTemp: {self.bodyTemp}")
+        logger.debug("bodyTemp: %s", self.bodyTemp)
 
         self.modeledSensorTemp += (
             deltaTime
@@ -182,15 +182,15 @@ class PController:
             / config.SENSOR_HEAT_CAPACITY
         )
 
-        logger.debug(f"modeledSensorTemp: {self.modeledSensorTemp},{temperature}")
+        logger.debug("modeledSensorTemp: %s,%s", self.modeledSensorTemp, temperature)
 
         # Any delta between modeledSensorTemp and temperature is either model error diverging slowly or (fast) noise.
         # Slowly correct towards this temperature and noise will average out.
         delta_to_apply = (temperature - self.modeledSensorTemp) * (
             deltaTime * config.MPC_SMOOTHING
         )
-        logger.debug(f"diff: {temperature - self.modeledSensorTemp}")
-        logger.debug(f"diffelement: {self.elementTemp - self.modeledSensorTemp}")
+        logger.debug("diff: %s", temperature - self.modeledSensorTemp)
+        logger.debug("diffelement: %s", self.elementTemp - self.modeledSensorTemp)
 
         # Add delta to all thermal masses
         self.modeledSensorTemp += delta_to_apply
@@ -203,7 +203,7 @@ class PController:
             and abs(elementTempDelta + delta_to_apply)
             < deltaTime * config.MPC_STEADY_STATE
         )
-        logger.debug(f"steadystate {steadystate}")
+        logger.debug("steadystate %s", steadystate)
         if steadystate:
             self.shellTemp += delta_to_apply
             self.waterTemp += delta_to_apply
@@ -261,13 +261,13 @@ class PController:
             / 15.0
         )
         desiredWaterInputPower += waterToFlowPower
-        logger.debug(f"desiredWaterInputPower: {desiredWaterInputPower}")
+        logger.debug("desiredWaterInputPower: %s", desiredWaterInputPower)
 
         desiredAverageShellTemp = (
             self.waterTemp
             + desiredWaterInputPower / config.BOILER_WATER_XFER_COEFF_NOFLOW
         )
-        logger.debug(f"desiredAverageShellTemp: {desiredAverageShellTemp}")
+        logger.debug("desiredAverageShellTemp: %s", desiredAverageShellTemp)
 
         # TODO: Flow 0
         if flow_rate > 1.0:
@@ -285,11 +285,11 @@ class PController:
             / config.MASS_BOILER_SHELL
             + self.temp_setpoint
         )
-        logger.debug(f"maxStableAverageShellTemp: {maxStableAverageShellTemp}")
+        logger.debug("maxStableAverageShellTemp: %s", maxStableAverageShellTemp)
         desiredAverageShellTemp = min(
             desiredAverageShellTemp, maxStableAverageShellTemp
         )
-        logger.debug(f"desiredAverageShellTemp: {desiredAverageShellTemp}")
+        logger.debug("desiredAverageShellTemp: %s", desiredAverageShellTemp)
 
         error = (
             (self.shellTemp - desiredAverageShellTemp)
@@ -297,14 +297,14 @@ class PController:
             * config.MASS_BOILER_SHELL
             / 2.0
         )
-        logger.debug(f"error shellTemp: {error}")
+        logger.debug("error shellTemp: %s", error)
         error += (
             (self.elementTemp - desiredAverageShellTemp)
             * config.SPEC_HEAT_ALUMINIUM
             * config.MASS_BOILER_SHELL
             / 2.0
         )
-        logger.debug(f"error total (shellTemp + elementTemp): {error}")
+        logger.debug("error total (shellTemp + elementTemp): %s", error)
 
         self.heaterPower = (
             shellToBrewHeadPower
@@ -315,7 +315,7 @@ class PController:
             + elementToWaterPower
             - (error / 2.0)
         )
-        logger.debug(f"ISH LOST {(self.heaterPower + (error * 2.0))} W")
+        logger.debug("ISH LOST %s W", (self.heaterPower + (error * 2.0)))
         # keep power level safe and sane (where it would take two seconds to get triac or elements over max temp and five seconds to get shell over max temp)
         maxAllowableElementToShellPower = (
             (config.SHELL_MAX_TEMPERATURE - self.shellTemp)
@@ -326,18 +326,16 @@ class PController:
             + shellToBrewHeadPower
             + shellToBodyPower
         )
-        logger.debug(
-            f"maxAllowableElementToShellPower {maxAllowableElementToShellPower}"
-        )
+        logger.debug("maxAllowableElementToShellPower %s", maxAllowableElementToShellPower)
         maxAllowableElementTemp = (
             maxAllowableElementToShellPower / config.ELEMENT_SHELL_XFER_COEFF
             + self.shellTemp
         )
-        logger.debug(f"maxAllowableElementTemp {maxAllowableElementTemp}")
+        logger.debug("maxAllowableElementTemp %s", maxAllowableElementTemp)
         maxAllowableElementTemp = min(
             maxAllowableElementTemp, config.ELEMENT_MAX_TEMPERATURE
         )
-        logger.debug(f"maxAllowableElementTemp {maxAllowableElementTemp}")
+        logger.debug("maxAllowableElementTemp %s", maxAllowableElementTemp)
         maxAllowablePowerForElement = (
             (maxAllowableElementTemp - self.elementTemp)
             * config.SPEC_HEAT_ALUMINIUM
@@ -348,19 +346,19 @@ class PController:
             + elementToBrewHeadPower
             + elementToBodyPower
         )
-        logger.debug(f"maxAllowablePowerForElement {maxAllowablePowerForElement}")
+        logger.debug("maxAllowablePowerForElement %s", maxAllowablePowerForElement)
 
-        logger.debug(f"heaterPower0 {self.heaterPower}")
+        logger.debug("heaterPower0 %s", self.heaterPower)
         self.heaterPower = min(config.MAX_BOILER_POWER, self.heaterPower)
-        logger.debug(f"heaterPower1 {self.heaterPower}")
+        logger.debug("heaterPower1 %s", self.heaterPower)
         self.heaterPower = min(maxAllowablePowerForElement, self.heaterPower)
-        logger.debug(f"heaterPower2 {self.heaterPower}")
+        logger.debug("heaterPower2 %s", self.heaterPower)
         self.heaterPower = max(0.0, self.heaterPower)
-        logger.debug(f"heaterPower3 {self.heaterPower}")
+        logger.debug("heaterPower3 %s", self.heaterPower)
         normalizedHeaterPower = self.heaterPower / config.MAX_BOILER_POWER
         normalizedHeaterPower = max(normalizedHeaterPower, 0.0)
         normalizedHeaterPower = min(normalizedHeaterPower, 1.0)
-        logger.debug(f"heaterPower normalized {normalizedHeaterPower}")
+        logger.debug("heaterPower normalized %s", normalizedHeaterPower)
 
         self.diagnostics.update(
             {

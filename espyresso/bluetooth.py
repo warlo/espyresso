@@ -1,4 +1,5 @@
 import logging
+import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
@@ -18,6 +19,7 @@ class BluetoothScale:
     bleak_client: "BleakClient" = None
     stop_event: Optional["Event"] = None
     disconnect_event: Optional["Event"] = None
+    _thread: Optional[threading.Thread] = None
 
     def get_scale_weight(self) -> float:
         if time.perf_counter() - self.current_weight_timestamp > 5:
@@ -25,10 +27,22 @@ class BluetoothScale:
         return self.current_weight / 10
 
     def start(self) -> None:
+        """Spawn the bluetooth notify loop on its own thread.
+
+        Previously ``start`` called ``asyncio.run(self.notify())``
+        directly, which blocks the caller. Since ``app.start()`` invokes
+        ``self.bluetooth_scale.start()`` before ``self.display.start()``,
+        a paired scale (or a sufficiently slow first failure) would
+        prevent the display from ever launching."""
         if config.DEBUG:
             # Skip bluetooth in debug
             return
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
+    def _run(self) -> None:
         import asyncio
 
         if config.PLATFORM == "darwin":
@@ -57,7 +71,6 @@ class BluetoothScale:
 
     def callback(self, sender: int, data: bytearray) -> None:
         v_int = int.from_bytes(data[7:9], "little")
-        # print("Callback", list(data), v_int)
         self.current_weight = v_int
         self.current_weight_timestamp = time.perf_counter()
         sl = shot_logger.get()
@@ -68,13 +81,8 @@ class BluetoothScale:
         import asyncio
 
         self.stop_event = asyncio.Event()
+        self.disconnect_event = asyncio.Event()
         while not self.stop_event.is_set():
-            if self.disconnect_event and self.disconnect_event.is_set():
-                print("Already connected")
-                await asyncio.sleep(5)
-                continue
-
-            self.disconnect_event = asyncio.Event()
             try:
                 async with self.bleak_client as client:
                     await client.start_notify(
@@ -83,6 +91,12 @@ class BluetoothScale:
                     await self.disconnect_event.wait()
                     await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
             except Exception as e:
-                logger.debug(f"Exception raised when trying start_notify: {str(e)}")
+                logger.debug("start_notify failed: %s", e)
+                # Back off before retrying — without this, a missing
+                # scale produced a tight reconnect loop that allocated
+                # async resources on every iteration.
+                await asyncio.sleep(5)
 
-            self.disconnect_event = asyncio.Event()
+            # Reuse the event across iterations instead of replacing it,
+            # which used to leak one Event per reconnect attempt.
+            self.disconnect_event.clear()

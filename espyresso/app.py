@@ -19,15 +19,24 @@ from espyresso.temperature import Temperature
 from espyresso.timer import BrewingTimer
 from espyresso.utils import WaveQueue
 
-logging.basicConfig(
-    filename=f"log/{time.strftime('%Y-%m-%d-%H:%M')}.log",
-    filemode="a",
-    format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
-    datefmt="%Y-%m-%dT%H:%M:%S%z",
-    level=logging.DEBUG if config.DEBUG else logging.INFO,
-)
-
 logger = logging.getLogger(__name__)
+
+
+def _configure_logging() -> None:
+    """Configure file logging. Idempotent — safe to call from ``run()``.
+
+    Previously this lived at module scope, which meant importing
+    ``espyresso.app`` (e.g. from tests) would silently create a log file
+    and, if ``log/`` didn't exist, swallow the file-open error and fall
+    back to stderr with no output ever reaching disk."""
+    os.makedirs("log", exist_ok=True)
+    logging.basicConfig(
+        filename=f"log/{time.strftime('%Y-%m-%d-%H:%M')}.log",
+        filemode="a",
+        format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+        level=logging.DEBUG if config.DEBUG else logging.INFO,
+    )
 
 
 class Espyresso:
@@ -185,6 +194,7 @@ def handler(signum: int, *args: Any) -> None:
 
 
 def run() -> None:
+    _configure_logging()
     if not config.DEBUG:
         espyresso = Espyresso()
     else:
