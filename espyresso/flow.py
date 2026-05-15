@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import logging
-import threading
 import time
 from typing import TYPE_CHECKING, Optional
 
@@ -14,6 +13,21 @@ if TYPE_CHECKING:
     from espyresso.utils import WaveQueue
 
 logger = logging.getLogger(__name__)
+
+
+# Flow-meter calibration table. Module-level immutable so they aren't
+# re-allocated on every pulse (this used to allocate two 21-float lists
+# inside get_mls_per_pulse, which is called twice per pulse_callback
+# during a shot at ~60 Hz).
+_PULSE_RATES = (
+    0.755, 1.006, 1.257, 1.508, 1.759, 2.010, 2.261, 2.512, 2.763, 3.014,
+    3.265, 3.516, 3.767, 4.018, 4.269, 4.520, 4.771, 5.022, 5.273, 5.524, 5.775,
+)
+_ML_PER_PULSE = (
+    0.884, 0.688, 0.591, 0.539, 0.506, 0.484, 0.470, 0.464, 0.466, 0.469,
+    0.473, 0.477, 0.477, 0.472, 0.467, 0.466, 0.466, 0.469, 0.471, 0.473, 0.475,
+)
+_PULSE_INTERVAL = (_PULSE_RATES[-1] - _PULSE_RATES[0]) / (len(_PULSE_RATES) - 1)
 
 
 class Flow:
@@ -39,7 +53,6 @@ class Flow:
 
         self.first_half_period: Optional[float] = None
         self.second_half_period: Optional[float] = None
-        self.lock = threading.RLock()
 
     def reset_pulse_count(self) -> None:
         self.total_volume = 0.0
@@ -79,15 +92,19 @@ class Flow:
         if not flow_rate or not ml_per_pulse:
             return
 
-        logger.info(
-            f"Pulse rate, mls, flow_rate: {pulse_rate} {ml_per_pulse} {flow_rate}"
+        # Both at DEBUG: a brew shot fires ~60 pulses/sec and previously
+        # wrote ~60 INFO lines/sec to disk plus formatted an f-string for
+        # each. With %s-style lazy formatting nothing is built unless
+        # DEBUG logging is enabled.
+        logger.debug(
+            "pulse rate=%s ml/pulse=%s flow_rate=%s",
+            pulse_rate, ml_per_pulse, flow_rate,
         )
-        logger.debug(f"Flow pulse with ml per sec: {flow_rate}")
 
         self.total_volume += ml_per_pulse / 2.0
         average_rate = self.total_volume / (self.prev_pulse_time - self.pulse_start)
 
-        self.flow_queue.add_to_queue(tuple((flow_rate, average_rate)))
+        self.flow_queue.add_to_queue((flow_rate, average_rate))
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -123,63 +140,15 @@ class Flow:
 
     @staticmethod
     def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
-        pulse_rates = [
-            0.755,
-            1.006,
-            1.257,
-            1.508,
-            1.759,
-            2.010,
-            2.261,
-            2.512,
-            2.763,
-            3.014,
-            3.265,
-            3.516,
-            3.767,
-            4.018,
-            4.269,
-            4.520,
-            4.771,
-            5.022,
-            5.273,
-            5.524,
-            5.775,
-        ]
-        ml_per_pulse = [
-            0.884,
-            0.688,
-            0.591,
-            0.539,
-            0.506,
-            0.484,
-            0.470,
-            0.464,
-            0.466,
-            0.469,
-            0.473,
-            0.477,
-            0.477,
-            0.472,
-            0.467,
-            0.466,
-            0.466,
-            0.469,
-            0.471,
-            0.473,
-            0.475,
-        ]
-        interval = (pulse_rates[-1] - pulse_rates[0]) / (len(pulse_rates) - 1)
-
         # interpolate to get flowrate
-        index = int(round((pulse_rate - pulse_rates[0]) / interval))
+        index = int(round((pulse_rate - _PULSE_RATES[0]) / _PULSE_INTERVAL))
         if index < 0:
             return None
-        if index >= len(pulse_rates) - 1:
-            return ml_per_pulse[-1]
+        if index >= len(_PULSE_RATES) - 1:
+            return _ML_PER_PULSE[-1]
         return (
-            ml_per_pulse[index]
-            + (ml_per_pulse[index + 1] - ml_per_pulse[index])
-            * (pulse_rate - pulse_rates[index])
-            / interval
+            _ML_PER_PULSE[index]
+            + (_ML_PER_PULSE[index + 1] - _ML_PER_PULSE[index])
+            * (pulse_rate - _PULSE_RATES[index])
+            / _PULSE_INTERVAL
         )

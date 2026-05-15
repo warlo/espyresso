@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import logging
-import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -71,8 +70,6 @@ class Temperature:
                 "temperature",
             ]
         )
-
-        self.lock = threading.RLock()
 
     def set_steam_temp(self) -> None:
         self.pcontroller.set_target_temp(config.TARGET_STEAM_TEMP)
@@ -150,8 +147,9 @@ class Temperature:
                 **self.pcontroller.diagnostics,
             )
 
-        with self.lock:
-            self.temp_queue.add_to_queue(temp_tuple)
+        # deque.append is GIL-atomic; no explicit lock needed for a
+        # single-producer, single-consumer rolling buffer.
+        self.temp_queue.add_to_queue(temp_tuple)
 
         logger.debug(f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}")
 

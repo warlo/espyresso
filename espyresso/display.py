@@ -334,18 +334,20 @@ class Display:
         high: int,
     ) -> None:
         queue_list = list(queue)
-        for i in range(len(queue_list[0]) if len(queue_list) > 0 else 0):
+        if not queue_list:
+            return
+        # Transpose once via zip instead of slicing column-by-column with
+        # a fresh list comprehension per series. Then issue a single
+        # pygame.draw.lines call per series rather than one draw.line
+        # per segment — ~66× fewer Python→C round trips on the temp
+        # waveform.
+        for i, series in enumerate(zip(*queue_list)):
             points = self.generate_coordinates(
-                [tup[i] for tup in queue_list], X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
+                list(series), X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
             )
-            if not points:
-                return
-
-            color = self.colors[i]
-            previous_point = points[0]
-            for point in points[1:]:
-                pygame.draw.line(self.screen, color, previous_point, point)
-                previous_point = point
+            if len(points) < 2:
+                continue
+            pygame.draw.lines(self.screen, self.colors[i], False, points)
 
     def stop(self) -> None:
         self._stop_event.set()

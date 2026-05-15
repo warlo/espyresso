@@ -205,3 +205,30 @@ def test_draw_degrees_skips_empty_queue(display: Display) -> None:
     q = _make_temp_queue()  # never .add_to_queue()'d
     # Should not raise
     display.draw_degrees(q)
+
+
+# ----------------------- draw_coordinates ----------------------------- #
+
+
+def test_draw_coordinates_calls_draw_lines_once_per_series(display: Display) -> None:
+    """One pygame.draw.lines call per series, not one draw.line per segment.
+
+    Currently FAILS because draw_coordinates uses ``pygame.draw.line``
+    (singular) in a Python-level segment loop — ~66 round trips per
+    series instead of 1."""
+    import pygame  # mocked in conftest
+
+    q = _make_temp_queue()
+    q.add_to_queue((22.0, 50.0, 95.0))
+    q.add_to_queue((23.0, 51.0, 96.0))
+    q.add_to_queue((24.0, 52.0, 97.0))
+
+    pygame.draw.lines.reset_mock()  # type: ignore[attr-defined]
+    display.draw_coordinates(q, q.X_MIN, q.X_MAX, q.Y_MIN, q.Y_MAX, q.low, q.high)
+    # 3 series → 3 draw.lines calls
+    assert pygame.draw.lines.call_count == 3  # type: ignore[attr-defined]
+
+
+def test_draw_coordinates_empty_queue_does_not_crash(display: Display) -> None:
+    q = _make_temp_queue()
+    display.draw_coordinates(q, q.X_MIN, q.X_MAX, q.Y_MIN, q.Y_MAX, q.low, q.high)
