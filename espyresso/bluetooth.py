@@ -2,7 +2,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Optional
 
-from espyresso import config
+from espyresso import config, shot_logger
 
 if TYPE_CHECKING:
     from asyncio import Event
@@ -60,6 +60,9 @@ class BluetoothScale:
         # print("Callback", list(data), v_int)
         self.current_weight = v_int
         self.current_weight_timestamp = time.perf_counter()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("scale", grams=v_int / 10)
 
     async def notify(self) -> None:
         import asyncio

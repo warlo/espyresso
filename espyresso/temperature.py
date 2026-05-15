@@ -5,7 +5,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, Callable
 
-from espyresso import config
+from espyresso import config, shot_logger
 from espyresso.pcontroller import PController
 
 # from espyresso.pid import PID
@@ -20,8 +20,6 @@ if TYPE_CHECKING:
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.utils import WaveQueue
-
-LOG_POWER_FILE = f"log/power-{time.strftime('%X')}.log"
 
 
 class Temperature:
@@ -79,10 +77,16 @@ class Temperature:
     def set_steam_temp(self) -> None:
         self.pcontroller.set_target_temp(config.TARGET_STEAM_TEMP)
         self.temp_queue.target_y = config.TARGET_STEAM_TEMP
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("setpoint", target=config.TARGET_STEAM_TEMP, mode="steam")
 
     def set_brew_temp(self) -> None:
         self.pcontroller.set_target_temp(config.TARGET_TEMP)
         self.temp_queue.target_y = config.TARGET_TEMP
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("setpoint", target=config.TARGET_TEMP, mode="brew")
 
     def get_latest_brewhead_temperature(self) -> float:
         return self.pcontroller.brewHeadTemp
@@ -113,6 +117,9 @@ class Temperature:
                 f"Undefined or no new temperature measurement: "
                 f"{self.prev_timestamp}, {measurement}"
             )
+            sl = shot_logger.get()
+            if sl is not None:
+                sl.log_event("tsic_drop", repr=str(measurement))
             return
 
         self.prev_timestamp = measurement.seconds_since_epoch
@@ -126,14 +133,30 @@ class Temperature:
         if config.LOG_POWER:
             self.log_power(temp, self.prev_timestamp, heater_value)
 
-        self.lock.acquire()
-        self.temp_queue.add_to_queue(temp_tuple)
-        self.lock.release()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_tick(
+                raw_temp=temp,
+                heater=heater_value,
+                boiling=self.boiler.get_boiling(),
+                pwm_override=self.boiler.pwm_override,
+                setpoint=self.pcontroller.temp_setpoint,
+                shellTemp=temp_tuple[0],
+                elementTemp=temp_tuple[1],
+                waterTemp=temp_tuple[2],
+                bodyTemp=temp_tuple[3],
+                brewHeadTemp=temp_tuple[4],
+                modeledSensorTemp=temp_tuple[5],
+                **self.pcontroller.diagnostics,
+            )
+
+        with self.lock:
+            self.temp_queue.add_to_queue(temp_tuple)
 
         logger.debug(f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}")
 
     def log_power(self, temp: float, timestamp: float, heater_value: float) -> None:
-        with open(LOG_POWER_FILE, "a+") as f:
+        with open(config.LOG_POWER_FILE, "a+") as f:
             f.write(f"{temp},{timestamp},{heater_value}\n")
 
     def stop(self) -> None:

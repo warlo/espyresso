@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 import pigpio
 
-from espyresso import config
+from espyresso import config, shot_logger
 from espyresso.bluetooth import BluetoothScale
 from espyresso.boiler import Boiler
 from espyresso.buttons import Buttons
@@ -34,6 +34,9 @@ class Espyresso:
     def __init__(self, pigpio_pi: Optional[pigpio.pi] = None):
         self.started_time = time.perf_counter()
         logger.debug("STARTING ESPYRESSO")
+
+        if config.LOG_SHOT:
+            shot_logger.init(config.LOG_SHOT_DIR)
 
         if not pigpio_pi:
             self.pigpio_pi = pigpio.pi()
@@ -154,6 +157,9 @@ class Espyresso:
         self.ranger.stop()
         self.temperature.stop()
         self.display.stop()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.close()
 
     def exit(self) -> None:
         self.stop()

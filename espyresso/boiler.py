@@ -1,7 +1,7 @@
 import logging
 from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
-from espyresso import config
+from espyresso import config, shot_logger
 from espyresso.pwm import PWM
 
 logger = logging.getLogger(__name__)
@@ -42,11 +42,17 @@ class Boiler:
         self.boiling = False
         self.set_pwm_override(None)
         self.set_value(0)
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("boiler", state="off")
         logger.debug("Boiler stopped")
 
     def turn_on_boiler(self) -> None:
         self.boiling = True
         self.reset_started_time()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("boiler", state="on")
 
     def toggle_boiler(self) -> None:
         self.boiling = not self.get_boiling()
@@ -54,6 +60,11 @@ class Boiler:
             self.pwm.set_value(0)
         else:
             self.reset_started_time()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event(
+                "boiler", state="on" if self.boiling else "off", source="toggle"
+            )
 
     def set_pwm_override(self, value: Optional[float]) -> None:
         self.pwm_override = value
@@ -62,6 +73,9 @@ class Boiler:
             self.pwm.set_value(self.pwm_override)
         else:
             self.pwm.set_value(0)
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("boiler_override", value=value)
 
     def set_value(self, value: float) -> None:
         if not self.get_boiling():

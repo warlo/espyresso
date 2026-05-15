@@ -17,6 +17,11 @@ LOG_POWER = False
 LOG_POWER_FILE = "log/power.log"
 SHOT_STAT_FILE = "shot_stat.txt"
 
+# Structured CSV logging of every controller tick + lifecycle events.
+# Writes log/shot-<ts>-tick.csv and log/shot-<ts>-event.csv.
+LOG_SHOT = True
+LOG_SHOT_DIR = "log"
+
 TSIC_GPIO = 24
 BOILER_PWM_GPIO = 12
 

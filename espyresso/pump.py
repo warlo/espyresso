@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 import pigpio
 
-from espyresso import config
+from espyresso import config, shot_logger
 from espyresso.pwm import PWM
 
 if TYPE_CHECKING:
@@ -64,11 +64,17 @@ class Pump:
         else:
             self.reset_started_time()
             self.pigpio_pi.write(self.pump_out_gpio, 1)
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("pump", state="on" if self.pumping else "off")
 
     def stop_pump(self) -> None:
         self.pigpio_pi.write(self.pump_out_gpio, 0)
         self.boiler.set_pwm_override(None)
         self.pumping = False
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("pump", state="off", source="stop_pump")
 
     def get_time_since_started_preinfuse(self) -> float:
         if self.stopped_preinfuse and self.started_preinfuse:
@@ -95,6 +101,9 @@ class Pump:
 
     def pulse_pump_routine(self) -> None:
         logger.debug("Starting pulse pump routine!")
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("pulse_pump", phase="start")
 
         # Disable automatic BrewingTimer
         self.brewing_timer.disable_automatic_timing()
@@ -112,6 +121,13 @@ class Pump:
             time.sleep(1)
 
         self.reset()
+        if sl is not None:
+            sl.log_event(
+                "pulse_pump",
+                phase="end",
+                seconds=time.perf_counter() - started,
+                brewhead=self.temperature.get_latest_brewhead_temperature(),
+            )
 
     def pulse_pump_steam(self) -> Tuple[bool, Optional[str]]:
         if self.pump_thread.is_alive():
@@ -128,6 +144,9 @@ class Pump:
 
     def pulse_pump_steam_routine(self) -> None:
         logger.debug("Starting pulse pump steam routine!")
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("steam", phase="start")
 
         # Disable automatic BrewingTimer
         self.brewing_timer.disable_automatic_timing()
@@ -144,6 +163,8 @@ class Pump:
 
         self.temperature.set_brew_temp()
         self.reset()
+        if sl is not None:
+            sl.log_event("steam", phase="end", seconds=time.perf_counter() - started)
 
     def brew_shot(self) -> Tuple[bool, Optional[str]]:
         if self.pump_thread.is_alive():
@@ -182,6 +203,10 @@ class Pump:
         self.started_preinfuse = time.perf_counter()
         self.stopped_preinfuse = None
 
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("brew", phase="preinfuse_start")
+
         # Sleep until flow is above 30ml or 7seconds
         while self.pumping and not (
             self.flow.get_millilitres() > 30
@@ -195,6 +220,14 @@ class Pump:
         # Start brewing timer
         self.brewing_timer.reset_timer()
         self.brewing_timer.start_timer()
+
+        if sl is not None:
+            sl.log_event(
+                "brew",
+                phase="preinfuse_stop",
+                preinfuse_seconds=self.stopped_preinfuse - self.started_preinfuse,
+                preinfuse_ml=self.flow.get_millilitres(),
+            )
 
         while self.pumping:
             # current_ml = self.flow.get_millilitres()
@@ -230,11 +263,22 @@ class Pump:
         self.reset()
         self.brewing_timer.stop_timer()
         self.log_shot()
-        logger.info(f"Time for shot {self.brewing_timer.get_time_since_started()}")
+        shot_seconds = self.brewing_timer.get_time_since_started()
+        logger.info(f"Time for shot {shot_seconds}")
         logger.info(f"Pulse count for shot {self.flow.get_pulse_count()}")
         self.brewing_timer.enable_automatic_timing()
         if not self.stopped_preinfuse:
             self.stopped_preinfuse = time.perf_counter()
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event(
+                "brew",
+                phase="end",
+                shot_seconds=shot_seconds,
+                total_ml=self.flow.get_millilitres(),
+                pulses=self.flow.get_pulse_count(),
+                final_grams=self.bluetooth_scale.get_scale_weight(),
+            )
 
     def set_pwm_value(self, value: float) -> None:
         if value < 0.0:
@@ -242,7 +286,11 @@ class Pump:
         elif value > 1.0:
             value = 1.0
 
+        prev = self.pwm.value
         self.pwm.set_value(value)
+        sl = shot_logger.get()
+        if sl is not None and value != prev:
+            sl.log_event("pump_pwm", value=value)
 
     def log_shot(self) -> None:
         shot_time = self.brewing_timer.get_time_since_started()

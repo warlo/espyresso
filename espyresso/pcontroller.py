@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import logging
+import math
 import time
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Tuple
 
 from espyresso import config
 
@@ -37,6 +38,9 @@ class PController:
         self.heaterPower = 0.0
         self.lastBoilerPidTime: float = time.perf_counter()
         self.flow = flow
+        # Populated every update() so callers can introspect intermediate
+        # power terms, error, safety bounds, etc. without re-computing them.
+        self.diagnostics: Dict[str, Any] = {}
 
     def set_target_temp(self, temperature: float) -> None:
         self.temp_setpoint = temperature
@@ -208,6 +212,33 @@ class PController:
 
         # self.shellTemp = temperature
 
+        self.diagnostics = {
+            "deltaTime": deltaTime,
+            "flow_rate": flow_rate,
+            "waterToFlowPower": waterToFlowPower,
+            "brewHeadToAmbientPower": brewHeadToAmbientPower,
+            "shellToWaterPower": shellToWaterPower,
+            "elementToWaterPower": elementToWaterPower,
+            "shellToBrewHeadPower": shellToBrewHeadPower,
+            "elementToBrewHeadPower": elementToBrewHeadPower,
+            "waterFlowToBrewHeadPower": waterFlowToBrewHeadPower,
+            "elementToShellPower": elementToShellPower,
+            "shellToBodyPower": shellToBodyPower,
+            "elementToBodyPower": elementToBodyPower,
+            "elementTempDelta": elementTempDelta,
+            "delta_to_apply": delta_to_apply,
+            "steadystate": steadystate,
+            "ambientTemp": self.ambientTemp,
+            "desiredWaterInputPower": math.nan,
+            "desiredAverageShellTemp": math.nan,
+            "maxStableAverageShellTemp": math.nan,
+            "error": math.nan,
+            "heaterPower_W": 0.0,
+            "maxAllowableElementToShellPower": math.nan,
+            "maxAllowableElementTemp": math.nan,
+            "maxAllowablePowerForElement": math.nan,
+        }
+
         if not boiling:
             return 0, (
                 self.shellTemp,
@@ -330,6 +361,19 @@ class PController:
         normalizedHeaterPower = max(normalizedHeaterPower, 0.0)
         normalizedHeaterPower = min(normalizedHeaterPower, 1.0)
         logger.debug(f"heaterPower normalized {normalizedHeaterPower}")
+
+        self.diagnostics.update(
+            {
+                "desiredWaterInputPower": desiredWaterInputPower,
+                "desiredAverageShellTemp": desiredAverageShellTemp,
+                "maxStableAverageShellTemp": maxStableAverageShellTemp,
+                "error": error,
+                "heaterPower_W": self.heaterPower,
+                "maxAllowableElementToShellPower": maxAllowableElementToShellPower,
+                "maxAllowableElementTemp": maxAllowableElementTemp,
+                "maxAllowablePowerForElement": maxAllowablePowerForElement,
+            }
+        )
 
         return min(normalizedHeaterPower, 1.0), (
             self.shellTemp,

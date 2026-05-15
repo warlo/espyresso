@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import pigpio
 
-from espyresso import config
+from espyresso import config, shot_logger
 
 if TYPE_CHECKING:
     from pigpio import pi
@@ -112,6 +112,10 @@ class Buttons:
         self.button_one_timestamp = None
         logger.debug(f"Button one falling: {seconds}")
 
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("button", which="one", seconds=seconds)
+
         if seconds < 0.25:
             return
 
@@ -136,6 +140,10 @@ class Buttons:
 
         seconds = time.perf_counter() - self.button_two_timestamp
         self.button_two_timestamp = None
+
+        sl = shot_logger.get()
+        if sl is not None:
+            sl.log_event("button", which="two", seconds=seconds)
 
         if seconds < 0.25:
             return
