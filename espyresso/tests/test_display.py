@@ -24,14 +24,33 @@ from espyresso.utils import WaveQueue
 
 
 def make_display() -> Display:
+    """Make a Display with mocks wired so f-string formatting works.
+
+    The header/brew-strip renderers call ``f"{value:.0f}"`` on several
+    of these returns, which fails if they're left as bare MagicMocks
+    (Mock.__format__ raises TypeError on format specs)."""
+    bluetooth_scale = MagicMock()
+    bluetooth_scale.get_scale_weight.return_value = 0.0
+    boiler = MagicMock()
+    boiler.get_boiling.return_value = False
+    boiler.pwm.get_display_value.return_value = "0.0"
+    brewing_timer = MagicMock()
+    brewing_timer.get_time_since_started.return_value = 0.0
+    pump = MagicMock()
+    pump.get_time_since_started_preinfuse.return_value = 0.0
+    ranger = MagicMock()
+    ranger.get_current_distance.return_value = 80.0
+    flow = MagicMock()
+    flow.get_millilitres.return_value = 0.0
+    flow.get_flow_rate.return_value = 0.0
     return Display(
-        bluetooth_scale=MagicMock(),
-        boiler=MagicMock(),
+        bluetooth_scale=bluetooth_scale,
+        boiler=boiler,
         buttons=MagicMock(),
-        brewing_timer=MagicMock(),
-        pump=MagicMock(),
-        ranger=MagicMock(),
-        flow=MagicMock(),
+        brewing_timer=brewing_timer,
+        pump=pump,
+        ranger=ranger,
+        flow=flow,
         get_started_time=lambda: 0.0,
         wave_queues={},
     )
@@ -57,7 +76,7 @@ def test_render_cache_distinct_keys_distinct_entries(display: Display) -> None:
     rendered Surfaces share identity.)"""
     display._render("hello", 12, (255, 255, 255))
     display._render("world", 12, (255, 255, 255))
-    display._render("hello", 42, (255, 255, 255))
+    display._render("hello", 28, (255, 255, 255))
     display._render("hello", 12, (255, 0, 0))
     assert len(display._render_cache) == 4
 
@@ -129,7 +148,7 @@ def test_hline_cache_does_not_re_create_for_known_width(display: Display) -> Non
     assert pygame.Surface.call_count == 1  # type: ignore[attr-defined]
 
 
-# ----------------------- draw_degrees bug ----------------------------- #
+# ----------------------- temp legend ---------------------------------- #
 
 
 def _make_temp_queue() -> WaveQueue:
@@ -145,66 +164,79 @@ def _make_temp_queue() -> WaveQueue:
     return q
 
 
-def test_draw_degrees_renders_distinct_label_per_thermal_mass(
-    display: Display,
-) -> None:
-    """Regression: at cold startup every thermal mass reads the same
-    temperature; the labels must still appear with distinct names and
-    distinct colors. Currently FAILS because ``degrees.index(degree)``
-    returns 0 for every duplicate."""
-    q = _make_temp_queue()
-    q.set_labels(["A", "B", "C"])
-    q.add_to_queue((22.0, 22.0, 22.0))
-
-    rendered_args: list = []
-    original_render = display._render
-
-    def spy(text: str, size: int, color):  # type: ignore[no-untyped-def]
-        rendered_args.append((text, color))
-        return original_render(text, size, color)
-
-    display._render = spy  # type: ignore[assignment]
-
-    display.draw_degrees(q)
-
-    texts = [t for t, _ in rendered_args]
-    colors = [c for _, c in rendered_args]
-
-    assert "A: 22.0°C" in texts
-    assert "B: 22.0°C" in texts
-    assert "C: 22.0°C" in texts
-    # All three should have distinct colors (one per series)
-    assert len(set(colors)) == 3
-
-
-def test_draw_degrees_handles_unique_values(display: Display) -> None:
-    """Sanity check — when temperatures are all distinct, the existing
-    code already works. This test should pass before and after the
-    duplicate-handling fix."""
-    q = _make_temp_queue()
-    q.set_labels(["A", "B", "C"])
-    q.add_to_queue((22.0, 50.0, 95.0))
-
-    rendered = []
-    original_render = display._render
+def _spy_render(display: Display) -> list:
+    """Replace display._render with a spy and return the list it
+    accumulates ``(text, color)`` tuples into."""
+    rendered: list = []
+    original = display._render
 
     def spy(text, size, color):  # type: ignore[no-untyped-def]
-        rendered.append(text)
-        return original_render(text, size, color)
+        rendered.append((text, color))
+        return original(text, size, color)
 
     display._render = spy  # type: ignore[assignment]
-    display.draw_degrees(q)
-
-    assert "A: 22.0°C" in rendered
-    assert "B: 50.0°C" in rendered
-    assert "C: 95.0°C" in rendered
+    return rendered
 
 
-def test_draw_degrees_skips_empty_queue(display: Display) -> None:
-    """Defensive: don't crash on an empty queue."""
-    q = _make_temp_queue()  # never .add_to_queue()'d
+def test_temp_legend_renders_distinct_label_per_thermal_mass(
+    display: Display,
+) -> None:
+    """At cold startup every thermal mass reads the same temperature;
+    each label must still appear with a distinct color (the index-based
+    sort was the old bug — labels are now keyed off position, not
+    value)."""
+    display.wave_queues["temp"] = _make_temp_queue()
+    q = display.wave_queues["temp"]
+    q.set_labels(["a", "b", "c", "d", "e", "f"])
+    q.add_to_queue((22.0,) * 6)
+
+    rendered = _spy_render(display)
+    display._redraw_temp_legend([])
+
+    texts = [t for t, _ in rendered]
+    colors = [c for _, c in rendered]
+    # First 6 labels rendered, one per thermal mass
+    for label in ["a", "b", "c", "d", "e", "f"]:
+        assert any(label in t for t in texts), f"missing label {label!r}"
+    # Six distinct colors
+    assert len(set(colors)) == 6
+
+
+def test_temp_legend_renders_values_with_one_decimal(display: Display) -> None:
+    display.wave_queues["temp"] = _make_temp_queue()
+    q = display.wave_queues["temp"]
+    q.set_labels(["shell", "elem", "water", "body", "head", "model"])
+    q.add_to_queue((28.04, 50.51, 24.66, 22.7, 22.74, 23.81))
+
+    rendered = _spy_render(display)
+    display._redraw_temp_legend([])
+
+    texts = " || ".join(t for t, _ in rendered)
+    # Each value formatted to one decimal, label prefixed
+    assert "shell" in texts and "28.0" in texts
+    assert "elem" in texts and "50.5" in texts
+    assert "water" in texts and "24.7" in texts
+
+
+def test_temp_legend_skips_empty_queue(display: Display) -> None:
+    display.wave_queues["temp"] = _make_temp_queue()
     # Should not raise
-    display.draw_degrees(q)
+    display._redraw_temp_legend([])
+
+
+def test_temp_legend_skips_redraw_when_values_unchanged(display: Display) -> None:
+    display.wave_queues["temp"] = _make_temp_queue()
+    q = display.wave_queues["temp"]
+    q.set_labels(["shell", "elem", "water", "body", "head", "model"])
+    q.add_to_queue((28.0, 50.5, 24.7, 22.7, 22.7, 23.8))
+
+    dirty1: list = []
+    display._redraw_temp_legend(dirty1)
+    assert len(dirty1) == 1, "first frame must be dirty"
+
+    dirty2: list = []
+    display._redraw_temp_legend(dirty2)
+    assert dirty2 == [], "no value changed → no dirty rect"
 
 
 # ----------------------- draw_coordinates ----------------------------- #
@@ -232,3 +264,25 @@ def test_draw_coordinates_calls_draw_lines_once_per_series(display: Display) -> 
 def test_draw_coordinates_empty_queue_does_not_crash(display: Display) -> None:
     q = _make_temp_queue()
     display.draw_coordinates(q, q.X_MIN, q.X_MAX, q.Y_MIN, q.Y_MAX, q.low, q.high)
+
+
+# ----------------------- partial update -------------------------------- #
+
+
+def test_render_frame_returns_dirty_rects_on_first_pass(display: Display) -> None:
+    """On the very first frame, every zone is "new" and should be
+    reported as dirty so display.update flushes them."""
+    dirty = display._render_frame()
+    assert len(dirty) > 0, "first frame must report dirty zones"
+
+
+def test_render_frame_skips_unchanged_zones(display: Display) -> None:
+    """Second frame with identical inputs should report fewer dirty
+    rects (most zones cached, only the always-changing countdown in the
+    header is likely to differ — and only if a second elapsed)."""
+    display._render_frame()  # warm caches
+    dirty = display._render_frame()
+    # No new TSIC sample, no flow data, no boiler change → all wave
+    # zones should be skipped. At most the header (countdown) can be
+    # dirty if a second elapsed; we just assert it's strictly fewer.
+    assert len(dirty) < 8, "second frame should not redraw every zone"

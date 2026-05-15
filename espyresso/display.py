@@ -32,6 +32,18 @@ logger = logging.getLogger(__name__)
 
 
 class Display:
+    # Colors (class-level — never change at runtime)
+    BLACK = (0, 0, 0)
+    GREY = (100, 100, 100)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    LIGHT_BLUE = (0, 255, 255)
+    BLUE = (0, 0, 255)
+    ORANGE = (255, 140, 0)
+    YELLOW = (255, 255, 0)
+    PINK = (255, 0, 255)
+
     def __init__(
         self,
         *args: Any,
@@ -55,7 +67,6 @@ class Display:
         pygame.mouse.set_visible(False)
         pygame.font.init()
 
-        # set up the window
         pygame.event.set_allowed(None)
         if not config.DEBUG:
             flags = pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF
@@ -64,38 +75,26 @@ class Display:
         self.screen = pygame.display.set_mode((config.WIDTH, config.HEIGHT), flags)
 
         font = str(Path(__file__).parent / "nk57-monospace-cd-rg.ttf")
-        self.big_font = pygame.font.Font(font, 42)
-        self.medium_font = pygame.font.Font(font, 28)
+        self.big_font = pygame.font.Font(font, 28)
+        self.medium_font = pygame.font.Font(font, 18)
         self.small_font = pygame.font.Font(font, 12)
 
         # Render cache: pygame.font.Font.render() allocates a new SDL surface
-        # per call. Doing that ~45×/frame at 10 Hz on a Pi Zero caused heap
-        # fragmentation and eventual OOM. We cache by (text, font_size, color)
-        # with LRU eviction, so static labels and most dynamic values become
-        # zero-allocation blits after the first render.
+        # per call. Cache by (text, font_size, color) with LRU eviction so
+        # static labels and most dynamic values become zero-allocation blits
+        # after the first render.
         self._fonts: Dict[int, pygame.font.Font] = {
-            42: self.big_font,
-            28: self.medium_font,
+            28: self.big_font,
+            18: self.medium_font,
             12: self.small_font,
         }
         self._render_cache: "OrderedDict[Tuple[str, int, Tuple[int, int, int]], pygame.Surface]" = OrderedDict()
 
         # Pre-rendered translucent horizontal grid line, keyed by width.
-        # Previously this was a fresh SRCALPHA surface per y-axis step per
-        # queue per frame — the dominant leak source.
         self._hline_cache: Dict[int, pygame.Surface] = {}
 
-        # set up the colors
-        self.BLACK = (0, 0, 0)
-        self.GREY = (100, 100, 100)
-        self.WHITE = (255, 255, 255)
-        self.RED = (255, 0, 0)
-        self.GREEN = (0, 255, 0)
-        self.LIGHT_BLUE = (0, 255, 255)
-        self.BLUE = (0, 0, 255)
-        self.ORANGE = (255, 140, 0)
-        self.YELLOW = (255, 255, 0)
-        self.PINK = (255, 0, 255)
+        # Series colors for the temp waveform (one per thermal mass, in
+        # the order PController.update returns).
         self.colors = [
             self.GREEN,
             self.ORANGE,
@@ -106,9 +105,27 @@ class Display:
             self.YELLOW,
         ]
 
-        self.notification: str = ""
-        self.notification_updated = time.perf_counter()
-        self.notification_timer: Optional[float] = None
+        # Layout rects (turn config tuples into pygame.Rect once)
+        self.rect_header = pygame.Rect(*config.LAYOUT_HEADER)
+        self.rect_brew = pygame.Rect(*config.LAYOUT_BREW)
+        self.rect_temp_legend = pygame.Rect(*config.LAYOUT_TEMP_LEGEND)
+        self.rect_temp_wave = pygame.Rect(*config.LAYOUT_TEMP_WAVE)
+        self.rect_flow_header = pygame.Rect(*config.LAYOUT_FLOW_HEADER)
+        self.rect_flow_wave = pygame.Rect(*config.LAYOUT_FLOW_WAVE)
+        self.rect_boiler_header = pygame.Rect(*config.LAYOUT_BOILER_HEADER)
+        self.rect_boiler_wave = pygame.Rect(*config.LAYOUT_BOILER_WAVE)
+
+        # Dirty-tracking state. Each zone records whatever value last
+        # produced its rendered output; if the new value matches, we
+        # skip the redraw and don't add the rect to display.update().
+        self._last_header: Optional[str] = None
+        self._last_brew: Optional[str] = None
+        self._last_legend: Optional[Tuple[Any, ...]] = None
+        self._last_flow_header: Optional[str] = None
+        self._last_flow_wave_token: Any = None
+        self._last_boiler_header: Optional[str] = None
+        self._last_boiler_wave_token: Any = None
+        self._last_temp_wave_token: Any = None
 
         self.boiler = boiler
         self.buttons = buttons
@@ -122,16 +139,17 @@ class Display:
         self._stop_event = threading.Event()
         self.wave_queues = wave_queues
 
+    # ------------------------------------------------------------------ #
+    #  Caching helpers
+    # ------------------------------------------------------------------ #
+
     def _render(
         self,
         text: str,
         size: int,
         color: Tuple[int, int, int],
     ) -> pygame.Surface:
-        """Return a cached rendered Surface for (text, font size, color).
-
-        The returned Surface is reused across frames; callers must not mutate
-        it (blitting is fine — that's read-only)."""
+        """Return a cached rendered Surface for (text, font size, color)."""
         key = (text, size, color)
         cached = self._render_cache.get(key)
         if cached is not None:
@@ -144,13 +162,16 @@ class Display:
         return surf
 
     def _get_hline(self, width: int) -> pygame.Surface:
-        """Return a cached translucent 1-px horizontal line of the given width."""
         surf = self._hline_cache.get(width)
         if surf is None:
             surf = pygame.Surface((width, 1), flags=pygame.SRCALPHA)
             surf.fill((255, 255, 255, 100))
             self._hline_cache[width] = surf
         return surf
+
+    # ------------------------------------------------------------------ #
+    #  Waveform primitives (unchanged math, just cleaner names)
+    # ------------------------------------------------------------------ #
 
     @staticmethod
     def generate_coordinate(
@@ -166,7 +187,7 @@ class Display:
 
     def generate_coordinates(
         self,
-        values: List[float],
+        values: Any,
         X_MIN: int,
         X_MAX: int,
         Y_MIN: int,
@@ -186,32 +207,6 @@ class Display:
             for index, value in enumerate(values)
         ]
 
-    def draw_notification(self) -> None:
-        notification = self.buttons.get_notification()
-
-        if not notification:
-            return None
-
-        label = self._render(f"{notification}", 42, self.WHITE)
-        self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
-
-    def draw_waveform(
-        self,
-        queue: WaveQueue,
-        X_MIN: int,
-        X_MAX: int,
-        Y_MIN: int,
-        Y_MAX: int,
-        steps: int = 10,
-        target_y: Optional[float] = None,
-    ) -> None:
-        if target_y:
-            self.draw_target_line(
-                target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
-            )
-        self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
-        self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
-
     def draw_y_axis(
         self,
         X_MIN: int,
@@ -222,25 +217,18 @@ class Display:
         high: int,
         number_of_steps: int,
     ) -> None:
-
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MIN, Y_MIN))
         pygame.draw.line(self.screen, self.WHITE, (X_MIN, Y_MAX), (X_MAX, Y_MAX))
 
-        range_steps = int(
-            (high * number_of_steps - low * number_of_steps) / number_of_steps
-        )
-
+        range_steps = int(high - low) or 1
         steps: List[Tuple[float, int]] = []
         rounded = True
         for i in range(low * number_of_steps, high * number_of_steps, range_steps):
             closest_step = i / number_of_steps
-
             y_val = round(linear_transform(closest_step, low, high, Y_MAX, Y_MIN))
             if y_val < Y_MIN:
                 continue
-
             steps.append((closest_step, y_val))
-
             if not closest_step.is_integer():
                 rounded = False
 
@@ -249,66 +237,8 @@ class Display:
             if rounded:
                 step = round(step)
             label = self._render(str(step), 12, self.WHITE)
-            self.screen.blit(label, (X_MIN - 24, y_val - 8))  # Number on Y-axis step
-            self.screen.blit(hline, (X_MIN, y_val))  # Line on Y-axis
-
-    def draw_degrees(self, queue: Optional[WaveQueue]) -> None:
-        if not queue:
-            return
-        degrees = queue[-1]
-        # Sort *indices* by descending value. Sorting by value and then
-        # looking up via list.index() collapses duplicates onto the first
-        # match (e.g. all thermal masses at room temperature on a cold
-        # boot), hiding every series after the first.
-        order = sorted(range(len(degrees)), key=lambda k: -degrees[k])
-
-        for row, idx in enumerate(order):
-            label = self._render(
-                f"{queue.queue_labels[idx]}: {round(degrees[idx], 1)}\u00B0C",
-                12,
-                self.colors[idx],
-            )
-            self.screen.blit(
-                label, (max(0, (100 - int(label.get_rect().width))), 12 * row)
-            )
-
-    def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:
-        time_label = self._render(f"Time:  {time_left}", 12, self.WHITE)
-        power_label = self._render(
-            f"Power: {self.boiler.pwm.get_display_value()}%", 12, self.WHITE
-        )
-        water_value = round(self.ranger.get_current_distance(), 1)
-        water_label = self._render(
-            f"Water: {water_value}%", 12, self.WHITE if water_value > 10 else self.RED
-        )
-        on_off_label = self._render("ON" if boiling else "OFF", 12, self.RED)
-
-        self.screen.blit(time_label, (200, 0))
-        self.screen.blit(power_label, (200, 14))
-        self.screen.blit(water_label, (200, 28))
-
-        pygame.draw.circle(
-            self.screen, self.RED if boiling else self.GREY, (300, 12), 10
-        )
-        self.screen.blit(
-            on_off_label, (300 - int(on_off_label.get_rect().width / 2), 24)
-        )
-
-    def draw_brewing_timer(self, time_since_started: float = 0) -> None:
-        label = self._render(f"{round(time_since_started, 1)}", 12, self.WHITE)
-        self.screen.blit(label, (140, 0))
-
-    def draw_preinfuse_timer(self, time_since_started: float = 0) -> None:
-        label = self._render(f"{round(time_since_started, 1)}", 12, self.WHITE)
-        self.screen.blit(label, (140, 14))
-
-    def draw_flow(self, millilitres: float = 0) -> None:
-        label = self._render(f"{round(millilitres, 1)}mL", 12, self.WHITE)
-        self.screen.blit(label, (140, 28))
-
-    def draw_scale_weight(self, scale_weight: float = 0) -> None:
-        label = self._render(f"{scale_weight}g", 12, self.WHITE)
-        self.screen.blit(label, (140, 42))
+            self.screen.blit(label, (X_MIN - 24, y_val - 8))
+            self.screen.blit(hline, (X_MIN, y_val))
 
     def draw_target_line(
         self,
@@ -336,11 +266,6 @@ class Display:
         queue_list = list(queue)
         if not queue_list:
             return
-        # Transpose once via zip instead of slicing column-by-column with
-        # a fresh list comprehension per series. Then issue a single
-        # pygame.draw.lines call per series rather than one draw.line
-        # per segment — ~66× fewer Python→C round trips on the temp
-        # waveform.
         for i, series in enumerate(zip(*queue_list)):
             points = self.generate_coordinates(
                 list(series), X_MIN, X_MAX, Y_MIN, Y_MAX, low, high
@@ -349,21 +274,254 @@ class Display:
                 continue
             pygame.draw.lines(self.screen, self.colors[i], False, points)
 
+    def draw_waveform(
+        self,
+        queue: WaveQueue,
+        X_MIN: int,
+        X_MAX: int,
+        Y_MIN: int,
+        Y_MAX: int,
+        steps: int = 10,
+        target_y: Optional[float] = None,
+    ) -> None:
+        if target_y:
+            self.draw_target_line(
+                target_y, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high
+            )
+        self.draw_y_axis(X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high, steps)
+        self.draw_coordinates(queue, X_MIN, X_MAX, Y_MIN, Y_MAX, queue.low, queue.high)
+
+    # ------------------------------------------------------------------ #
+    #  Zone redraws — each returns the rect it touched, or None if it
+    #  decided the zone was unchanged since last frame.
+    # ------------------------------------------------------------------ #
+
+    def _redraw_header(self, dirty: List[pygame.Rect]) -> None:
+        """Hero current temp + setpoint + boil state + water % + countdown."""
+        temp_queue = self.wave_queues.get("temp")
+        if temp_queue and len(temp_queue) > 0:
+            raw_temp = temp_queue[-1][-1]  # last tuple, last entry = raw TSIC reading
+        else:
+            raw_temp = 0.0
+        # Setpoint lives on the queue as its target_y
+        setpoint = temp_queue.target_y if temp_queue is not None else 0
+        boiling = self.boiler.get_boiling()
+        water = round(self.ranger.get_current_distance(), 0)
+        countdown = int(
+            config.TURN_OFF_SECONDS - (time.perf_counter() - self.get_started_time())
+        )
+
+        hero = f"{raw_temp:.1f}°"
+        target = f"→{setpoint:.0f}°" if setpoint else "→---"
+        boil = "●BOIL" if boiling else "○OFF"
+        water_str = f"H2O {water:.0f}%"
+        count_str = f"{countdown}s"
+
+        key = f"{hero}|{target}|{boil}|{water_str}|{count_str}"
+        if key == self._last_header:
+            return
+        self._last_header = key
+
+        self.screen.fill(self.BLACK, self.rect_header)
+
+        hero_surf = self._render(hero, 28, self.WHITE)
+        self.screen.blit(hero_surf, (4, 0))
+
+        target_color = self.GREY if not boiling else self.WHITE
+        self.screen.blit(self._render(target, 12, target_color), (120, 4))
+
+        boil_color = self.RED if boiling else self.GREY
+        self.screen.blit(self._render(boil, 12, boil_color), (120, 16))
+
+        water_color = self.WHITE if water > 10 else self.RED
+        self.screen.blit(self._render(water_str, 12, water_color), (210, 4))
+        self.screen.blit(self._render(count_str, 12, self.WHITE), (210, 16))
+
+        dirty.append(self.rect_header)
+
+    def _redraw_brew_strip(self, dirty: List[pygame.Rect]) -> None:
+        """Single 12pt line with brew/preinfuse/flow/scale values."""
+        brew_s = round(self.brewing_timer.get_time_since_started(), 1)
+        pre_s = round(self.pump.get_time_since_started_preinfuse(), 1)
+        flow_ml = round(self.flow.get_millilitres(), 1)
+        scale_g = self.bluetooth_scale.get_scale_weight()
+
+        text = f"Brew {brew_s}s  Pre {pre_s}s  Flow {flow_ml}mL  Scale {scale_g}g"
+        if text == self._last_brew:
+            return
+        self._last_brew = text
+
+        self.screen.fill(self.BLACK, self.rect_brew)
+        self.screen.blit(self._render(text, 12, self.WHITE), (4, 32))
+        dirty.append(self.rect_brew)
+
+    def _redraw_temp_legend(self, dirty: List[pygame.Rect]) -> None:
+        """2 columns x 3 rows of color-coded thermal-mass readings.
+
+        The 7th element of the tuple (raw temperature) is the hero
+        number in the header, so we render only the first 6 here."""
+        queue = self.wave_queues.get("temp")
+        if not queue or len(queue) == 0:
+            # Still need to clear the zone once
+            token: Tuple[Any, ...] = ()
+            if token == self._last_legend:
+                return
+            self._last_legend = token
+            self.screen.fill(self.BLACK, self.rect_temp_legend)
+            dirty.append(self.rect_temp_legend)
+            return
+
+        latest = queue[-1]
+        labels = queue.queue_labels[:6]
+        values = latest[:6]
+
+        token = (tuple(labels), tuple(round(v, 1) for v in values))
+        if token == self._last_legend:
+            return
+        self._last_legend = token
+
+        self.screen.fill(self.BLACK, self.rect_temp_legend)
+
+        # 2 columns, 3 rows. Column widths chosen so "shell  28.0" fits.
+        col_x = (4, 84)
+        row_y = (48, 60, 72)
+        for i, (label, value) in enumerate(zip(labels, values)):
+            row = i // 2
+            col = i % 2
+            text = f"{label:<5} {value:5.1f}"
+            self.screen.blit(
+                self._render(text, 12, self.colors[i]),
+                (col_x[col], row_y[row]),
+            )
+
+        dirty.append(self.rect_temp_legend)
+
+    def _redraw_temp_wave(self, dirty: List[pygame.Rect]) -> None:
+        queue = self.wave_queues.get("temp")
+        token = self._wave_token(queue)
+        if token == self._last_temp_wave_token:
+            return
+        self._last_temp_wave_token = token
+
+        self.screen.fill(self.BLACK, self.rect_temp_wave)
+        if queue is not None:
+            self.draw_waveform(
+                queue=queue,
+                X_MIN=queue.X_MIN,
+                X_MAX=queue.X_MAX,
+                Y_MIN=queue.Y_MIN,
+                Y_MAX=queue.Y_MAX,
+                steps=queue.steps,
+                target_y=queue.target_y,
+            )
+        dirty.append(self.rect_temp_wave)
+
+    def _redraw_flow_header(self, dirty: List[pygame.Rect]) -> None:
+        flow_rate = self.flow.get_flow_rate() or 0.0
+        text = f"Flow {flow_rate:.1f} mL/s"
+        if text == self._last_flow_header:
+            return
+        self._last_flow_header = text
+
+        self.screen.fill(self.BLACK, self.rect_flow_header)
+        self.screen.blit(self._render(text, 12, self.WHITE), (164, 48))
+        dirty.append(self.rect_flow_header)
+
+    def _redraw_flow_wave(self, dirty: List[pygame.Rect]) -> None:
+        queue = self.wave_queues.get("flow")
+        token = self._wave_token(queue)
+        if token == self._last_flow_wave_token:
+            return
+        self._last_flow_wave_token = token
+
+        self.screen.fill(self.BLACK, self.rect_flow_wave)
+        if queue is not None:
+            self.draw_waveform(
+                queue=queue,
+                X_MIN=queue.X_MIN,
+                X_MAX=queue.X_MAX,
+                Y_MIN=queue.Y_MIN,
+                Y_MAX=queue.Y_MAX,
+                steps=queue.steps,
+                target_y=queue.target_y,
+            )
+        dirty.append(self.rect_flow_wave)
+
+    def _redraw_boiler_header(self, dirty: List[pygame.Rect]) -> None:
+        pwm_pct = self.boiler.pwm.get_display_value()
+        text = f"Pwr {pwm_pct}%"
+        if text == self._last_boiler_header:
+            return
+        self._last_boiler_header = text
+
+        self.screen.fill(self.BLACK, self.rect_boiler_header)
+        self.screen.blit(self._render(text, 12, self.WHITE), (164, 145))
+        dirty.append(self.rect_boiler_header)
+
+    def _redraw_boiler_wave(self, dirty: List[pygame.Rect]) -> None:
+        queue = self.wave_queues.get("boiler")
+        token = self._wave_token(queue)
+        if token == self._last_boiler_wave_token:
+            return
+        self._last_boiler_wave_token = token
+
+        self.screen.fill(self.BLACK, self.rect_boiler_wave)
+        if queue is not None:
+            self.draw_waveform(
+                queue=queue,
+                X_MIN=queue.X_MIN,
+                X_MAX=queue.X_MAX,
+                Y_MIN=queue.Y_MIN,
+                Y_MAX=queue.Y_MAX,
+                steps=queue.steps,
+                target_y=queue.target_y,
+            )
+        dirty.append(self.rect_boiler_wave)
+
+    @staticmethod
+    def _wave_token(queue: Optional[WaveQueue]) -> Any:
+        """Cheap "has the queue changed?" token. Length plus the id() of
+        the most recent tuple (which is a fresh object on every
+        add_to_queue call) is enough to detect new data without
+        comparing values."""
+        if queue is None or len(queue) == 0:
+            return (0, None)
+        return (len(queue), id(queue[-1]))
+
+    # ------------------------------------------------------------------ #
+    #  Frame composition + main loop
+    # ------------------------------------------------------------------ #
+
+    def _render_frame(self) -> List[pygame.Rect]:
+        """Run one frame's worth of redraws. Returns the list of rects
+        that actually changed and need to be flushed to the framebuffer.
+
+        Split out from ``start`` so tests can drive a single frame."""
+        dirty: List[pygame.Rect] = []
+        self._redraw_header(dirty)
+        self._redraw_brew_strip(dirty)
+        self._redraw_temp_legend(dirty)
+        self._redraw_temp_wave(dirty)
+        self._redraw_flow_header(dirty)
+        self._redraw_flow_wave(dirty)
+        self._redraw_boiler_header(dirty)
+        self._redraw_boiler_wave(dirty)
+        return dirty
+
     def stop(self) -> None:
         self._stop_event.set()
 
     def start(self) -> None:
-        # Clock.tick caps the frame rate but, unlike a fixed time.sleep, it
-        # subtracts the time spent rendering. Total cycle length stays
-        # bounded so the display thread predictably yields the GIL to the
-        # pigpio temperature callback.
         logger.info("display loop starting at %s fps", config.DISPLAY_FPS)
+        # First frame: clear the whole screen so any garbage from boot
+        # is gone before partial updates start touching individual zones.
+        self.screen.fill(self.BLACK)
+        pygame.display.update()
+
         clock = pygame.time.Clock()
         frame = 0
         try:
             while not self._stop_event.is_set():
-                # Per-iteration try/except: a draw failure must not silently
-                # kill the loop and freeze the screen.
                 try:
                     for event in pygame.event.get():
                         x, _ = pygame.mouse.get_pos()
@@ -372,80 +530,32 @@ class Display:
                                 self.buttons.rising_button_one()
                             else:
                                 self.buttons.rising_button_two()
-
                         if event.type == pygame.MOUSEBUTTONUP:
                             if x < 160:
                                 self.buttons.falling_button_one()
                             else:
                                 self.buttons.falling_button_two()
 
-                    time_left = int(
-                        config.TURN_OFF_SECONDS
-                        - (time.perf_counter() - self.get_started_time())
-                    )
-                    self.screen.fill(self.BLACK)
-                    self.draw_degrees(self.wave_queues.get("temp", None))
-                    self.draw_boiling_label(self.boiler.get_boiling(), time_left)
-                    self.draw_preinfuse_timer(
-                        time_since_started=self.pump.get_time_since_started_preinfuse()
-                    )
-                    self.draw_brewing_timer(
-                        time_since_started=self.brewing_timer.get_time_since_started()
-                    )
-                    self.draw_flow(millilitres=self.flow.get_millilitres())
-                    self.draw_scale_weight(
-                        scale_weight=self.bluetooth_scale.get_scale_weight()
-                    )
-                    self.draw_notification()
-                    for queue in self.wave_queues.values():
-                        self.draw_waveform(
-                            queue=queue,
-                            X_MIN=queue.X_MIN,
-                            X_MAX=queue.X_MAX,
-                            Y_MIN=queue.Y_MIN,
-                            Y_MAX=queue.Y_MAX,
-                            steps=queue.steps,
-                            target_y=queue.target_y,
-                        )
-                    pygame.display.update()
+                    dirty = self._render_frame()
+                    if dirty:
+                        # Partial update — only the rects we touched
+                        # get flushed to the framebuffer. When nothing
+                        # changed (rare with live data) we skip the
+                        # flush entirely.
+                        pygame.display.update(dirty)
 
                     frame += 1
-                    # First frame, then once a minute at 4 fps
                     if frame == 1 or frame % 240 == 0:
                         logger.info("display heartbeat: frame=%d", frame)
 
                     clock.tick(config.DISPLAY_FPS)
                 except Exception:
                     logger.exception("display loop iteration failed (frame=%d)", frame)
-                    # Avoid spin-logging if the failure persists
                     time.sleep(1)
         finally:
             logger.info("display loop exiting after %d frames", frame)
             pygame.display.quit()
             pygame.quit()
-
-    def test_display(self) -> None:
-        # run the game loop
-        # import random
-        import time
-
-        v = 25
-        try:
-            while not self._stop_event.is_set() and v < 1000:
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        pygame.quit()
-                        sys.exit()
-                    if event.type == pygame.MOUSEBUTTONDOWN:
-                        print("Pos: %sx%s\n" % pygame.mouse.get_pos())
-                v += 1
-                # self.wave_queues["temp"].add_to_queue(random.randint(94, 96))
-                # self.wave_queues["flow"].add_to_queue(random.randint(1, 2))
-                # self.wave_queues["boiler"].add_to_queue(random.randint(20, 80))
-                time.sleep(0.1)
-        except Exception:
-            logger.exception("EXC")
-            self.stop()
 
 
 if __name__ == "__main__":
@@ -473,11 +583,11 @@ if __name__ == "__main__":
             X_MAX=config.TEMP_X_MAX,
             Y_MIN=config.TEMP_Y_MIN,
             Y_MAX=config.TEMP_Y_MAX,
-            target_y=True,
+            target_y=config.TARGET_TEMP,
         ),
         "flow": WaveQueue(
             0,
-            100,
+            3,
             X_MIN=config.FLOW_X_MIN,
             X_MAX=config.FLOW_X_MAX,
             Y_MIN=config.FLOW_Y_MIN,
@@ -486,7 +596,7 @@ if __name__ == "__main__":
         ),
         "boiler": WaveQueue(
             0,
-            2,
+            100,
             X_MIN=config.BOILER_X_MIN,
             X_MAX=config.BOILER_X_MAX,
             Y_MIN=config.BOILER_Y_MIN,
@@ -508,7 +618,6 @@ if __name__ == "__main__":
     )
     try:
         dis.start()
-        dis.test_display()
     except Exception:
-        print("EXCEPTIOON")
+        logger.exception("display crashed")
         dis.stop()

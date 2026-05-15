@@ -59,15 +59,18 @@ class Temperature:
             flow=self.flow,
         )
         self.temp_queue = temp_queue
+        # Labels map 1:1 to the tuple PController.update returns. The
+        # last entry (raw sensor reading) is the hero in the header strip
+        # and isn't shown in the diagnostic legend.
         self.temp_queue.set_labels(
             [
-                "shellTemp",
-                "elementTemp",
-                "waterTemp",
-                "bodyTemp",
-                "brewHeadTemp",
-                "modeledSensorTemp",
-                "temperature",
+                "shell",
+                "elem",
+                "water",
+                "body",
+                "head",
+                "model",
+                "tp",
             ]
         )
 

@@ -61,19 +61,37 @@ DISPLAY_FPS = 4
 
 AXIS_WIDTH = 28
 
+# Display layout (320 x 240). All rects are (x, y, w, h) in screen coords.
+# Header (320x30): hero current temp + status info.
+# Brew strip (320x16): brew/preinfuse/flow/scale labels.
+# Temp panel (160x194): compact 6-mass legend (40px) + waveform (154px).
+# Flow + Boiler panels stack on the right: each is (160x97) with a 14px
+# header strip above their waveform.
+LAYOUT_HEADER = (0, 0, 320, 30)
+LAYOUT_BREW = (0, 30, 320, 16)
+LAYOUT_TEMP_LEGEND = (0, 46, 160, 40)
+LAYOUT_TEMP_WAVE = (0, 86, 160, 154)
+LAYOUT_FLOW_HEADER = (160, 46, 160, 14)
+LAYOUT_FLOW_WAVE = (160, 60, 160, 83)
+LAYOUT_BOILER_HEADER = (160, 143, 160, 14)
+LAYOUT_BOILER_WAVE = (160, 157, 160, 83)
+
+# Waveform plot regions. X_MIN/X_MAX define the column range and therefore
+# the WaveQueue length; keeping them unchanged preserves the existing
+# 132-sample rolling buffer width and the test that asserts it.
 TEMP_X_MIN = 0 + AXIS_WIDTH
 TEMP_X_MAX = 160
-TEMP_Y_MIN = 70
+TEMP_Y_MIN = 86
 TEMP_Y_MAX = 240
 
 FLOW_X_MIN = 160 + AXIS_WIDTH
 FLOW_X_MAX = 320
-FLOW_Y_MIN = 50
-FLOW_Y_MAX = 140
+FLOW_Y_MIN = 60
+FLOW_Y_MAX = 143
 
 BOILER_X_MIN = 160 + AXIS_WIDTH
 BOILER_X_MAX = 320
-BOILER_Y_MIN = 150
+BOILER_Y_MIN = 157
 BOILER_Y_MAX = 240
 
 ZOOM = 2
