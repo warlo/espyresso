@@ -48,6 +48,12 @@ TURN_OFF_SECONDS = 600.0
 WIDTH = 320
 HEIGHT = 240
 
+# Display refresh rate. Kept intentionally low: the Pi Zero is CPU-bound and
+# the TSIC temperature callback shares the GIL with the display thread. A
+# lower FPS means the display releases the GIL more, giving the temperature
+# control loop more room to run.
+DISPLAY_FPS = 4
+
 AXIS_WIDTH = 28
 
 TEMP_X_MIN = 0 + AXIS_WIDTH

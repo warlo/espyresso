@@ -3,12 +3,19 @@ import os
 import sys
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import pygame
 
 from espyresso import config
+
+# Cap on cached rendered-text surfaces. Each entry is a tiny SDL surface
+# (a few KB at most for the fonts used here). 512 entries covers all
+# static labels plus a wide range of dynamic values (timer ticks, etc.)
+# with comfortable headroom; LRU eviction handles overflow.
+_RENDER_CACHE_MAX = 512
 
 if TYPE_CHECKING:
     from espyresso.boiler import Boiler
@@ -61,6 +68,23 @@ class Display:
         self.medium_font = pygame.font.Font(font, 28)
         self.small_font = pygame.font.Font(font, 12)
 
+        # Render cache: pygame.font.Font.render() allocates a new SDL surface
+        # per call. Doing that ~45×/frame at 10 Hz on a Pi Zero caused heap
+        # fragmentation and eventual OOM. We cache by (text, font_size, color)
+        # with LRU eviction, so static labels and most dynamic values become
+        # zero-allocation blits after the first render.
+        self._fonts: Dict[int, pygame.font.Font] = {
+            42: self.big_font,
+            28: self.medium_font,
+            12: self.small_font,
+        }
+        self._render_cache: "OrderedDict[Tuple[str, int, Tuple[int, int, int]], pygame.Surface]" = OrderedDict()
+
+        # Pre-rendered translucent horizontal grid line, keyed by width.
+        # Previously this was a fresh SRCALPHA surface per y-axis step per
+        # queue per frame — the dominant leak source.
+        self._hline_cache: Dict[int, pygame.Surface] = {}
+
         # set up the colors
         self.BLACK = (0, 0, 0)
         self.GREY = (100, 100, 100)
@@ -97,6 +121,36 @@ class Display:
 
         self._stop_event = threading.Event()
         self.wave_queues = wave_queues
+
+    def _render(
+        self,
+        text: str,
+        size: int,
+        color: Tuple[int, int, int],
+    ) -> pygame.Surface:
+        """Return a cached rendered Surface for (text, font size, color).
+
+        The returned Surface is reused across frames; callers must not mutate
+        it (blitting is fine — that's read-only)."""
+        key = (text, size, color)
+        cached = self._render_cache.get(key)
+        if cached is not None:
+            self._render_cache.move_to_end(key)
+            return cached
+        surf = self._fonts[size].render(text, True, color)
+        self._render_cache[key] = surf
+        if len(self._render_cache) > _RENDER_CACHE_MAX:
+            self._render_cache.popitem(last=False)
+        return surf
+
+    def _get_hline(self, width: int) -> pygame.Surface:
+        """Return a cached translucent 1-px horizontal line of the given width."""
+        surf = self._hline_cache.get(width)
+        if surf is None:
+            surf = pygame.Surface((width, 1), flags=pygame.SRCALPHA)
+            surf.fill((255, 255, 255, 100))
+            self._hline_cache[width] = surf
+        return surf
 
     @staticmethod
     def generate_coordinate(
@@ -138,7 +192,7 @@ class Display:
         if not notification:
             return None
 
-        label = self.big_font.render(f"{notification}", 1, self.WHITE)
+        label = self._render(f"{notification}", 42, self.WHITE)
         self.screen.blit(label, ((config.WIDTH / 2) - 25, (config.HEIGHT / 2)))
 
     def draw_waveform(
@@ -190,18 +244,13 @@ class Display:
             if not closest_step.is_integer():
                 rounded = False
 
+        hline = self._get_hline(X_MAX - X_MIN)
         for (step, y_val) in steps:
             if rounded:
                 step = round(step)
-            label = self.small_font.render("{}".format(str(step)), 1, self.WHITE)
+            label = self._render(str(step), 12, self.WHITE)
             self.screen.blit(label, (X_MIN - 24, y_val - 8))  # Number on Y-axis step
-
-            # Transparent line
-            horizontal_line = pygame.Surface((X_MAX - X_MIN, 1), flags=pygame.SRCALPHA)
-            horizontal_line.fill(
-                (255, 255, 255, 100)
-            )  # You can change the 100 depending on what transparency it is.
-            self.screen.blit(horizontal_line, (X_MIN, y_val))  # Line on Y-axis
+            self.screen.blit(hline, (X_MIN, y_val))  # Line on Y-axis
 
     def draw_degrees(self, queue: Optional[WaveQueue]) -> None:
         if not queue:
@@ -211,9 +260,9 @@ class Display:
 
         for i, degree in enumerate(sorted_degrees):
             initial_index = degrees.index(degree)
-            label = self.small_font.render(
+            label = self._render(
                 f"{queue.queue_labels[initial_index]}: {round(degree, 1)}\u00B0C",
-                1,
+                12,
                 self.colors[initial_index],
             )
             self.screen.blit(
@@ -221,15 +270,15 @@ class Display:
             )
 
     def draw_boiling_label(self, boiling: bool = False, time_left: float = 0) -> None:
-        time_label = self.small_font.render(f"Time:  {time_left}", 1, self.WHITE)
-        power_label = self.small_font.render(
-            f"Power: {self.boiler.pwm.get_display_value()}%", 1, self.WHITE
+        time_label = self._render(f"Time:  {time_left}", 12, self.WHITE)
+        power_label = self._render(
+            f"Power: {self.boiler.pwm.get_display_value()}%", 12, self.WHITE
         )
         water_value = round(self.ranger.get_current_distance(), 1)
-        water_label = self.small_font.render(
-            f"Water: {water_value}%", 1, self.WHITE if water_value > 10 else self.RED
+        water_label = self._render(
+            f"Water: {water_value}%", 12, self.WHITE if water_value > 10 else self.RED
         )
-        on_off_label = self.small_font.render("ON" if boiling else "OFF", 1, self.RED)
+        on_off_label = self._render("ON" if boiling else "OFF", 12, self.RED)
 
         self.screen.blit(time_label, (200, 0))
         self.screen.blit(power_label, (200, 14))
@@ -243,19 +292,19 @@ class Display:
         )
 
     def draw_brewing_timer(self, time_since_started: float = 0) -> None:
-        label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
+        label = self._render(f"{round(time_since_started, 1)}", 12, self.WHITE)
         self.screen.blit(label, (140, 0))
 
     def draw_preinfuse_timer(self, time_since_started: float = 0) -> None:
-        label = self.small_font.render(f"{round(time_since_started, 1)}", 1, self.WHITE)
+        label = self._render(f"{round(time_since_started, 1)}", 12, self.WHITE)
         self.screen.blit(label, (140, 14))
 
     def draw_flow(self, millilitres: float = 0) -> None:
-        label = self.small_font.render(f"{round(millilitres, 1)}mL", 1, self.WHITE)
+        label = self._render(f"{round(millilitres, 1)}mL", 12, self.WHITE)
         self.screen.blit(label, (140, 28))
 
     def draw_scale_weight(self, scale_weight: float = 0) -> None:
-        label = self.small_font.render(f"{scale_weight}g", 1, self.WHITE)
+        label = self._render(f"{scale_weight}g", 12, self.WHITE)
         self.screen.blit(label, (140, 42))
 
     def draw_target_line(
@@ -299,6 +348,11 @@ class Display:
         self._stop_event.set()
 
     def start(self) -> None:
+        # Clock.tick caps the frame rate but, unlike a fixed time.sleep, it
+        # subtracts the time spent rendering. Total cycle length stays
+        # bounded so the display thread predictably yields the GIL to the
+        # pigpio temperature callback.
+        clock = pygame.time.Clock()
         while not self._stop_event.is_set():
 
             for event in pygame.event.get():
@@ -342,7 +396,7 @@ class Display:
                     target_y=queue.target_y,
                 )
             pygame.display.update()
-            time.sleep(0.1)
+            clock.tick(config.DISPLAY_FPS)
 
         pygame.display.quit()
         pygame.quit()
