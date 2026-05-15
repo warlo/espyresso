@@ -91,7 +91,7 @@ class Temperature:
     def update_boiler_value(self, pid_value: float) -> None:
 
         value = pid_value
-        logger.debug(f"Updating boiler: value {value}; pcontroller {pid_value}")
+        logger.debug("Updating boiler: value %s; pcontroller %s", value, pid_value)
         self.boiler.set_value(value)
 
     def start(self) -> None:
@@ -111,8 +111,8 @@ class Temperature:
             or measurement.seconds_since_epoch is None
         ):
             logger.warning(
-                f"Undefined or no new temperature measurement: "
-                f"{self.prev_timestamp}, {measurement}"
+                "Undefined or no new temperature measurement: %s, %s",
+                self.prev_timestamp, measurement,
             )
             sl = shot_logger.get()
             if sl is not None:
@@ -151,7 +151,9 @@ class Temperature:
         # single-producer, single-consumer rolling buffer.
         self.temp_queue.add_to_queue(temp_tuple)
 
-        logger.debug(f"Temp: {round(temp, 2)} - PID {self.pcontroller}: {heater_value}")
+        # Lazy %s: the formatting (and the round() / repr) only runs when
+        # DEBUG logging is actually enabled.
+        logger.debug("Temp: %s - PID %s: %s", temp, self.pcontroller, heater_value)
 
     def log_power(self, temp: float, timestamp: float, heater_value: float) -> None:
         with open(config.LOG_POWER_FILE, "a+") as f:

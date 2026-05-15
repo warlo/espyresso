@@ -263,9 +263,11 @@ class Pump:
         self.reset()
         self.brewing_timer.stop_timer()
         self.log_shot()
-        shot_seconds = self.brewing_timer.get_time_since_started()
-        logger.info(f"Time for shot {shot_seconds}")
-        logger.info(f"Pulse count for shot {self.flow.get_pulse_count()}")
+        logger.info(
+            "shot complete: time=%ss pulses=%s",
+            self.brewing_timer.get_time_since_started(),
+            self.flow.get_pulse_count(),
+        )
         self.brewing_timer.enable_automatic_timing()
         if not self.stopped_preinfuse:
             self.stopped_preinfuse = time.perf_counter()

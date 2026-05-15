@@ -72,7 +72,9 @@ class Flow:
             self.prev_change_time
             and current_time - self.prev_change_time < config.FLOW_METER_DEBOUNCE_TIME
         ):
-            logger.warning("Skipping sub 20ms flow pulse")
+            # Expected behaviour (pump vibration), not a warning. Demoted
+            # to DEBUG so the log isn't flooded ~20×/sec during a shot.
+            logger.debug("Skipping sub 20ms flow pulse")
             self.prev_change_time = current_time
             return None
 
