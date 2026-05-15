@@ -51,7 +51,7 @@ class Temperature:
         ).degree_celsius  # type: ignore
 
         self.prev_timestamp = time.perf_counter()
-        logger.warning("INITIAL TEMP: %s", str(initial_temperature))
+        logger.info("initial TSIC reading on GPIO %s = %s", config.TSIC_GPIO, initial_temperature)
 
         if not initial_temperature:
             initial_temperature = 22.0

@@ -355,54 +355,72 @@ class Display:
         # subtracts the time spent rendering. Total cycle length stays
         # bounded so the display thread predictably yields the GIL to the
         # pigpio temperature callback.
+        logger.info("display loop starting at %s fps", config.DISPLAY_FPS)
         clock = pygame.time.Clock()
-        while not self._stop_event.is_set():
+        frame = 0
+        try:
+            while not self._stop_event.is_set():
+                # Per-iteration try/except: a draw failure must not silently
+                # kill the loop and freeze the screen.
+                try:
+                    for event in pygame.event.get():
+                        x, _ = pygame.mouse.get_pos()
+                        if event.type == pygame.MOUSEBUTTONDOWN:
+                            if x < 160:
+                                self.buttons.rising_button_one()
+                            else:
+                                self.buttons.rising_button_two()
 
-            for event in pygame.event.get():
-                x, _ = pygame.mouse.get_pos()
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if x < 160:
-                        self.buttons.rising_button_one()
-                    else:
-                        self.buttons.rising_button_two()
+                        if event.type == pygame.MOUSEBUTTONUP:
+                            if x < 160:
+                                self.buttons.falling_button_one()
+                            else:
+                                self.buttons.falling_button_two()
 
-                if event.type == pygame.MOUSEBUTTONUP:
-                    if x < 160:
-                        self.buttons.falling_button_one()
-                    else:
-                        self.buttons.falling_button_two()
+                    time_left = int(
+                        config.TURN_OFF_SECONDS
+                        - (time.perf_counter() - self.get_started_time())
+                    )
+                    self.screen.fill(self.BLACK)
+                    self.draw_degrees(self.wave_queues.get("temp", None))
+                    self.draw_boiling_label(self.boiler.get_boiling(), time_left)
+                    self.draw_preinfuse_timer(
+                        time_since_started=self.pump.get_time_since_started_preinfuse()
+                    )
+                    self.draw_brewing_timer(
+                        time_since_started=self.brewing_timer.get_time_since_started()
+                    )
+                    self.draw_flow(millilitres=self.flow.get_millilitres())
+                    self.draw_scale_weight(
+                        scale_weight=self.bluetooth_scale.get_scale_weight()
+                    )
+                    self.draw_notification()
+                    for queue in self.wave_queues.values():
+                        self.draw_waveform(
+                            queue=queue,
+                            X_MIN=queue.X_MIN,
+                            X_MAX=queue.X_MAX,
+                            Y_MIN=queue.Y_MIN,
+                            Y_MAX=queue.Y_MAX,
+                            steps=queue.steps,
+                            target_y=queue.target_y,
+                        )
+                    pygame.display.update()
 
-            time_left = int(
-                config.TURN_OFF_SECONDS
-                - (time.perf_counter() - self.get_started_time())
-            )
-            self.screen.fill(self.BLACK)
-            self.draw_degrees(self.wave_queues.get("temp", None))
-            self.draw_boiling_label(self.boiler.get_boiling(), time_left)
-            self.draw_preinfuse_timer(
-                time_since_started=self.pump.get_time_since_started_preinfuse()
-            )
-            self.draw_brewing_timer(
-                time_since_started=self.brewing_timer.get_time_since_started()
-            )
-            self.draw_flow(millilitres=self.flow.get_millilitres())
-            self.draw_scale_weight(scale_weight=self.bluetooth_scale.get_scale_weight())
-            self.draw_notification()
-            for queue in self.wave_queues.values():
-                self.draw_waveform(
-                    queue=queue,
-                    X_MIN=queue.X_MIN,
-                    X_MAX=queue.X_MAX,
-                    Y_MIN=queue.Y_MIN,
-                    Y_MAX=queue.Y_MAX,
-                    steps=queue.steps,
-                    target_y=queue.target_y,
-                )
-            pygame.display.update()
-            clock.tick(config.DISPLAY_FPS)
+                    frame += 1
+                    # First frame, then once a minute at 4 fps
+                    if frame == 1 or frame % 240 == 0:
+                        logger.info("display heartbeat: frame=%d", frame)
 
-        pygame.display.quit()
-        pygame.quit()
+                    clock.tick(config.DISPLAY_FPS)
+                except Exception:
+                    logger.exception("display loop iteration failed (frame=%d)", frame)
+                    # Avoid spin-logging if the failure persists
+                    time.sleep(1)
+        finally:
+            logger.info("display loop exiting after %d frames", frame)
+            pygame.display.quit()
+            pygame.quit()
 
     def test_display(self) -> None:
         # run the game loop

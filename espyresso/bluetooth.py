@@ -37,27 +37,40 @@ class BluetoothScale:
         if config.DEBUG:
             # Skip bluetooth in debug
             return
+        if not config.BLUETOOTH_ENABLED:
+            logger.info("bluetooth disabled via config.BLUETOOTH_ENABLED")
+            return
         if self._thread is not None and self._thread.is_alive():
             return
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
     def _run(self) -> None:
-        import asyncio
+        logger.info("bluetooth thread starting")
+        try:
+            import asyncio
 
-        if config.PLATFORM == "darwin":
-            from bleak.backends.corebluetooth.client import (
-                BleakClientCoreBluetooth as BleakClient,
-            )
-        else:
-            from bleak.backends.bluezdbus.client import (
-                BleakClientBlueZDBus as BleakClient,
-            )
+            if config.PLATFORM == "darwin":
+                from bleak.backends.corebluetooth.client import (
+                    BleakClientCoreBluetooth as BleakClient,
+                )
+            else:
+                from bleak.backends.bluezdbus.client import (
+                    BleakClientBlueZDBus as BleakClient,
+                )
 
-        self.bleak_client = BleakClient(
-            config.BLUETOOTH_SCALE_ADDRESS, disconnected_callback=self.disconnected
-        )
-        asyncio.run(self.notify())
+            self.bleak_client = BleakClient(
+                config.BLUETOOTH_SCALE_ADDRESS,
+                disconnected_callback=self.disconnected,
+            )
+            asyncio.run(self.notify())
+        except Exception:
+            # Defensive: this is a daemon thread, so an unhandled exception
+            # here would otherwise die silently and leave the scale reading
+            # frozen at its last value.
+            logger.exception("bluetooth thread crashed")
+        finally:
+            logger.info("bluetooth thread exiting")
 
     def stop(self) -> None:
         if self.stop_event is not None:

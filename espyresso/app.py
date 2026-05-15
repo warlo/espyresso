@@ -23,20 +23,30 @@ logger = logging.getLogger(__name__)
 
 
 def _configure_logging() -> None:
-    """Configure file logging. Idempotent — safe to call from ``run()``.
+    """Configure file + stderr logging. Idempotent — safe to call from ``run()``.
 
-    Previously this lived at module scope, which meant importing
-    ``espyresso.app`` (e.g. from tests) would silently create a log file
-    and, if ``log/`` didn't exist, swallow the file-open error and fall
-    back to stderr with no output ever reaching disk."""
+    The stderr handler is important for diagnostics: under systemd, stderr
+    is captured by the journal, so ``journalctl -u espyresso`` shows live
+    output even if the log file isn't accessible."""
     os.makedirs("log", exist_ok=True)
-    logging.basicConfig(
-        filename=f"log/{time.strftime('%Y-%m-%d-%H:%M')}.log",
-        filemode="a",
-        format="%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S%z",
-        level=logging.DEBUG if config.DEBUG else logging.INFO,
+    fmt = "%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s"
+    datefmt = "%Y-%m-%dT%H:%M:%S%z"
+    formatter = logging.Formatter(fmt, datefmt=datefmt)
+
+    file_handler = logging.FileHandler(
+        f"log/{time.strftime('%Y-%m-%d-%H:%M')}.log", mode="a"
     )
+    file_handler.setFormatter(formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG if config.DEBUG else logging.INFO)
+    # basicConfig is a no-op if handlers are already attached, so clear first
+    for h in list(root.handlers):
+        root.removeHandler(h)
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
 
 
 class Espyresso:
@@ -146,16 +156,21 @@ class Espyresso:
     def start(self) -> None:
         self.reset_started_time()
 
+        logger.info("starting temperature thread")
         self.temperature.start()
+        logger.info("starting ranger thread")
         self.ranger.start()
+        logger.info("starting bluetooth thread")
         self.bluetooth_scale.start()
         # self.brewing_timer.start()
+        logger.info("entering display loop")
         self.display.start()
+        logger.info("display loop exited")
 
         self.ranger.join()
         # self.brewing_timer.join()
 
-        logger.debug("Pigpio stopping")
+        logger.info("pigpio stopping")
         self.pigpio_pi.stop()
         sys.exit(0)
 
@@ -195,12 +210,18 @@ def handler(signum: int, *args: Any) -> None:
 
 def run() -> None:
     _configure_logging()
-    if not config.DEBUG:
-        espyresso = Espyresso()
-    else:
-        from espyresso.simulator_mock import get_espyresso_simulator
+    logger.info("constructing Espyresso")
+    try:
+        if not config.DEBUG:
+            espyresso = Espyresso()
+        else:
+            from espyresso.simulator_mock import get_espyresso_simulator
 
-        espyresso = get_espyresso_simulator()
+            espyresso = get_espyresso_simulator()
+    except Exception:
+        logger.exception("Espyresso construction failed")
+        raise
+    logger.info("Espyresso constructed, installing signal handlers")
 
     try:
         signal.signal(signal.SIGHUP, handler)
