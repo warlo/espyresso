@@ -136,6 +136,7 @@ def quick_brew(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(config, "BREW_DOSE_G", 20.0)
     monkeypatch.setattr(config, "BREW_TARGET_YIELD_G", 40.0)
     monkeypatch.setattr(config, "BREW_RETAINED_ML_PER_G", 1.0)  # target inlet: 40 + 20 = 60 mL
+    monkeypatch.setattr(config, "BREW_BLOOM_SECONDS", 0.0)
 
 
 def test_brew_stops_at_target_inlet_volume_without_a_scale(
@@ -170,6 +171,41 @@ def test_brew_tells_the_controller_how_long_the_shot_has_left(
 
     # 30 mL still to go at 1.5 mL/s
     assert seconds == pytest.approx(20.0, abs=1.0)
+
+
+def _in_bloom(pump: Pump) -> bool:
+    return pump.pumping and pump.pwm.value == 0
+
+
+def test_bloom_stops_pushing_with_the_relay_on_then_brews(
+    log_dir: Path, quick_brew: None, pump: Pump, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the fill the pump stops pushing but its relay stays on, so the
+    puck soaks under the fill's pressure while the heater catches up."""
+    monkeypatch.setattr(config, "BREW_BLOOM_SECONDS", 0.5)
+    pump.brew_shot()
+
+    assert _wait_for(lambda: _in_bloom(pump))
+    relay = [c.args[1] for c in pump.pigpio_pi.write.call_args_list if c.args[0] == config.PUMP_OUT_GPIO]
+    assert relay[-1] == 1
+    assert pump.stopped_preinfuse is None  # the bloom counts as preinfusion
+    assert _wait_for(lambda: pump.stopped_preinfuse is not None)
+    assert pump.pwm.value > 0
+    assert pump.stopped_preinfuse - pump.started_preinfuse >= 0.2 + 0.5 - 0.05  # type: ignore[operator]
+
+
+def test_pressing_the_button_during_the_bloom_ends_the_shot(
+    log_dir: Path, quick_brew: None, pump: Pump, timer: BrewingTimer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "BREW_BLOOM_SECONDS", 5.0)
+    pump.brew_shot()
+    assert _wait_for(lambda: _in_bloom(pump))
+
+    pump.brew_shot()  # the button again
+
+    assert _wait_for(lambda: not pump.pump_thread.is_alive(), timeout=2.0)
+    assert pump.pumping is False
+    assert not timer.timer_running()
 
 
 def test_steam_holds_steam_setpoint_until_pressed_again_without_pumping(log_dir: Path, pump: Pump) -> None:

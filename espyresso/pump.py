@@ -239,6 +239,21 @@ class Pump:
             self._report_remaining_shot()
             time.sleep(0.1)
 
+        # Bloom: pump power off with the relay on, so the puck soaks under the
+        # fill's pressure while the heater catches up.
+        if config.BREW_BLOOM_SECONDS > 0 and self.pumping:
+            self.set_pwm_value(0)
+            if sl is not None:
+                sl.log_event("brew", phase="bloom_start", fill_ml=self.flow.get_millilitres())
+            bloom_until = time.perf_counter() + config.BREW_BLOOM_SECONDS
+            while self.pumping and time.perf_counter() < bloom_until:
+                self._report_remaining_shot()
+                time.sleep(0.1)
+
+        if not self.pumping:
+            # Stopped during preinfusion: don't start the brew timer.
+            return self.reset_brew_routine()
+
         # Stop preinfuse timer
         self.stopped_preinfuse = time.perf_counter()
         self.preinfuse_ml = self.flow.get_millilitres()

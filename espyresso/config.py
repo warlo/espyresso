@@ -44,11 +44,11 @@ SCL_GPIO = 3
 # reaches the coffee has lost heat to the group on the way. BREW_PUCK_TEMP is
 # what you want at the puck (Tim Wendelboe-style light roasts: 93-94 C) and
 # PUCK_OFFSET how much hotter the boiler must be to deliver it. Not measured
-# yet: during the default 18 g -> 36 g shot the simulation puts the water
-# reaching the cup about 10 under the setpoint (tools/sim/report.py
-# setpoints; it said 6 while the logged shot flows were read at half), PID
-# kits assume 7-8; see docs/temperature-control.md. Measure the puck
-# temperature once and correct it here.
+# yet: during the default 18 g -> 36 g Pi shot (with its bloom) the
+# simulation puts the water reaching the cup about 8.5 under the setpoint
+# (tools/sim/report.py setpoints; it said 6 while the logged shot flows were
+# read at half), PID kits assume 7-8; see docs/temperature-control.md.
+# Measure the puck temperature once and correct it here.
 BREW_PUCK_TEMP = 93.0
 PUCK_OFFSET = 6.0
 TARGET_TEMP = BREW_PUCK_TEMP + PUCK_OFFSET
@@ -68,8 +68,14 @@ BREW_TARGET_YIELD_G = 44.0
 BREW_RETAINED_ML_PER_G = 1.25
 BREW_MAX_SECONDS = 45.0
 # Preinfusion at low pump power until this volume or time, whichever first.
-# At ~1.4 mL/s every logged shot hit the 7 s limit first.
+# At about 4 mL/s the 7 s limit usually comes first (about 26 mL).
 PREINFUSE_MAX_SECONDS = 7.0
+# Bloom after the fill: the pump stops pushing (its relay stays on) so the puck
+# soaks under the fill's pressure, and the heater, already at full power, gets
+# time on the cold fill water. Simulated: 1.3-1.6 C hotter water at the
+# coffee for 8 s, and a lower display peak (docs/temperature-control.md).
+# Counts as preinfusion on the screen; 0 turns it off.
+BREW_BLOOM_SECONDS = 8.0
 # Pump power (PWM duty) during preinfusion, and what the brew phase ramps to
 # over its first 5 s. Through an open group 0.5 gives about 4 mL/s and 0.7
 # about 6.5 mL/s; below about 0.4 the pump stalls.

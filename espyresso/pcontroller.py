@@ -99,6 +99,10 @@ class PController:
         self._flow_horizon_s = min(max(0.0, seconds), config.FLOW_HEAT_HORIZON_MAX)
         self._flow_horizon_until = time.perf_counter() + config.FLOW_HEAT_HORIZON_EXPIRY
 
+    def shot_running(self) -> bool:
+        """A shot the Pi controls is under way, including its bloom."""
+        return time.perf_counter() < self._flow_horizon_until
+
     def update(
         self, *, temperature: float, boiling: bool
     ) -> Tuple[float, Tuple[float, ...]]:

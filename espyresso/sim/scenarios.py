@@ -3,6 +3,7 @@ Pi shots with a puck (Jan-Mar 2026), with the flow meter's halving
 corrected: a fast fill at the preinfusion pump power, then extraction."""
 from typing import Iterable, Optional, Tuple
 
+from espyresso import config
 from espyresso.pump import remaining_shot_seconds
 from espyresso.sim.closedloop import FlowFn
 from espyresso.temperature import Temperature
@@ -23,6 +24,10 @@ SHOT_SHAPE_NO_PREINFUSION = ((0.0, 5.4), (4.0, 2.5), (6.0, 1.4), (11.0, 1.6), (1
 # The fill ends when the flow drops to extraction; what comes after it is
 # what reaches the cup.
 FILL_SECONDS = SHOT_SHAPE[3][0]
+# The Pi's brew routine pauses the pump this long after the fill (a bloom);
+# a Pi shot lasts PI_SHOT_SECONDS from pump start.
+BLOOM_SECONDS = config.BREW_BLOOM_SECONDS
+PI_SHOT_SECONDS = SHOT_SECONDS + BLOOM_SECONDS
 
 
 def recipe_shot(
@@ -31,11 +36,13 @@ def recipe_shot(
     seconds: float = SHOT_SECONDS,
     preinfuse: bool = True,
     heat_budget: bool = True,
+    bloom: float = 0.0,
 ) -> FlowFn:
     """Shots with the logged flow shape, the extraction phase scaled so
-    ``inlet_ml`` arrives in ``seconds`` from pump start. The Pi's brew
-    routine reports the remaining shot time to the controller (the in-shot
-    heat budget) unless ``heat_budget`` is off."""
+    ``inlet_ml`` arrives in ``seconds`` of pumping. ``bloom`` pauses the pump
+    that long after the fill, so the shot lasts ``seconds + bloom``. The Pi's
+    brew routine reports the remaining shot time to the controller (the
+    in-shot heat budget) unless ``heat_budget`` is off."""
     shape = SHOT_SHAPE if preinfuse else SHOT_SHAPE_NO_PREINFUSION
     fill_end = FILL_SECONDS if preinfuse else shape[2][0]
     fill_ml = sum(
@@ -46,14 +53,19 @@ def recipe_shot(
     scale = max(0.0, inlet_ml - fill_ml) / tail_ml
     starts = sorted(starts)
 
-    def rate_at(s: float) -> float:
+    def pumped_at(s: float) -> float:
         r = [rate for t, rate in shape if t <= s][-1]
         return r * scale if s >= fill_end else r
+
+    def rate_at(s: float) -> float:
+        if s < fill_end:
+            return pumped_at(s)
+        return 0.0 if s < fill_end + bloom else pumped_at(s - bloom)
 
     def flow(t: float, temperature: Temperature) -> Tuple[float, Optional[float]]:
         for t0 in starts:
             s = t - t0
-            if 0 <= s < seconds:
+            if 0 <= s < seconds + bloom:
                 rate = rate_at(s)
                 ml = sum(rate_at(x * 0.1) * 0.1 for x in range(int(s / 0.1)))
                 return rate, (remaining_shot_seconds(inlet_ml, ml, rate) if heat_budget else None)
@@ -64,7 +76,7 @@ def recipe_shot(
 
 def pi_shots(starts: Iterable[float], heat_budget: bool = True) -> FlowFn:
     """Shots of the default recipe run by the Pi's brew routine."""
-    return recipe_shot(starts, heat_budget=heat_budget)
+    return recipe_shot(starts, heat_budget=heat_budget, bloom=BLOOM_SECONDS)
 
 
 def manual_shots(starts: Iterable[float]) -> FlowFn:

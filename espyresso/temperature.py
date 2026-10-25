@@ -135,7 +135,7 @@ class Temperature:
             boiling=self.boiler.get_boiling(),
             fault=bool(self.boiler.fault),
             steam=not self._brew_mode,
-            flowing=(self.flow.get_flow_rate() or 0.0) > 0.3,
+            flowing=(self.flow.get_flow_rate() or 0.0) > 0.3 or pc.shot_running(),
             group_deficit=self.group_deficit(),
             water_from_setpoint=pc.waterTemp - pc.temp_setpoint,
             water_from_target=pc.waterTemp - pc.target,

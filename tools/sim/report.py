@@ -38,8 +38,9 @@ def _fmt(v: float) -> str:
 
 
 def _shot_stats(run: closedloop.Run, t0: float) -> Dict[str, float]:
-    rows = [r for r in run.window(t0, t0 + scenarios.SHOT_SECONDS) if r["flow"] > 0]
+    rows = [r for r in run.window(t0, t0 + scenarios.PI_SHOT_SECONDS) if r["flow"] > 0]
     pucks = [r["puck"] for r in rows]
+    end = rows[-1]["t"]
     cup = [r for r in rows if r["t"] >= t0 + scenarios.FILL_SECONDS]
     return dict(
         puck=sum(pucks) / len(pucks),
@@ -50,7 +51,8 @@ def _shot_stats(run: closedloop.Run, t0: float) -> Dict[str, float]:
         water_min=min(r["water"] for r in rows),
         head=run.at(t0)["head"],
         head_model=run.at(t0)["m_head"],
-        post_water=run.max("water", after=t0 + scenarios.SHOT_SECONDS),
+        post_water=run.max("water", after=end),
+        end=end,
         display_peak=run.max("sensor", after=t0),
     )
 
@@ -104,7 +106,7 @@ def shots() -> None:
                 f"   {s['water_min']:6.1f}"
                 f"      {s['head']:5.1f}/{s['head_model']:5.1f}       {s['post_water']:5.1f}       {s['display_peak']:5.1f}"
             )
-    first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
+    first, second = 600.0, 600.0 + scenarios.PI_SHOT_SECONDS + 23.0
     for budget in (True, False):
         run = closedloop.simulate(duration=900, start=plant.uniform(22.6), flow=scenarios.pi_shots([first, second], heat_budget=budget))
         a, b = _shot_stats(run, first), _shot_stats(run, second)
@@ -166,7 +168,7 @@ def precision() -> None:
             if group == "central":
                 run = r
         s = pucks["central"]
-        end = 600.0 + scenarios.SHOT_SECONDS
+        end = s["end"]
         print(
             f"      {name}: boiler water {run.at(600)['water']:.1f} -> min {s['water_min']:.1f} | puck {s['puck']:.1f} C"
             f" ({pucks['eps 0.7']['puck']:.1f}..{pucks['eps 0.5']['puck']:.1f}), drop over shot {s['drop']:.1f} C"
@@ -174,7 +176,7 @@ def precision() -> None:
             f" range {s['extraction_range']:.1f}"
             f" | back within +-0.5 C {_fmt(_settled(run, SP, 0.5, end))} after | post-shot water peak {s['post_water'] - SP:+.2f}"
         )
-    first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
+    first, second = 600.0, 600.0 + scenarios.PI_SHOT_SECONDS + 23.0
     run = closedloop.simulate(duration=900, start=plant.uniform(22.6), flow=scenarios.pi_shots([first, second]))
     print(f"      back-to-back Pi shots 23 s apart: second {_shot_stats(run, second)['puck'] - _shot_stats(run, first)['puck']:+.2f} C at the puck")
     print("   4. steaming (Pi steam mode from idle at 10 min, 120 s, no refill; steam draw not modelled)")

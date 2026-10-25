@@ -86,29 +86,34 @@ def test_detached_sensor_switches_heater_off() -> None:
     assert late and all(r["duty"] == 0 for r in late)
 
 
+def _cup(run: closedloop.Run, start: float, end: float) -> float:
+    """Water at the puck, weighted by flow: what reaches the cup."""
+    rows = [r for r in run.window(start, end) if r["flow"] > 0]
+    return sum(r["puck"] * r["flow"] for r in rows) / sum(r["flow"] for r in rows)
+
+
 def _pi_shot(horizon: bool) -> closedloop.Run:
     flow = scenarios.pi_shots([600.0], heat_budget=horizon)
     return closedloop.simulate(duration=800, start=plant.uniform(22.6), flow=flow)
 
 
-def test_heat_budget_narrows_in_shot_drop_without_post_shot_overshoot() -> None:
+def test_heat_budget_keeps_the_cup_warmer_without_post_shot_overshoot() -> None:
+    """The fill's drop is the same either way; knowing how much shot is left
+    lets the boiler store heat for the extraction that follows."""
     with_budget, without = _pi_shot(True), _pi_shot(False)
-    end = 600.0 + scenarios.SHOT_SECONDS
+    extraction = 600.0 + scenarios.FILL_SECONDS + scenarios.BLOOM_SECONDS
+    end = 600.0 + scenarios.PI_SHOT_SECONDS
 
-    def spread(run: closedloop.Run) -> float:
-        pucks = [r["puck"] for r in run.window(600.0, end) if r["flow"] > 0]
-        return max(pucks) - min(pucks)
-
-    assert spread(with_budget) < spread(without) - 0.5
+    assert _cup(with_budget, extraction, end) > _cup(without, extraction, end) + 0.5
     assert with_budget.max("water", after=end) < SP + 1.5
 
 
 def test_back_to_back_pi_shots_stay_within_one_degree() -> None:
-    first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
+    first, second = 600.0, 600.0 + scenarios.PI_SHOT_SECONDS + 23.0
     run = closedloop.simulate(duration=800, start=plant.uniform(22.6), flow=scenarios.pi_shots([first, second]))
 
     def mean_puck(t0: float) -> float:
-        pucks = [r["puck"] for r in run.window(t0, t0 + scenarios.SHOT_SECONDS) if r["flow"] > 0]
+        pucks = [r["puck"] for r in run.window(t0, t0 + scenarios.PI_SHOT_SECONDS) if r["flow"] > 0]
         return sum(pucks) / len(pucks)
 
     assert abs(mean_puck(second) - mean_puck(first)) < 1.0
@@ -196,7 +201,7 @@ def test_plant_reproduces_published_puck_drop_of_a_pid_classic() -> None:
 def _shot_puck(params: dict, at: float, preheat: bool = False) -> float:
     flow = scenarios.preheat_then_shot(90.0, at) if preheat else scenarios.pi_shots([at])
     run = closedloop.simulate(duration=at + 60, start=plant.uniform(22.6), params=params, flow=flow, auto_off=False)
-    pucks = [r["puck"] for r in run.window(at, at + scenarios.SHOT_SECONDS) if r["flow"] > 0]
+    pucks = [r["puck"] for r in run.window(at, at + scenarios.PI_SHOT_SECONDS) if r["flow"] > 0]
     return sum(pucks) / len(pucks)
 
 
@@ -298,7 +303,7 @@ def test_flush_when_the_screen_says_so_makes_ready_sooner() -> None:
 
 def test_ready_again_soon_after_a_shot_without_flicker() -> None:
     run = closedloop.simulate(duration=1100, start=plant.uniform(22.6), flow=scenarios.pi_shots([900.0]), auto_off=False)
-    end = 900.0 + scenarios.SHOT_SECONDS
+    end = 900.0 + scenarios.PI_SHOT_SECONDS
 
     assert _states(run, after=890.0) == ["READY", "FLOW", "HEAT", "READY"]
     assert _ready_from(run, after=end) - end < 90
@@ -352,3 +357,42 @@ def test_recipe_shot_never_trips_the_safety_cut_off(preinfuse: bool) -> None:
         )
 
         assert not [r["t"] for r in run.window(600.0, 720.0) if r["safety"]], name
+
+
+def test_bloom_lets_the_heater_catch_up_on_every_plant() -> None:
+    """The heater is already at full power through the fill; a pause after it
+    gives the heater time on the fill water before extraction starts."""
+    for name, params in plant.candidates().items():
+        cups = []
+        for bloom in (0.0, 8.0):
+            run = closedloop.simulate(
+                duration=700, start=plant.uniform(22.6), params=params,
+                flow=scenarios.recipe_shot([600.0], bloom=bloom), auto_off=False,
+            )
+            extraction = 600.0 + scenarios.FILL_SECONDS + bloom
+            cups.append(_cup(run, extraction, extraction + scenarios.SHOT_SECONDS))
+
+        assert cups[1] > cups[0] + 0.5, name
+
+
+def test_screen_says_flow_through_the_bloom() -> None:
+    run = closedloop.simulate(
+        duration=660, start=plant.uniform(22.6), flow=scenarios.recipe_shot([600.0], bloom=8.0), auto_off=False
+    )
+
+    bloom = run.window(600.0 + scenarios.FILL_SECONDS + 0.5, 600.0 + scenarios.FILL_SECONDS + 7.5)
+    assert bloom and all(r["flow"] == 0 for r in bloom)
+    assert {str(r["state"]) for r in bloom} == {"FLOW"}
+
+
+def test_recipe_shot_with_a_bloom_pauses_then_delivers_its_volume() -> None:
+    flow = scenarios.recipe_shot([0.0], inlet_ml=66.0, seconds=28.0, bloom=8.0)
+    unused: Any = None
+    ticks = [i * 0.1 for i in range(400)]
+
+    volume = sum(flow(t, unused)[0] * 0.1 for t in ticks)
+
+    assert volume == pytest.approx(66.0, rel=0.03)
+    assert flow(scenarios.FILL_SECONDS + 4.0, unused)[0] == 0.0
+    assert flow(28.0 + 8.0 - 0.5, unused)[0] > 0.0
+    assert flow(28.0 + 8.0 + 0.5, unused)[0] == 0.0
