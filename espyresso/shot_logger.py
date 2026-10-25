@@ -16,7 +16,6 @@ import json
 import logging
 import math
 import os
-import subprocess
 import threading
 import time
 from typing import Any, Dict, List, Optional, TextIO
@@ -126,20 +125,42 @@ class ShotLogger:
                 self._event_file.close()
 
 
+def git_commit(path: str) -> str:
+    """Commit checked out in the repo containing ``path``, read from .git
+    directly. Running git is not an option: under systemd the app runs as
+    root on a repo owned by pi, and git refuses ("dubious ownership")."""
+    try:
+        here = os.path.abspath(path)
+        while not os.path.isdir(os.path.join(here, ".git")):
+            parent = os.path.dirname(here)
+            if parent == here:
+                return ""
+            here = parent
+        git_dir = os.path.join(here, ".git")
+        with open(os.path.join(git_dir, "HEAD")) as f:
+            head = f.read().strip()
+        if not head.startswith("ref: "):
+            return head  # detached HEAD
+        ref = head[len("ref: "):]
+        loose = os.path.join(git_dir, ref)
+        if os.path.exists(loose):
+            with open(loose) as f:
+                return f.read().strip()
+        with open(os.path.join(git_dir, "packed-refs")) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    return parts[0]
+    except OSError:
+        logger.exception("could not read git commit")
+    return ""
+
+
 def collect_metadata() -> Dict[str, Any]:
     """Git commit and every upper-case config value."""
     from espyresso import config
 
-    try:
-        commit = subprocess.run(
-            ["git", "describe", "--always", "--dirty"],
-            cwd=os.path.dirname(os.path.abspath(__file__)),
-            capture_output=True,
-            text=True,
-            timeout=5,
-        ).stdout.strip()
-    except Exception:
-        commit = ""
+    commit = git_commit(os.path.dirname(os.path.abspath(__file__)))
     values = {
         k: getattr(config, k)
         for k in dir(config)

@@ -26,7 +26,7 @@ from scipy.optimize import least_squares
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.insert(0, ROOT)
 
-from espyresso.sim.plant import FIT_PATH, Plant, nominal, uniform  # noqa: E402
+from espyresso.sim.plant import FIT_PATH, nominal, replay_sensor  # noqa: E402
 
 # name, lower, upper (multipliers of the controller's constant, a_s absolute),
 # prior sigma in log units (None = free). Masses and power are "measured"
@@ -61,13 +61,7 @@ def load_sessions(log_dir):
 
 
 def replay(p, t, u, T0):
-    pl = Plant(p, uniform(T0))
-    out = np.empty(len(t))
-    out[0] = T0
-    for i in range(1, len(t)):
-        pl.step(t[i] - t[i - 1], u[i - 1] * p["P_max"], 0.0)
-        out[i] = pl.sensor
-    return out
+    return np.asarray(replay_sensor(p, t, u, T0))
 
 
 def unpack(x, base):
@@ -109,8 +103,18 @@ def main():
     fit = least_squares(residuals, x0, args=(base, sessions), bounds=bounds, diff_step=1e-3, max_nfev=300)
     p = unpack(fit.x, base)
     report(p, sessions, "fitted plant")
-    for name, *_ in SPEC:
-        print(f"   {name:8s} {base[name]:10.4f} -> {p[name]:10.4f}")
+    at_bounds = []
+    for (name, lo, hi, _sig), v in zip(SPEC, fit.x):
+        flag = ""
+        if v <= lo * 1.01 or v >= hi * 0.99:
+            flag = "  <- at its bound"
+            at_bounds.append(name)
+        print(f"   {name:8s} {base[name]:10.4f} -> {p[name]:10.4f}{flag}")
+    if at_bounds:
+        print(
+            f"WARNING: {', '.join(at_bounds)} at their bounds: the plant can't explain these "
+            "sessions with plausible physics (e.g. a non-uniform start). Check before --write."
+        )
 
     if len(sessions) > 1:
         print("== leave-one-out (fit without a session, predict it)")

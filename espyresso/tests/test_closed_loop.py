@@ -11,6 +11,8 @@ compared relative to each other, not asserted as absolute truths.
 
 from __future__ import annotations
 
+import pytest
+
 from espyresso import config
 from espyresso.sim import closedloop, plant, scenarios
 
@@ -98,3 +100,32 @@ def test_back_to_back_pi_shots_stay_within_one_degree() -> None:
         return sum(pucks) / len(pucks)
 
     assert abs(mean_puck(second) - mean_puck(first)) < 1.0
+
+
+def test_simulated_session_writes_pi_format_logs(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Simulated runs log through the production ShotLogger on simulated
+    time, so real and simulated sessions go through the same analysis."""
+    import csv
+    import glob
+    import importlib.util
+    import json
+    import os
+
+    from espyresso import shot_logger
+
+    before = shot_logger.get()
+    closedloop.simulate(duration=120, start=plant.uniform(22.6), log_dir=str(tmp_path))
+
+    (tick,) = glob.glob(os.path.join(str(tmp_path), "shot-*-tick.csv"))
+    rows = list(csv.DictReader(open(tick)))
+    assert float(rows[-1]["t"]) == pytest.approx(120, abs=1)  # simulated seconds, not wall time
+    assert {"raw_temp", "heater", "heater_cmd", "waterTemp"} <= set(rows[0])
+    meta = json.load(open(tick.replace("-tick.csv", "-meta.json")))
+    assert meta["sim"]["start"]["water"] == 22.6
+    assert shot_logger.get() is before  # the global logger is restored
+
+    tools = os.path.join(os.path.dirname(__file__), "..", "..", "tools", "review_shot.py")
+    spec = importlib.util.spec_from_file_location("review_shot", tools)
+    review = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(review)  # type: ignore[union-attr]
+    review.summarize(tick, tick.replace("-tick.csv", "-event.csv"))

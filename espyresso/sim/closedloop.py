@@ -6,12 +6,14 @@ the Watchdog. Only the hardware is faked: pigpio records the boiler duty, the
 TSIC reading comes from the plant, and time comes from the simulation.
 """
 import math
+import time
 import types
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
 
 from espyresso import config
 from espyresso import pcontroller as pcontroller_module
+from espyresso import shot_logger
 from espyresso import temperature as temperature_module
 from espyresso.boiler import Boiler
 from espyresso.safety import Watchdog
@@ -85,13 +87,13 @@ class _FakeTsic:
         pass
 
 
-_TIMED_MODULES = (pcontroller_module, temperature_module)
+_TIMED_MODULES = (pcontroller_module, temperature_module, shot_logger)
 
 
 @contextmanager
 def _sim_clock(clock: List[float]) -> Iterator[None]:
     """Point the control code's ``time.perf_counter`` at the simulated clock."""
-    fake = types.SimpleNamespace(perf_counter=lambda: clock[0])
+    fake = types.SimpleNamespace(perf_counter=lambda: clock[0], strftime=time.strftime)
     saved = [getattr(m, "time") for m in _TIMED_MODULES]
     for m in _TIMED_MODULES:
         setattr(m, "time", fake)
@@ -114,11 +116,14 @@ def simulate(
     sensor_override: Optional[Callable[[float, float], float]] = None,
     auto_off: bool = True,
     tick: float = TICK,
+    log_dir: Optional[str] = None,
 ) -> Run:
     """Simulate ``duration`` seconds from the app starting with the machine in
     plant state ``start``. ``stall`` = (t0, t1) stops control callbacks then
     (e.g. a hung pigpio thread). ``sensor_override(t, true_reading)`` replaces
-    what the sensor reports (e.g. a detached sensor)."""
+    what the sensor reports (e.g. a detached sensor). ``log_dir`` writes the
+    session through the production ShotLogger (simulated time), in the same
+    format as the Pi, plus a ``sim`` section in the metadata."""
     p = params or fitted()
     plant = Plant(p, start)
     clock = [0.0]
@@ -127,7 +132,15 @@ def simulate(
     ff = _FakeFlow()
     rows: List[Dict[str, float]] = []
 
+    previous_logger = shot_logger.get()
     with _sim_clock(clock):
+        session = shot_logger.init(log_dir) if log_dir else None
+        if session is not None:
+            meta = shot_logger.collect_metadata()
+            meta["sim"] = dict(params=p, start=start, duration=duration, setpoint=setpoint)
+            session.write_meta(meta)
+        else:
+            shot_logger._INSTANCE = None
         boiler = Boiler(pigpio_pi=pi, reset_started_time=lambda: None, add_to_queue=lambda v: None, boiling=True)
         watchdog = Watchdog(
             boiler=boiler,
@@ -192,6 +205,9 @@ def simulate(
                     boiling=1.0 if boiler.get_boiling() else 0.0,
                 )
             )
+        if session is not None:
+            session.close()
+    shot_logger._INSTANCE = previous_logger
     return Run(rows)
 
 

@@ -146,3 +146,61 @@ def test_brew_head_readiness_follows_the_setpoint(rig_factory, setpoint: float, 
     rig.temperature.pcontroller.brewHeadTemp = head
 
     assert rig.temperature.brewhead_ready() is ready
+
+
+# ------------------------------------------------------------------ #
+#  What the control tick leaves behind for analysis
+# ------------------------------------------------------------------ #
+
+
+@pytest.fixture
+def session(tmp_path):  # type: ignore[no-untyped-def]
+    from espyresso import shot_logger
+
+    sl = shot_logger.init(str(tmp_path))
+    yield sl
+    sl.close()
+    shot_logger._INSTANCE = None
+
+
+def _rows(path: str) -> List[dict]:
+    import csv
+
+    with open(path) as f:
+        return list(csv.DictReader(f))
+
+
+def test_control_tick_logs_a_row_with_the_analysis_columns(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(60.0, 999.0))
+    rig.tick(60.0, seconds=6.0)
+    rig.tick(60.5)
+    session.close()
+
+    rows = _rows(session.tick_path)
+    assert [float(r["raw_temp"]) for r in rows] == [60.0, 60.5]
+    for column in ("heater", "heater_cmd", "safety", "boost", "resync", "flow_horizon_s", "waterTemp", "setpoint"):
+        assert column in rows[0]
+    assert rows[0]["boost"] == "1"  # cold: boot boost on the first tick
+    assert rows[0]["resync"] == "gap"  # slow first step re-synced the model
+
+
+def test_safety_fault_is_logged_as_an_event(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(23.0, 999.0))
+    for _ in range(int((config.SAFETY_RUNAWAY_SECONDS + 2) / 0.1)):
+        rig.tick(23.0)
+    session.close()
+
+    events = open(session.event_path).read()
+    assert "safety,reason=sensor not responding" in events
+
+
+def test_switching_boiler_on_after_a_fault_resumes_heating(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(23.0, 999.0))
+    for _ in range(int((config.SAFETY_RUNAWAY_SECONDS + 2) / 0.1)):
+        rig.tick(23.0)
+    assert rig.boiler.get_boiling() is False
+
+    rig.boiler.toggle_boiler()  # user acknowledges and switches on again
+
+    assert rig.tick(23.5) == 1.0
+    assert rig.boiler.fault is None

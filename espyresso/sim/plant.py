@@ -10,8 +10,9 @@ parameter. Two additions the controller does not model:
   boiler sensor; the puck estimate is ``water - eps*(water - head)``.
 """
 import json
+import math
 import os
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Sequence
 
 from espyresso import config as C
 
@@ -108,3 +109,24 @@ class Plant:
         self.body += dt * (s_b + e_b) / p["C_body"]
         target = p["a_s"] * self.elem + (1.0 - p["a_s"]) * self.shell
         self.sensor += dt * (target - self.sensor) * p["k_s"] / p["C_s"]
+
+
+def replay_sensor(
+    params: Dict[str, float],
+    t: Sequence[float],
+    heater: Sequence[float],
+    start_temperature: float,
+    max_step: float = 0.1,
+) -> List[float]:
+    """Open loop: drive the plant with a logged heater duty (heater[i] applies
+    from t[i] to t[i+1]) from a uniform start; return the plant's sensor at
+    each t."""
+    plant = Plant(params, uniform(start_temperature))
+    out = [start_temperature]
+    for i in range(1, len(t)):
+        dt = t[i] - t[i - 1]
+        steps = max(1, int(math.ceil(dt / max_step)))
+        for _ in range(steps):
+            plant.step(dt / steps, heater[i - 1] * params["P_max"], 0.0)
+        out.append(plant.sensor)
+    return out

@@ -42,3 +42,52 @@ def test_close_twice_is_safe(tmp_path: Path) -> None:
     sl.log_tick(raw_temp=95.0)
     sl.close()
     sl.close()
+
+
+def _git(repo: Path, *args: str) -> str:
+    import subprocess
+
+    return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+@pytest.fixture
+def repo(tmp_path: Path) -> Path:
+    _git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "f").write_text("x")
+    _git(tmp_path, "add", "f")
+    _git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "c")
+    return tmp_path
+
+
+def test_git_commit_is_read_without_running_git(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Under systemd the app runs as root on a repo owned by pi; git then
+    # refuses ("dubious ownership") and the commit came out empty.
+    import subprocess
+
+    def no_subprocess(*a: object, **kw: object) -> None:
+        raise AssertionError("must not shell out")
+
+    expected = _git(repo, "rev-parse", "HEAD")
+    monkeypatch.setattr(subprocess, "run", no_subprocess)
+
+    assert shot_logger.git_commit(str(repo / "sub" / "dir")) == expected
+
+
+def test_git_commit_reads_packed_refs(repo: Path) -> None:
+    expected = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "pack-refs", "--all")
+
+    assert shot_logger.git_commit(str(repo)) == expected
+
+
+def test_git_commit_outside_a_repo_is_empty(tmp_path: Path) -> None:
+    assert shot_logger.git_commit(str(tmp_path)) == ""
+
+
+def test_session_metadata_commit_matches_this_checkout() -> None:
+    import subprocess
+
+    here = Path(__file__).resolve().parent
+    head = subprocess.run(["git", "-C", str(here), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+
+    assert shot_logger.collect_metadata()["commit"] == head

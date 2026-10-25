@@ -259,3 +259,27 @@ def test_control_events_distinguish_start_from_recovery(rig: dict, tmp_path) -> 
 
     reasons = [line.split("reason=")[1].strip() for line in open(sl.event_path) if "reason=" in line]
     assert reasons == ["control_started", "control_stale", "control_resumed"]
+
+
+def test_watchdog_thread_survives_a_failing_check_and_forces_heater_off(rig: dict) -> None:
+    import time
+
+    wd = rig["wd"]
+    rig["boiler"].set_value(0.6)
+    calls = {"n": 0}
+
+    def flaky_check() -> None:
+        calls["n"] += 1
+        raise RuntimeError("check broke")
+
+    wd.check = flaky_check  # type: ignore[method-assign]
+    wd.start()
+    deadline = time.perf_counter() + 3
+    while calls["n"] < 2 and time.perf_counter() < deadline:
+        time.sleep(0.05)
+    alive = wd.is_alive()
+    wd.stop()
+
+    assert calls["n"] >= 2  # kept looping after the first failure
+    assert alive
+    assert _boiler_duties(rig["pi"])[-1] == 0

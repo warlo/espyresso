@@ -20,10 +20,11 @@ sim:
 fit:
 	uv run -q --no-project --with pandas --with numpy --with scipy python tools/sim/fit.py $(FIT_ARGS)
 
-# Copy logs from the Pi into log/pi
+# Copy logs from the Pi into log/pi (make fetch-logs PI=pi@<host>)
+PI ?= pi@raspberrypi.local
 fetch-logs:
-	rsync -a pi@192.168.0.9:espyresso/log/ log/pi/
-	rsync -a pi@192.168.0.9:espyresso/shot_stat.txt log/pi/
+	rsync -a $(PI):espyresso/log/ log/pi/
+	rsync -a $(PI):espyresso/shot_stat.txt log/pi/
 
 run:
 	sudo python3 -m espyresso
