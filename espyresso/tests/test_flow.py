@@ -51,7 +51,7 @@ def test_flow_initial_state() -> None:
     flow = Flow(pigpio_pi=Mock(), flow_queue=_flow_queue())
     assert flow.get_pulse_count() == 0
     assert flow.get_millilitres() == 0.0
-    assert flow.last_period is None
+    assert flow.second_half_period is None
 
 
 def test_flow_get_flow_rate_with_no_pulses_is_zero() -> None:
@@ -61,34 +61,33 @@ def test_flow_get_flow_rate_with_no_pulses_is_zero() -> None:
 
 def test_flow_reset_pulse_count_clears_everything() -> None:
     flow = Flow(pigpio_pi=Mock(), flow_queue=_flow_queue())
-    flow.pulse_count = 42
+    flow.edges = 42
     flow.total_volume = 12.0
-    flow.last_period = 0.1
+    flow.second_half_period = 0.1
     flow.flow_queue.add_to_queue((1.0, 1.0))
 
     flow.reset_pulse_count()
 
     assert flow.pulse_count == 0
     assert flow.total_volume == 0.0
-    assert flow.last_period is None
+    assert flow.second_half_period is None
     assert len(flow.flow_queue) == 0
 
 
 def test_flow_pulse_callback_increments_count_for_valid_pulse() -> None:
     flow = Flow(pigpio_pi=Mock(), flow_queue=_flow_queue())
-    # No previous change → first pulse always passes the debounce check
-    flow.pulse_callback(0, 0, 0)
+    # A rising and a falling edge make one pulse
+    flow.pulse_callback(0, 1, 0)
+    flow.pulse_callback(0, 0, 100_000)
     assert flow.pulse_count == 1
 
 
 def test_lifetime_volume_keeps_counting_across_shot_resets() -> None:
     flow = Flow(pigpio_pi=Mock(), flow_queue=Mock())
-    for i in range(6):
-        flow.pulse_callback(5, 1, i * 250_000)  # 4 pulses/s
+    _pulses(flow, 6, hz=4.0)
     first = flow.lifetime_ml
     flow.reset_pulse_count()  # a new shot starts
-    for i in range(6):
-        flow.pulse_callback(5, 1, 10_000_000 + i * 250_000)
+    _pulses(flow, 6, hz=4.0, start_tick=10_000_000)
 
     assert first > 0
     assert flow.get_millilitres() < flow.lifetime_ml
@@ -96,24 +95,33 @@ def test_lifetime_volume_keeps_counting_across_shot_resets() -> None:
 
 
 
-def _pulses(flow: Flow, count: int, hz: float, start_tick: int = 0) -> None:
+def _pulses(flow: Flow, count: int, hz: float, start_tick: int = 0, bounce_us: int = 0) -> None:
+    """``count`` meter pulses: a rising and a falling edge each, half a period
+    apart; ``bounce_us`` adds a spurious edge pair that long after each one."""
+    period = 1e6 / hz
     for i in range(count):
-        flow.pulse_callback(5, 1, start_tick + int(i * 1e6 / hz))
+        for half, level in ((0, 1), (period / 2, 0)):
+            tick = start_tick + int(i * period + half)
+            flow.pulse_callback(5, level, tick)
+            if bounce_us:
+                flow.pulse_callback(5, 1 - level, tick + bounce_us)
+                flow.pulse_callback(5, level, tick + 2 * bounce_us)
 
 
 def test_every_pulse_adds_its_full_volume() -> None:
-    """Weighed on the machine: 64.8 g and 131.1 g of water for 140 and 284
-    pulses, about 0.46 g a pulse. The code used to add half a pulse each."""
+    """Both edges count half a pulse each, as in Tom Brazier's firmware (a
+    pin-change interrupt). Listening to rising edges only halved everything."""
     flow = Flow(pigpio_pi=Mock(), flow_queue=Mock())
 
     _pulses(flow, 284, hz=12.0)
 
-    assert flow.get_millilitres() == pytest.approx(131.1, rel=0.05)
+    assert flow.get_millilitres() == pytest.approx(284 * 0.475, rel=0.02)
+    assert flow.get_pulse_count() == 284
 
 
 def test_flow_rate_is_timed_from_hardware_ticks(monkeypatch: pytest.MonkeyPatch) -> None:
     """Edges reach Python late and in bursts when the Pi is busy; pigpio's
-    tick is when the pulse actually happened."""
+    tick is when the edge actually happened."""
     import espyresso.flow as flow_module
 
     monkeypatch.setattr(flow_module.time, "perf_counter", lambda: 100.0)  # all handled "at once"
@@ -122,6 +130,18 @@ def test_flow_rate_is_timed_from_hardware_ticks(monkeypatch: pytest.MonkeyPatch)
     _pulses(flow, 10, hz=4.0)  # 4 pulses/s, about 1.9 mL/s
 
     assert flow.get_flow_rate() == pytest.approx(4.0 * 0.472, rel=0.05)
+
+
+def test_pump_vibration_bounces_are_ignored() -> None:
+    """Tom's 20 ms debounce: a change within 20 ms of the last one is a bounce
+    from pump vibration, not flow."""
+    clean, bouncy = (Flow(pigpio_pi=Mock(), flow_queue=Mock()) for _ in range(2))
+
+    _pulses(clean, 40, hz=4.0)
+    _pulses(bouncy, 40, hz=4.0, bounce_us=3000)
+
+    assert bouncy.get_millilitres() == pytest.approx(clean.get_millilitres())
+    assert bouncy.get_pulse_count() == clean.get_pulse_count()
 
 
 def test_slow_pulses_still_count() -> None:

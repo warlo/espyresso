@@ -172,6 +172,10 @@ BOILER_Y_MAX = 240
 
 ZOOM = 2
 
+FLOW_METER_DEBOUNCE_TIME = 0.02
+# any state change within 20ms of the last is considered a bounce error (from
+# pump vibration), as in Tom Brazier's firmware
+
 
 # characteristics of the temperature controller
 

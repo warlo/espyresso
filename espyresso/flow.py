@@ -45,7 +45,7 @@ class Flow:
         self.flow_in_gpio = config.FLOW_IN_GPIO
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
         self.pigpio_pi.callback(
-            self.flow_in_gpio, pigpio.RISING_EDGE, safe_callback(self.pulse_callback)
+            self.flow_in_gpio, pigpio.EITHER_EDGE, safe_callback(self.pulse_callback)
         )
 
         self.learning_mode = True
@@ -54,46 +54,62 @@ class Flow:
         # the watchdog notice water flowing, e.g. shots pulled on the machine's
         # own switch, to postpone auto-off.
         self.lifetime_ml: float = 0.0
-        self.pulse_count = 0
 
         self.flow_queue = flow_queue
 
         self.pulse_start: float = time.perf_counter()
-        self.prev_tick: Optional[int] = None
+        self.edges = 0
+        self.prev_change_tick: Optional[int] = None
+        self.prev_edge_tick: Optional[int] = None
         self.prev_pulse_time: float = 0.0
-        self.prev_period: Optional[float] = None
-        self.last_period: Optional[float] = None
+        self.first_half_period: Optional[float] = None
+        self.second_half_period: Optional[float] = None
 
     def reset_pulse_count(self) -> None:
         self.total_volume = 0.0
-        self.pulse_count = 0
-        self.prev_tick = None
+        self.edges = 0
+        self.prev_edge_tick = None
         self.prev_pulse_time = 0.0
-        self.prev_period = None
-        self.last_period = None
+        self.first_half_period = None
+        self.second_half_period = None
         self.pulse_start = time.perf_counter()
         self.flow_queue.clear()
 
     def pulse_callback(self, gpio: int, level: int, tick: int) -> None:
-        """One rising edge per pulse of the meter. Periods come from pigpio's
-        tick (when the edge happened): Python may handle edges late and in
-        bursts when the Pi is busy."""
-        self.pulse_count += 1
-        if self.prev_tick is not None:
-            period = _tick_diff(self.prev_tick, tick) / 1e6
-            if period > 0:
-                self.prev_period, self.last_period = self.last_period, period
-        self.prev_tick = tick
+        """Each edge of the meter's square wave is half a pulse, as in Tom
+        Brazier's firmware (a pin-change interrupt): half the volume, and the
+        rate from half-periods. A change within FLOW_METER_DEBOUNCE_TIME of the
+        previous one is a bounce from pump vibration. Times are pigpio's ticks
+        (when the edge happened): Python may handle edges late on a busy Pi."""
+        bounce = (
+            self.prev_change_tick is not None
+            and _tick_diff(self.prev_change_tick, tick) / 1e6 < config.FLOW_METER_DEBOUNCE_TIME
+        )
+        self.prev_change_tick = tick
+        if bounce:
+            return
+
+        if self.prev_edge_tick is not None:
+            self.first_half_period, self.second_half_period = (
+                self.second_half_period,
+                _tick_diff(self.prev_edge_tick, tick) / 1e6,
+            )
+        self.prev_edge_tick = tick
+        self.edges += 1
         self.prev_pulse_time = time.perf_counter()
 
         rate = self.get_pulse_rate_for_volume()
-        # The first pulse of a run has no rate yet: count it at the typical
+        # The first edges of a run have no rate yet: count them at the typical
         # value; slower than the table goes: its slowest value.
         ml_per_pulse = (self.get_mls_per_pulse(rate) or _ML_PER_PULSE[0]) if rate else _ML_PER_PULSE[-1]
-        self.total_volume += ml_per_pulse
-        self.lifetime_ml += ml_per_pulse
+        self.total_volume += ml_per_pulse / 2.0
+        self.lifetime_ml += ml_per_pulse / 2.0
         average_rate = self.total_volume / max(1e-3, self.prev_pulse_time - self.pulse_start)
         self.flow_queue.add_to_queue((self.get_flow_rate(), average_rate))
+
+    @property
+    def pulse_count(self) -> int:
+        return self.edges // 2
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -102,23 +118,24 @@ class Flow:
         return self.total_volume
 
     def get_flow_rate(self) -> float:
-        """mL/s, from the recent pulse period; falls off once pulses stop."""
+        """mL/s from the last two half-periods; falls off once edges stop."""
         rate = self.get_pulse_rate_for_volume()
         if not rate:
             return 0.0
         since = time.perf_counter() - self.prev_pulse_time
         if since > max(_FLOW_STOPPED_SECONDS, 3.0 / rate):
             return 0.0
-        rate = min(rate, 1.0 / since) if since > 1.0 / rate else rate
+        if self.first_half_period and self.second_half_period:
+            rate = 1.0 / (max(since, self.first_half_period) + self.second_half_period)
         return rate * (self.get_mls_per_pulse(rate) or _ML_PER_PULSE[0])
 
     def get_pulse_rate_for_volume(self) -> float:
-        """Pulses per second over the last two periods."""
-        if not self.last_period:
+        """Meter pulses per second from the last two half-periods."""
+        if not self.second_half_period:
             return 0.0
-        if not self.prev_period:
-            return 1.0 / self.last_period
-        return 2.0 / (self.prev_period + self.last_period)
+        if not self.first_half_period:
+            return 0.5 / self.second_half_period
+        return 1.0 / (self.first_half_period + self.second_half_period)
 
     @staticmethod
     def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
