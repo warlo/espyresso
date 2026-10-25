@@ -215,6 +215,10 @@ class ZacWireInputChannel(object):
             self.__last_high_tick = tick
 
         elif level == pigpio.TIMEOUT:
+            # The watchdog only marks the end of a packet, and pigpio repeats
+            # it every period until the pin changes: switch it off until the
+            # next packet arms it again.
+            self.pi.set_watchdog(self.gpio, 0)
             self.__pass_any_packet_to_callback(self.STATUS_OK)
             self.__reset_packet()
 
