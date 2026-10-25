@@ -4,11 +4,12 @@ tools/sim/make_fixture.py: seconds, sensor, applied heater duty only).
 Replays the logged heater duty through the plant, so this pins the plant
 (espyresso/sim/plant_fit.json) without freezing controller behaviour.
 
-* cold_start_95: 2026-05-15, setpoint 95, one of the sessions the fit used.
-* cold_start_99: 2026-10-25, setpoint 99 with the self-healing controller;
-  not used in the fit. Open loop the plant runs ~3.5 K hot above 80 C here
-  (closed loop the simulator matched this warm-up within ~0.5 K, because the
-  controller corrects for it). A refit that makes either worse should fail.
+* cold_start_95: 2026-05-15, setpoint 95.
+* cold_start_99: 2026-10-25, setpoint 99 with the self-healing controller.
+
+Both are in the current fit (Tom Brazier's weighed masses fixed, three cold
+starts; open-loop RMSE ~1.4 and ~2.6 C on these downsampled fixtures; leave-
+one-out about +-3-4 C). A refit that makes either worse should fail.
 """
 
 from __future__ import annotations

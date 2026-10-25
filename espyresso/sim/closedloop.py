@@ -117,19 +117,23 @@ def simulate(
     auto_off: bool = True,
     tick: float = TICK,
     log_dir: Optional[str] = None,
+    controller_sees_flow: bool = True,
 ) -> Run:
     """Simulate ``duration`` seconds from the app starting with the machine in
     plant state ``start``. ``stall`` = (t0, t1) stops control callbacks then
     (e.g. a hung pigpio thread). ``sensor_override(t, true_reading)`` replaces
     what the sensor reports (e.g. a detached sensor). ``log_dir`` writes the
     session through the production ShotLogger (simulated time), in the same
-    format as the Pi, plus a ``sim`` section in the metadata."""
+    format as the Pi, plus a ``sim`` section in the metadata.
+    ``controller_sees_flow=False`` hides the flow meter from the controller
+    (no flow feed-forward), like the plain-PID machines in published tests."""
     p = params or fitted()
     plant = Plant(p, start)
     clock = [0.0]
     started = [0.0]
     pi = _FakePi()
     ff = _FakeFlow()
+    ctrl_flow = ff if controller_sees_flow else _FakeFlow()
     rows: List[Dict[str, float]] = []
 
     previous_logger = shot_logger.get()
@@ -156,7 +160,7 @@ def simulate(
         temperature = Temperature(
             pigpio_pi=pi,
             boiler=boiler,
-            flow=ff,  # type: ignore[arg-type]
+            flow=ctrl_flow,  # type: ignore[arg-type]
             get_started_time=lambda: started[0],
             temp_queue=WaveQueue(90, 100, X_MIN=0, X_MAX=10, Y_MIN=0, Y_MAX=10),
             heartbeat=watchdog.heartbeat,

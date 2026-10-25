@@ -4,10 +4,11 @@ Same six-mass structure as espyresso.pcontroller, with every coefficient a
 parameter. Two additions the controller does not model:
 
 * ``a_s``: the sensor follows a_s*element + (1-a_s)*shell (the controller
-  assumes the element only; the fit puts it about halfway).
+  assumes the element only; the fit puts it about three quarters element).
 * ``eps``: fraction of the flowing water's excess heat the brew head absorbs
   on the way to the puck (the controller assumes 1). Not identifiable from a
   boiler sensor; the puck estimate is ``water - eps*(water - head)``.
+  Calibrated against a published study instead (see ``fitted``).
 """
 import json
 import math
@@ -44,11 +45,12 @@ def nominal() -> Dict[str, float]:
 
 
 def fitted(**overrides: float) -> Dict[str, float]:
-    """Parameters fitted to this machine's logs. eps defaults to 0.5, the
-    middle of the plausible range."""
+    """Parameters fitted to this machine's logs. eps defaults to 0.6: with a
+    controller blind to flow, 0.52-0.68 reproduces the 7.5-10 C puck drop a
+    2005 thermocouple study measured on a PID Classic (60 mL in 30 s)."""
     with open(FIT_PATH) as f:
         params: Dict[str, float] = json.load(f)
-    params["eps"] = 0.5
+    params["eps"] = 0.6
     params.update(overrides)
     return params
 

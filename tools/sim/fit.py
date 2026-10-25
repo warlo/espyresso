@@ -12,6 +12,13 @@ run the regression tests and tools/sim/report.py.
 Logs from before the self-healing controller (no ``heater_cmd`` column) had
 ~5-7 s of blind full power before the first tick when booting with the boiler
 on; it is reconstructed from the first tick's deltaTime.
+
+The boiler shell and water volume are fixed at Tom Brazier's weighed values
+by default: the aluminium Classic and his Baby share the boiler (EF0030/A) and
+group (B0171). Fixing them sets the model's scale; without it the fit can
+trade every heat capacity, coupling and the heater power against each other
+(scaling all of them together leaves the temperatures unchanged) and drifts.
+``--free-masses`` fits them anyway.
 """
 import argparse
 import glob
@@ -29,12 +36,10 @@ sys.path.insert(0, ROOT)
 from espyresso.sim.plant import FIT_PATH, nominal, replay_sensor  # noqa: E402
 
 # name, lower, upper (multipliers of the controller's constant, a_s absolute),
-# prior sigma in log units (None = free). Masses and power are "measured"
-# values that may be off, so they get loose priors instead of being fixed.
+# prior sigma in log units (None = free). Power and the group's coupling are
+# known roughly (element rating, Tom's measurement), so they get loose priors.
 SPEC = [
     ("P_max", 0.80, 1.15, 0.07),
-    ("m_shell", 0.6, 2.5, 0.3),
-    ("V", 0.7, 1.6, 0.2),
     ("k_es", 0.2, 5.0, None),
     ("k_w", 0.2, 5.0, None),
     ("k_bh", 0.3, 3.0, 0.3),
@@ -43,6 +48,7 @@ SPEC = [
     ("k_s", 0.1, 20.0, None),
     ("a_s", 0.0, 1.0, None),
 ]
+MASS_SPEC = [("m_shell", 0.6, 2.5, 0.3), ("V", 0.7, 1.6, 0.2)]
 
 
 def load_sessions(log_dir):
@@ -90,7 +96,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--logs", default=os.path.join(ROOT, "log", "pi"))
     ap.add_argument("--write", action="store_true", help="save espyresso/sim/plant_fit.json")
+    ap.add_argument("--free-masses", action="store_true", help="also fit shell mass and water volume")
     args = ap.parse_args()
+    if args.free_masses:
+        SPEC[1:1] = MASS_SPEC
 
     sessions = load_sessions(args.logs)
     if not sessions:

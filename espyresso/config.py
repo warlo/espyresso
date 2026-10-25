@@ -43,9 +43,10 @@ SCL_GPIO = 3
 # Brew temperature. The controller regulates the boiler water; the water that
 # reaches the coffee has lost heat to the group on the way. BREW_PUCK_TEMP is
 # what you want at the puck (Tim Wendelboe-style light roasts: 93-94 C) and
-# PUCK_OFFSET how much hotter the boiler must be to deliver it. The offset is a
-# simulation estimate (tools/sim/report.py setpoints, central case): measure the
-# puck temperature once and correct it here.
+# PUCK_OFFSET how much hotter the boiler must be to deliver it. Not measured
+# yet: the simulation says about 5 (tools/sim/report.py setpoints), PID kits
+# assume 7-8; see docs/temperature-control.md. Measure the puck temperature
+# once and correct it here.
 BREW_PUCK_TEMP = 93.0
 PUCK_OFFSET = 6.0
 TARGET_TEMP = BREW_PUCK_TEMP + PUCK_OFFSET

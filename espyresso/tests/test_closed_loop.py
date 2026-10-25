@@ -129,3 +129,45 @@ def test_simulated_session_writes_pi_format_logs(tmp_path) -> None:  # type: ign
     review = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
     spec.loader.exec_module(review)  # type: ignore[union-attr]
     review.summarize(tick, tick.replace("-tick.csv", "-event.csv"))
+
+
+def test_controller_blind_to_flow_lets_the_boiler_drop_further() -> None:
+    """Comparing with published measurements from plain-PID machines needs a
+    controller that can't see the flow meter (no feed-forward)."""
+    flow = scenarios.manual_shots([600.0])
+    seeing = closedloop.simulate(duration=700, start=plant.uniform(22.6), flow=flow)
+    blind = closedloop.simulate(duration=700, start=plant.uniform(22.6), flow=scenarios.manual_shots([600.0]), controller_sees_flow=False)
+
+    assert blind.max("water", after=600) > 0  # ran
+    assert min(r["water"] for r in blind.window(600, 640)) < min(r["water"] for r in seeing.window(600, 640)) - 0.5
+
+
+def _published_pid_shot_puck_drop(**params: float) -> float:
+    """A 2005 thermocouple study of a PID Gaggia Classic (setpoint 99.5, 60 mL
+    in 30 s after a 20 min warm-up, controller blind to flow) measured the
+    water above the puck falling 7.5-10 C over the shot."""
+    start = 1200.0
+
+    def flow(t: float, temperature: float):  # type: ignore[no-untyped-def]
+        return (2.0 if start <= t < start + 30 else 0.0), None
+
+    run = closedloop.simulate(
+        duration=start + 40,
+        start=plant.uniform(22.6),
+        params=plant.fitted(**params),
+        flow=flow,
+        setpoint=99.5,
+        controller_sees_flow=False,
+        auto_off=False,
+    )
+    first = [r["puck"] for r in run.window(start, start + 3) if r["flow"] > 0]
+    last = [r["puck"] for r in run.window(start + 27, start + 30) if r["flow"] > 0]
+    return sum(first) / len(first) - sum(last) / len(last)
+
+
+def test_plant_reproduces_published_puck_drop_of_a_pid_classic() -> None:
+    """Pins eps (how much heat the brew head takes from the water), which the
+    boiler sensor can't see. The controller's own assumption (1.0) gives a
+    fraction of the measured drop."""
+    assert 7.5 < _published_pid_shot_puck_drop() < 10.0
+    assert _published_pid_shot_puck_drop(eps=1.0) < 4.0

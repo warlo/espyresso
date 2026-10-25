@@ -23,11 +23,11 @@ resolution). That gives three different temperatures worth keeping apart:
 |---|---|---|
 | **Display** | the sensor reading, shown on the screen | measured |
 | **Boiler water** | the water in the boiler | estimated by the controller's model; simulated |
-| **Puck** | the water reaching the coffee, after passing through the group | simulated only, with a wide uncertainty |
+| **Puck** | the water reaching the coffee, after passing through the group | simulated only; the drop over a shot is calibrated against published measurements, the level is not |
 
-The display reads a little above the boiler water at rest (the sensor sits
-between the heating element and the boiler wall), and the puck is several
-degrees below the boiler water (the group head takes heat from it). The
+The display reads about 0.5 °C above the boiler water at rest (the sensor
+sits mostly on the heating element's side of the boiler), and the puck is
+several degrees below the boiler water (the group head takes heat from it). The
 setpoint is the boiler water target; `PUCK_OFFSET` is the estimated drop to
 the puck, until it is measured with a thermocouple.
 
@@ -70,11 +70,12 @@ On top of that model:
 
 | | Measured (2026-10-25, from 35.5 °C) | Simulated, from 35.5 °C | Simulated, from 22.6 °C |
 |---|---|---|---|
-| Display reaches setpoint | 63 s | 58 s | 73 s |
-| Display peak | +2.7 °C (101.7 °C) | +2.2 °C | +2.4 °C |
-| Boiler water within 1 °C | not measurable | 190 s | 211 s |
-| Boiler water peak | not measurable | +1.4 °C | +1.5 °C |
-| Settled to the idle state | display 99.9 °C at 8 min | about 11 min | about 12 min |
+| Display reaches setpoint | 63 s | 59 s | 75 s |
+| Display peak | +2.7 °C (101.7 °C) | +2.2 °C | +2.3 °C |
+| Boiler water within 1 °C | not measurable | 192 s | 216 s |
+| Boiler water peak | not measurable | +0.7 °C | +0.8 °C |
+| Boiler water settled within ±0.5 °C | not measurable | 6.2 min | 6.7 min |
+| Display back near its idle level | 99.9 °C at 7 min | | |
 
 The display overshoots more than the water: the element and wall run hotter
 than the water while heating. The display is at setpoint after about a
@@ -87,19 +88,17 @@ head much longer** (see brewing). A warm restart does not overshoot: from
 
 | | Measured (25 min, 2026-10-25) | Simulated |
 |---|---|---|
-| Display mean vs setpoint | +0.57 °C | +0.60 °C |
-| Display standard deviation | 0.08 °C | 0.05 °C |
+| Display mean vs setpoint | +0.57 °C | +0.58 °C |
+| Display standard deviation | 0.08 °C | 0.06 °C |
 | Display range | +0.29 to +0.78 °C | +0.51 to +0.71 °C |
-| Boiler water mean vs setpoint | not measurable (model: -0.15 °C) | +0.46 °C |
-| Boiler water standard deviation | not measurable | 0.05 °C |
-| Heater power | about 4 % (55 W) | |
+| Boiler water mean vs setpoint | not measurable (model: -0.15 °C) | +0.09 °C |
+| Boiler water standard deviation | not measurable | 0.03 °C |
+| Heater power | about 4 % (55 W) | 3-4 % |
 
 At idle the temperature is **stable to about ±0.1 °C**, at the limit of the
-sensor's resolution. The boiler water sits about 0.5 °C above the setpoint in
-the simulation because the controller's built-in constants (from Tom's
-modified Baby Class) don't match this machine exactly. A constant offset like
-this doesn't matter for taste: it is absorbed when `PUCK_OFFSET` is
-calibrated against a real puck measurement.
+sensor's resolution. The display sits about 0.5 °C above the setpoint while
+the boiler water is on it: the sensor is mostly on the element's side, which
+runs a little hotter than the water.
 
 ## 3. While brewing
 
@@ -110,23 +109,44 @@ a cold boot.
 
 | | Pi shot (button) | Manual shot (machine switch) |
 |---|---|---|
-| Boiler water during the shot | 99.6 → 91.4 °C | 99.6 → 89.3 °C |
-| Water at the puck, mean | 92.8 °C (81.9 to 94.6) | 91.6 °C (81.5 to 93.1) |
-| Puck temperature drop over the shot | 2.8 °C | 4.4 °C |
-| Boiler back within ±0.5 °C after the shot | 2.6 min | 2.9 min |
-| Boiler water overshoot after the shot | +0.7 °C | +0.6 °C |
-| Second shot 23 s after the first | +0.7 °C at the puck | |
+| Boiler water during the shot | 99.2 → 93.7 °C | 99.2 → 91.6 °C |
+| Water at the puck, mean | 94.1 °C (93.9 to 94.3) | 92.6 °C (92.6 to 92.7) |
+| Puck temperature range over the shot | 1.3 °C | 2.3 °C |
+| Display peak (the element at full power) | 110.7 °C | 105.9 °C |
+| Boiler back within ±0.5 °C after the shot | 29 s | 36 s |
+| Boiler water overshoot after the shot | +0.4 °C | +0.3 °C |
+| Second shot 23 s after the first | +0.8 °C at the puck | |
 
-The boiler loses up to 10 °C during a shot because the cold water coming in
-is a large heat sink for a small boiler; the puck sees less of that because
-the group head buffers it. Pi shots do better because of the heat budget.
+The boiler loses 5-8 °C during a shot because the cold water coming in is a
+large heat sink for a small boiler; the puck sees less of that because the
+group head buffers it. Pi shots do better because of the heat budget. The
+display jumps well above the setpoint during a shot: that is the heating
+element running at full power, not the water.
 
-The puck numbers in brackets show how much depends on **how well the group
-head is coupled to the boiler**, which no sensor on the machine can see. The
-central estimate (92.8 °C) is close to the 93 °C target, but it could be
-several degrees lower. This is the biggest uncertainty in the whole system:
-measure the puck temperature once (see the simulation README) before
-fine-tuning by taste.
+**How sure is this?** Two things decide the puck numbers, and they are known
+to different degrees:
+
+- **The drop over a shot** depends on how much heat the group head takes
+  from the water (`eps` in the simulation). It is calibrated against a 2005
+  thermocouple study of a PID Classic, which measured the puck water falling
+  7.5-10 °C over a 60 mL shot; the simulation reproduces 8.7 °C. On that
+  same shot this controller gives 4.6 °C on a manual shot and 2.7 °C on a
+  Pi shot: the flow feed-forward and the heat budget cut a plain PID's drop
+  roughly in half and by two thirds. The numbers in brackets are the range
+  over the plausible `eps`.
+- **The level** (94.1 °C) is less certain. The same study measured the puck
+  starting about 91 °C with its PID at 99.5 °C; this simulation would give
+  94.5 °C. Their sensor sat elsewhere on the boiler, so the two setpoints
+  don't mean the same water, but the real puck here could be up to about
+  3.5 °C lower than simulated. PID kits for the Classic assume 7-8 °C
+  between the boiler sensor and the brew water (Gaggiuino's default is
+  7 °C), which points the same way. That is why the setpoint is 99 °C
+  (`PUCK_OFFSET` 6), between the model (94 °C at the puck) and the kits
+  (91-92 °C), until the puck is measured once (see the simulation README).
+
+The boiler's recovery after a shot (29-36 s) is the least certain number:
+no shot has been logged since temperature logging started, and the warm-ups
+the model is fitted to don't pin it down well. One logged shot will.
 
 The group head also matters for the first shot of the day: it warms far more
 slowly than the boiler. The Pi's preheat routine (short press on button one
@@ -142,8 +162,8 @@ so real steaming will run cooler than this:
 | | Simulated, from idle at 99 °C |
 |---|---|
 | Display reaches 134 °C | 32 s |
-| Boiler water after 60 s / 120 s | 124.8 °C / 132.1 °C |
-| Display peak | 137.9 °C |
+| Boiler water after 60 s / 120 s | 129.2 °C / 132.8 °C |
+| Display peak | 137.8 °C |
 | Back to brew temperature (±1 °C) after steaming | about 14 min |
 
 The boiler water lags the display by several degrees while heating for steam,
@@ -165,12 +185,16 @@ the element side ran into the 145 °C safety cut-off.
 In order of expected benefit:
 
 1. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
-   removes the largest uncertainty (several °C).
-2. **Add a second sensor on the group head.** The controller could then track
+   removes the largest uncertainty (up to about 3.5 °C).
+2. **Log one Pi shot** after a 15 minute warm-up. Its boiler dip and
+   recovery pin down the in-shot behaviour the model can't learn from
+   warm-ups.
+3. **Add a second sensor on the group head.** The controller could then track
    the real group temperature instead of estimating it, which matters most
    for the first shots after a cold start.
-3. **Calibrate the flow meter and puck retention** (see the simulation
+4. **Calibrate the flow meter and puck retention** (see the simulation
    README), so Pi shots stop at the right yield and the heat budget knows
    exactly how much water is still to come.
-4. **Refit the model** after a few more cold starts (`make fetch-logs`,
-   `make fit`), so the controller's constants match this machine.
+5. **Measure the element and mains voltage**, and **refit the model** after a
+   few more cold starts (`make fetch-logs`, `make fit`), so the simulation
+   matches this machine more closely.

@@ -5,9 +5,12 @@
     python3 tools/sim/report.py setpoints  # one section
 
 Sections: restarts, faults, shots, setpoints. Pure Python (no numpy needed).
-The boiler side is fitted to logs; puck numbers depend on the group's
-coupling, which no sensor measures, so they are shown for three assumptions:
-central (eps 0.5), weak (group barely heated by the boiler) and strong.
+The boiler side is fitted to logs; puck numbers also depend on how much heat
+the brew head takes from the water on its way to the coffee (eps), which no
+sensor here measures. eps 0.52-0.68 reproduces a published thermocouple study
+of a PID Classic (puck falling 7.5-10 C over a 60 mL shot); central 0.6, range
+shown 0.5-0.7. The absolute puck level is less certain than that range (see
+tools/sim/README.md).
 """
 import logging
 import math
@@ -23,8 +26,8 @@ from espyresso.sim import closedloop, plant, scenarios  # noqa: E402
 SP = config.TARGET_TEMP
 GROUPS: Dict[str, Callable[[], Dict[str, float]]] = {
     "central": lambda: plant.fitted(),
-    "weak": lambda: plant.fitted(eps=1.0, k_bh=plant.fitted()["k_bh"] * 0.5),
-    "strong": lambda: plant.fitted(eps=0.25, k_bh=plant.fitted()["k_bh"] * 2.0),
+    "eps 0.7": lambda: plant.fitted(eps=0.7),
+    "eps 0.5": lambda: plant.fitted(eps=0.5),
 }
 
 
@@ -42,7 +45,7 @@ def _shot_stats(run: closedloop.Run, t0: float) -> Dict[str, float]:
         head=run.at(t0)["head"],
         head_model=run.at(t0)["m_head"],
         post_water=run.max("water", after=t0 + scenarios.SHOT_SECONDS),
-        post_sensor=run.max("sensor", after=t0 + scenarios.SHOT_SECONDS),
+        display_peak=run.max("sensor", after=t0),
     )
 
 
@@ -78,7 +81,7 @@ def faults() -> None:
 
 def shots() -> None:
     print(f"\n== shots (setpoint {SP:.1f}); puck = water reaching the coffee")
-    print("   scenario                      group     puck  drop  boiler min  head(true/model)  post water/sensor")
+    print("   scenario                      group     puck  drop  boiler min  head(true/model)  post water  display peak")
     cases = [
         ("Pi shot at 10 min", lambda: scenarios.pi_shots([600.0]), [600.0]),
         ("same, no heat budget", lambda: scenarios.pi_shots([600.0], heat_budget=False), [600.0]),
@@ -92,7 +95,7 @@ def shots() -> None:
             s = _shot_stats(run, starts[-1])
             print(
                 f"   {name:29s} {group:8s} {s['puck']:5.1f} {s['drop']:5.1f}   {s['water_min']:6.1f}"
-                f"      {s['head']:5.1f}/{s['head_model']:5.1f}       {s['post_water']:5.1f}/{s['post_sensor']:5.1f}"
+                f"      {s['head']:5.1f}/{s['head_model']:5.1f}       {s['post_water']:5.1f}       {s['display_peak']:5.1f}"
             )
     first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
     for budget in (True, False):
@@ -102,7 +105,7 @@ def shots() -> None:
 
 
 def setpoints() -> None:
-    print("\n== setpoint -> mean puck temperature, Pi shot at 10 min (central / weak / strong group)")
+    print("\n== setpoint -> mean puck temperature, Pi shot at 10 min (eps 0.6 / 0.7 / 0.5)")
     for sp in [93.0 + 0.5 * i for i in range(17)]:
         cells = []
         for group, params in GROUPS.items():
@@ -147,7 +150,7 @@ def precision() -> None:
         mean = sum(vals) / len(vals)
         sd = (sum((v - mean) ** 2 for v in vals) / len(vals)) ** 0.5
         print(f"      {name}: mean {mean:+.2f} C, sd {sd:.3f} C, range {min(vals):+.2f}..{max(vals):+.2f}")
-    print("   3. brewing (shot at 10 min; puck = central group, range over weak..strong)")
+    print("   3. brewing (shot at 10 min; puck = central eps 0.6, range eps 0.7..0.5)")
     for name, flow in (("Pi shot   ", scenarios.pi_shots([600.0])), ("manual    ", scenarios.manual_shots([600.0]))):
         pucks = {}
         for group, params in GROUPS.items():
@@ -159,7 +162,7 @@ def precision() -> None:
         end = 600.0 + scenarios.SHOT_SECONDS
         print(
             f"      {name}: boiler water {run.at(600)['water']:.1f} -> min {s['water_min']:.1f} | puck {s['puck']:.1f} C"
-            f" ({pucks['weak']['puck']:.1f}..{pucks['strong']['puck']:.1f}), drop over shot {s['drop']:.1f} C"
+            f" ({pucks['eps 0.7']['puck']:.1f}..{pucks['eps 0.5']['puck']:.1f}), drop over shot {s['drop']:.1f} C"
             f" | back within +-0.5 C {_fmt(_settled(run, SP, 0.5, end))} after | post-shot water peak {s['post_water'] - SP:+.2f}"
         )
     first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
