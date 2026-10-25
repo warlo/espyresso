@@ -107,6 +107,41 @@ shot up to 1.1 °C too hot. A preheat flush (short press on button one) still
 helps on top: flush at 1.5 minutes, shot at 5 minutes, -1.6 °C on the main
 fit.
 
+### Ready to brew: what the screen says
+
+The header shows one word for whether to brew, flush or wait
+(`espyresso/readiness.py`). It comes from the same group estimate the
+warm-up uses, plus the controller's model of the boiler water:
+
+| Screen | Meaning | What to do |
+|---|---|---|
+| ●HEAT | boiler water more than 1.5 °C below the setpoint (after switching on, after a shot) | wait |
+| ●FLUSH | boiler hot, group head more than 6 °C below warm | short press on button one: pulses hot water through the group until FLUSH ends |
+| ●WARM | group nearly warm; the warm-up's hotter boiler makes up the rest | brew if you can't wait (within about 2 °C), or wait |
+| ●READY | a shot now comes out close to one from a fully warm machine | brew |
+| ●COOL | boiler more than 3 °C above its target, e.g. after steaming | wait, or flush to cool it faster |
+| ●FLOW | a shot or flush is running | |
+| ●STEAM, ○OFF, FAULT | steam mode, boiler off, safety cut-off | |
+
+Button one follows the same estimate: a short press flushes while the group
+is cold (FLUSH, or HEAT with a cold group) and brews once it isn't, and a
+running flush stops when the group no longer needs it. HEAT and COOL clear at
+half their threshold, so the word doesn't flicker when the boiler hovers at
+the edge. Every change is logged as a `brew_state` event.
+
+Simulated on every plant that fits the logs, after a cold start:
+
+| | READY after | Shot pulled at READY vs a warm machine |
+|---|---|---|
+| Wait | 6.8-6.9 min | -0.8 to +0.7 °C |
+| Flush when FLUSH first shows (about 1.5 min, 140 mL) | 5.2-5.7 min | -1.2 to +1.0 °C |
+
+After a shot, READY returns in about 45 s. A second shot pulled then runs up
+to about 1 °C hotter than the first on the main fit (1.7 °C on the plant
+with the sensor on the plain side): the group is still hot from the first,
+and the boiler from the heat it stored for it. It fades within about 2
+minutes. After steaming, COOL lasts about 15 minutes unless you flush.
+
 The boiler itself, booting from about 35 °C. The first run with the warm-up
 (2026-10-25 13:55) behaved as simulated:
 
@@ -192,8 +227,8 @@ fitted to don't pin it down (adding the latest warm-up moved it from 30 to
 100 s). One logged shot will.
 
 The group head also matters for the first shot of the day: it warms far more
-slowly than the boiler. The Pi's preheat routine (short press on button one
-while the head is cold) runs hot water through it.
+slowly than the boiler. The screen says FLUSH while a preheat flush helps
+(see "Ready to brew" above).
 
 ## 4. Steaming
 

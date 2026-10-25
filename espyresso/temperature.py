@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from espyresso import config, shot_logger
 from espyresso.pcontroller import PController, boot_boost_seconds
+from espyresso.readiness import BrewState, brew_state
 from espyresso.safety import SafetyGuard
 from espyresso.warmup import GroupWarmUp
 
@@ -42,6 +44,7 @@ class Temperature:
         self.guard = SafetyGuard()
         self.warmup = GroupWarmUp()
         self._brew_mode = True
+        self._last_state: Optional[BrewState] = None
         self.last_safety = ""
         self._started = False
         self._had_valid_tick = False
@@ -112,10 +115,31 @@ class Temperature:
     def get_latest_brewhead_temperature(self) -> float:
         return self.pcontroller.brewHeadTemp
 
+    def group_deficit(self) -> float:
+        """How far (K) the estimated group head is below its temperature on a
+        warm machine at the brew setpoint; inf before the first reading."""
+        if self.warmup.group is None:
+            return math.inf
+        setpoint = self.pcontroller.temp_setpoint if self._brew_mode else config.TARGET_TEMP
+        return self.warmup.warm_temperature(setpoint) - self.warmup.group
+
     def brewhead_ready(self) -> bool:
-        return (
-            self.pcontroller.brewHeadTemp
-            >= self.pcontroller.temp_setpoint - config.BREWHEAD_READY_BELOW_SETPOINT
+        """Warm enough that a flush no longer helps: button one brews instead
+        of flushing, and a running flush stops."""
+        return self.group_deficit() <= config.FLUSH_GROUP_DEFICIT
+
+    def brew_state(self) -> BrewState:
+        """What the screen shows: ready to brew, flush first, or wait."""
+        pc = self.pcontroller
+        return brew_state(
+            boiling=self.boiler.get_boiling(),
+            fault=bool(self.boiler.fault),
+            steam=not self._brew_mode,
+            flowing=(self.flow.get_flow_rate() or 0.0) > 0.3,
+            group_deficit=self.group_deficit(),
+            water_from_setpoint=pc.waterTemp - pc.temp_setpoint,
+            water_from_target=pc.waterTemp - pc.target,
+            previous=self._last_state,
         )
 
     def set_flow_horizon(self, seconds: float) -> None:
@@ -220,6 +244,12 @@ class Temperature:
                 warmup_group=self.warmup.group,
                 **self.pcontroller.diagnostics,
             )
+
+        state = self.brew_state()
+        if state is not self._last_state:
+            self._last_state = state
+            if sl is not None:
+                sl.log_event("brew_state", state=state.value, group=round(self.group_deficit(), 2))
 
         # deque.append is GIL-atomic; no explicit lock needed for a
         # single-producer, single-consumer rolling buffer.

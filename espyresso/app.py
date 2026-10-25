@@ -171,6 +171,7 @@ class Espyresso:
                 "boiler": self.boiler_queue,
             },
             on_frame=self.watchdog.display_heartbeat,
+            get_brew_state=self.temperature.brew_state,
         )
 
     def reset_started_time(self) -> None:

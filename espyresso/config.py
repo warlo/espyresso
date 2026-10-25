@@ -77,9 +77,21 @@ PREINFUSE_TARGET_ML = 30.0
 # 145 C safety cap (the refill flow at this PWM was never measured).
 STEAM_SECONDS = 120.0
 STEAM_REFILL_PWM = 0.0
-# Brew head counts as warm once the model says it is within this of the
-# setpoint (was a fixed 80 C, which only fit a 95 C setpoint).
-BREWHEAD_READY_BELOW_SETPOINT = 15.0
+# Ready to brew (espyresso/readiness.py; the screen shows the state). READY
+# once the estimated group head (espyresso/warmup.py) is no more than
+# READY_GROUP_DEFICIT below its warm temperature and the modelled boiler water
+# is not more than READY_WATER_BAND below the setpoint (HEAT) or twice that
+# above its target (COOL, e.g. after steam); both are left at half the
+# threshold, so the screen doesn't flicker. Simulated on every plant that fits
+# the logs: READY about 6.8 minutes after a cold start, a shot then within
+# 0.8 C of a warm machine's; about 45 s after a shot. While the boiler is hot
+# but the group is more than FLUSH_GROUP_DEFICIT below warm, the screen says
+# FLUSH: a short press on button one then pulses water through the group
+# until it isn't (a press after that brews). Flushing when FLUSH first shows
+# brings READY 1-1.5 minutes sooner (shot within 1.2 C) for about 140 mL.
+READY_WATER_BAND = 1.5
+READY_GROUP_DEFICIT = 0.0
+FLUSH_GROUP_DEFICIT = 6.0
 
 # Boiler auto-off after this long without a Pi button action or water flow.
 TURN_OFF_SECONDS = 1800.0

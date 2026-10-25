@@ -18,6 +18,7 @@ from espyresso import config, failsafe
 _RENDER_CACHE_MAX = 512
 
 if TYPE_CHECKING:
+    from espyresso.readiness import BrewState
     from espyresso.boiler import Boiler
     from espyresso.flow import Flow
     from espyresso.pump import Pump
@@ -43,6 +44,7 @@ class Display:
     ORANGE = (255, 140, 0)
     YELLOW = (255, 255, 0)
     PINK = (255, 0, 255)
+    STATE_COLORS = {"READY": GREEN, "FLUSH": YELLOW, "FLOW": LIGHT_BLUE, "STEAM": ORANGE}
 
     def __init__(
         self,
@@ -57,10 +59,13 @@ class Display:
         get_started_time: Callable[[], float],
         wave_queues: Dict[str, WaveQueue],
         on_frame: Optional[Callable[[], None]] = None,
+        get_brew_state: Optional[Callable[[], "BrewState"]] = None,
         **kwargs: Any,
     ) -> None:
         # Called after every frame; lets the watchdog notice a frozen display.
         self.on_frame = on_frame
+        # Ready to brew / flush / wait (espyresso.readiness), from Temperature.
+        self.get_brew_state = get_brew_state
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
@@ -321,6 +326,9 @@ class Display:
         target = f"→{setpoint:.0f}°" if setpoint else "→---"
         fault = self.boiler.fault
         boil = "FAULT" if fault else ("●BOIL" if boiling else "○OFF")
+        state = self.get_brew_state() if self.get_brew_state is not None and boiling and not fault else None
+        if state is not None:
+            boil = f"●{state.value}"
         water_str = f"H2O {water:.0f}%"
         count_str = f"{countdown}s"
 
@@ -338,6 +346,8 @@ class Display:
         self.screen.blit(self._render(target, 12, target_color), (120, 4))
 
         boil_color = self.RED if boiling or fault else self.GREY
+        if state is not None:
+            boil_color = self.STATE_COLORS.get(state.value, self.WHITE)
         self.screen.blit(self._render(boil, 12, boil_color), (120, 16))
 
         water_color = self.WHITE if water > 10 else self.RED

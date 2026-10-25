@@ -29,6 +29,8 @@ Espyresso is a hobby Python project designed for the Gaggia Classic espresso mac
 
 - **Bluetooth Scale Support (Eureka Precisa):** Supports Bluetooth-enabled scales, specifically the Eureka Precisa, for precise measurement of coffee grounds.
 
+- **Ready to brew:** the screen says HEAT, FLUSH, WARM or READY from a model of the boiler and the group head; while the group is cold the boiler runs a little hotter to make up for it ([docs/temperature-control.md](docs/temperature-control.md)).
+
 - **PID and MPC Temperature Control:** Initially implemented PID temperature adjustment, later updated to an MPC (Model Predictive Controller) inspired by Tom Brazier's work [here](http://tomblog.firstsolo.net/index.php/solved-temperature-control/).
 
 ## Safety and self-healing

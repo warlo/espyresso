@@ -322,3 +322,16 @@ def test_display_loop_reports_each_frame(display: Display) -> None:
     t.join(timeout=2)
 
     assert len(frames) >= 3
+
+
+
+def test_header_shows_the_brew_state(display: Display) -> None:
+    from espyresso.readiness import BrewState
+
+    display.boiler.get_boiling.return_value = True
+    display.get_brew_state = lambda: BrewState.READY
+
+    rendered = _spy_render(display)
+    display._redraw_header([])
+
+    assert ("●READY", display.GREEN) in rendered

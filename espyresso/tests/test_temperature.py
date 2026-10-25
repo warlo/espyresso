@@ -139,13 +139,23 @@ def test_stop_leaves_pwm_at_zero_even_after_boiler_flag_cleared(rig_factory) -> 
     rig.tsic.stop.assert_called_once()
 
 
-@pytest.mark.parametrize("setpoint,head,ready", [(95.0, 81.0, True), (95.0, 79.0, False), (99.0, 81.0, False), (99.0, 85.0, True)])
-def test_brew_head_readiness_follows_the_setpoint(rig_factory, setpoint: float, head: float, ready: bool) -> None:
-    rig = rig_factory(Measurement(95.0, 999.0))
+@pytest.mark.parametrize("setpoint", [95.0, 99.0])
+@pytest.mark.parametrize("deficit,ready", [(config.FLUSH_GROUP_DEFICIT + 1.0, False), (config.FLUSH_GROUP_DEFICIT - 1.0, True)])
+def test_brew_head_readiness_follows_the_group_estimate(rig_factory, setpoint: float, deficit: float, ready: bool) -> None:
+    """Decides whether button one flushes or brews, and when a flush stops."""
+    rig = rig_factory(Measurement(setpoint, 999.0))
     rig.temperature.pcontroller.set_target_temp(setpoint)
-    rig.temperature.pcontroller.brewHeadTemp = head
+    rig.tick(setpoint, seconds=1.0)
+    rig.temperature.warmup.group = rig.temperature.warmup.warm_temperature(setpoint) - deficit
 
+    assert rig.temperature.group_deficit() == pytest.approx(deficit)
     assert rig.temperature.brewhead_ready() is ready
+
+
+def test_brew_head_counts_as_cold_before_the_first_reading(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(95.0, 999.0))
+
+    assert rig.temperature.brewhead_ready() is False
 
 
 # ------------------------------------------------------------------ #
@@ -267,3 +277,26 @@ def test_warm_up_is_logged(rig_factory, session) -> None:  # type: ignore[no-unt
     rows = _rows(session.tick_path)
     assert float(rows[-1]["target_offset"]) == pytest.approx(config.WARMUP_MAX_OFFSET)
     assert float(rows[-1]["warmup_group"]) == pytest.approx(22.6, abs=0.5)
+
+
+
+def test_brew_state_on_a_cold_start_is_heating(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    from espyresso.readiness import BrewState
+
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.tick(22.6, seconds=1.0)
+
+    assert rig.temperature.brew_state() is BrewState.HEATING
+
+
+def test_brew_state_changes_are_logged(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.tick(22.6, seconds=1.0)
+    rig.tick(22.7)
+    rig.boiler.turn_off_boiler()
+    rig.tick(22.7)
+    session.close()
+
+    events = open(session.event_path).read()
+    assert events.count("brew_state") == 2
+    assert "state=HEAT" in events and "state=OFF" in events

@@ -208,6 +208,7 @@ def simulate(
                     m_water=pc.waterTemp,
                     m_head=pc.brewHeadTemp,
                     target=pc.target,
+                    state=temperature.brew_state().value,
                     boiling=1.0 if boiler.get_boiling() else 0.0,
                 )
             )

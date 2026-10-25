@@ -214,9 +214,15 @@ def warmup() -> None:
                 return WARMUP_SHOTS[i]
         return math.inf
 
+    def ready_at(run: closedloop.Run) -> float:
+        since = math.inf
+        for r in run.rows:
+            since = (since if since < math.inf else r["t"]) if r["state"] == "READY" else math.inf
+        return since / 60
+
     print(f"\n== warm-up: Pi shot after a cold start minus a warm machine's shot (C); setpoint {SP:.1f}")
     print("   shot at (min)          " + " ".join(f"{m:>5d}" for m in WARMUP_SHOTS)
-          + "  | within 1 / 0.5 C from (min) | display peak | flush@1.5, shot@5")
+          + "  | within 1 / 0.5 C from (min) | display peak | flush@1.5, shot@5 | screen READY at (min)")
     for name, params in plants.items():
         warm = puck(params, 2400.0)
         print(f"   {name}")
@@ -225,11 +231,16 @@ def warmup() -> None:
                 errors = [puck(params, m * 60.0) - warm for m in WARMUP_SHOTS]
                 flushed = puck(params, 300.0, preheat=True) - warm
                 run = closedloop.simulate(duration=900, start=plant.uniform(22.6), params=params, auto_off=False)
+                flush_run = closedloop.simulate(
+                    duration=900, start=plant.uniform(22.6), params=params,
+                    flow=scenarios.preheat_then_shot(90.0, 10_000.0), auto_off=False,
+                )
             off = [r["t"] for r in run.rows if r["target"] > SP]
             ends = f", warm-up off at {off[-1] / 60:4.1f} min" if off else ""
             print(
                 f"     {label:20s} " + " ".join(f"{e:+5.1f}" for e in errors)
-                + f"  | {_fmt(ready(errors, 1.0))} / {_fmt(ready(errors, 0.5))}       | {run.max('sensor') - SP:+5.1f}       | {flushed:+5.1f}{ends}"
+                + f"  | {_fmt(ready(errors, 1.0))} / {_fmt(ready(errors, 0.5))}       | {run.max('sensor') - SP:+5.1f}       | {flushed:+5.1f}"
+                + f"             | {ready_at(run):4.1f} ({ready_at(flush_run):4.1f} with flush){ends}"
             )
 
 

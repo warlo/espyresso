@@ -244,3 +244,68 @@ def test_warm_up_keeps_the_display_clear_of_the_safety_limit(name: str) -> None:
     run = closedloop.simulate(duration=600, start=plant.uniform(22.6), params=params, auto_off=False)
 
     assert run.max("sensor") < SP + config.SAFETY_MAX_ABOVE_SETPOINT - 3.0
+
+
+# ------------------------------------------------------------------ #
+#  Ready to brew (espyresso/readiness.py), as the screen shows it.
+# ------------------------------------------------------------------ #
+
+
+def _states(run: closedloop.Run, after: float = 0.0) -> list:
+    out: list = []
+    for r in run.rows:
+        if r["t"] >= after and (not out or out[-1] != r["state"]):
+            out.append(r["state"])
+    return out
+
+
+def _ready_from(run: closedloop.Run, after: float = 0.0) -> float:
+    """When READY comes on for good."""
+    since = None
+    for r in run.rows:
+        if r["t"] >= after:
+            since = (since if since is not None else r["t"]) if r["state"] == "READY" else None
+    assert since is not None, "never ready"
+    return since
+
+
+@pytest.mark.parametrize("name", sorted(plant.candidates()))
+def test_ready_means_a_shot_close_to_a_warm_machines(name: str) -> None:
+    params = plant.candidates()[name]
+    run = closedloop.simulate(duration=900, start=plant.uniform(22.6), params=params, auto_off=False)
+
+    assert _states(run) == ["HEAT", "FLUSH", "WARM", "READY"]
+    ready = _ready_from(run)
+    assert 4 * 60 < ready < 8.5 * 60
+    assert abs(_shot_puck(params, ready) - _warm_machine_puck(params)) < 1.0
+
+
+def test_flush_when_the_screen_says_so_makes_ready_sooner() -> None:
+    params = plant.fitted()
+    plain = closedloop.simulate(duration=900, start=plant.uniform(22.6), params=params, auto_off=False)
+    flushed = closedloop.simulate(
+        duration=900, start=plant.uniform(22.6), params=params, flow=scenarios.preheat_then_shot(90.0, 10_000.0), auto_off=False
+    )
+
+    flow = [r["t"] for r in flushed.rows if r["flow"] > 0]
+    assert flow[-1] - flow[0] < 110  # the flush stops by itself once it stops helping
+    ready = _ready_from(flushed)
+    assert ready < _ready_from(plain) - 60
+    assert abs(_shot_puck(params, ready, preheat=True) - _warm_machine_puck(params)) < 1.2
+
+
+def test_ready_again_soon_after_a_shot_without_flicker() -> None:
+    run = closedloop.simulate(duration=1100, start=plant.uniform(22.6), flow=scenarios.pi_shots([900.0]), auto_off=False)
+    end = 900.0 + scenarios.SHOT_SECONDS
+
+    assert _states(run, after=890.0) == ["READY", "FLOW", "HEAT", "READY"]
+    assert _ready_from(run, after=end) - end < 90
+
+
+def test_never_ready_while_steaming_or_far_too_hot_after() -> None:
+    run = closedloop.simulate(
+        duration=2400, start=plant.uniform(22.6), flow=scenarios.steam(600.0, 120.0, refill_flow=0.0), auto_off=False
+    )
+
+    assert _states(run, after=590.0) == ["READY", "STEAM", "COOL", "READY"]
+    assert all(r["water"] < SP + 2.5 for r in run.rows if r["t"] > 720 and r["state"] == "READY")
