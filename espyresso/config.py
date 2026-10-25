@@ -342,14 +342,14 @@ SENSOR_XFER_COEFF = 0.02656
 # Set False to skip the bluetooth notify loop entirely. The scale is optional;
 # when disabled, get_scale_weight() returns 0 and the display loop is not
 # coupled to bluetooth init at all.
-BLUETOOTH_ENABLED = True
+BLUETOOTH_ENABLED = False
 # Searching for the scale (asleep or away) is what loads the Pi Zero: each
 # attempt has BlueZ scan and hand every nearby advertisement to Python. The
 # wait between attempts doubles from BLUETOOTH_RETRY_SECONDS up to
-# BLUETOOTH_RETRY_MAX_SECONDS; starting a shot tries at once. Attempts keep
-# bleak's own 10 s: cutting them to 5 s aborted connections mid-setup and
-# crashed the Eureka Precisa. Connected, it is a few small notifications a
-# second.
+# BLUETOOTH_RETRY_MAX_SECONDS. Attempts keep bleak's own 10 s: cutting them to
+# 5 s aborted connections mid-setup and crashed the Eureka Precisa. Each
+# search still delays temperature decoding by 3-4 s while it runs (tsic_lag_ms
+# in the tick log), so it is off until the connected state is measured.
 BLUETOOTH_RETRY_SECONDS = 10.0
 BLUETOOTH_RETRY_MAX_SECONDS = 60.0
 BLUETOOTH_NOTIFY_UUID = "0000fff1-0000-1000-8000-00805f9b34fb"

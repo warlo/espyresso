@@ -193,9 +193,6 @@ class Pump:
             self.reset_brew_routine()
             return True, None
 
-        # The scale may have just been woken: don't wait for the back-off.
-        self.bluetooth_scale.request_connect()
-
         if not self.ranger.has_enough_water():
             return False, "Not enough water"
 
