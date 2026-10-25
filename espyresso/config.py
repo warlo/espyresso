@@ -68,6 +68,11 @@ BREW_MAX_SECONDS = 45.0
 # Preinfusion at low pump power until this volume or time, whichever first.
 # At ~1.4 mL/s every logged shot hit the 7 s limit first.
 PREINFUSE_MAX_SECONDS = 7.0
+# Pump power (PWM duty) during preinfusion, and what the brew phase ramps to
+# over its first 5 s. Through an open group 0.5 gives about 4 mL/s and 0.7
+# about 6.5 mL/s; below about 0.4 the pump stalls.
+PREINFUSE_PUMP_PWM = 0.5
+BREW_PUMP_PWM = 0.7
 PREINFUSE_TARGET_ML = 30.0
 # Steam mode (long press on button one): hold TARGET_STEAM_TEMP for up to
 # STEAM_SECONDS. STEAM_REFILL_PWM > 0 pulses the pump (0.5 s on / 0.5 s off)

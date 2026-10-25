@@ -219,8 +219,7 @@ class Pump:
         # Disable automatic BrewingTimer
         self.brewing_timer.disable_automatic_timing()
 
-        # Hard-code boiler to 30% during preinfuse and start pump at 0.5 PWM (2-3 bars?)
-        self.set_pwm_value(0.5)
+        self.set_pwm_value(config.PREINFUSE_PUMP_PWM)
         self.toggle_pump()
 
         # Set started preinfuse time
@@ -276,9 +275,10 @@ class Pump:
 
             time_passed = self.brewing_timer.get_time_since_started()
 
-            # Ramp pump PWM from 0.5 to 0.7 over the first 5 s
+            # Ramp from the preinfusion power to the brew power over 5 s
             if time_passed < 5:
-                self.set_pwm_value(0.5 + 0.2 * (time_passed / 5))
+                start, end = config.PREINFUSE_PUMP_PWM, config.BREW_PUMP_PWM
+                self.set_pwm_value(start + (end - start) * (time_passed / 5))
             if time_passed > config.BREW_MAX_SECONDS:
                 self._stop_reason = "time"
                 break
