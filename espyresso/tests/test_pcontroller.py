@@ -281,3 +281,25 @@ def test_model_stops_heating_when_boiler_is_turned_off(clock: Clock, flow_zero: 
 
     # The real element is off, so the modelled one must not keep heating.
     assert p.elementTemp < element_at_switch_off + 1.0
+
+
+def test_target_offset_raises_what_the_controller_regulates_to(clock: Clock, flow_zero: Mock) -> None:
+    held, raised = (PController(initial_temperature=config.TARGET_TEMP, flow=flow_zero) for _ in range(2))
+    raised.set_target_offset(4.0)
+
+    held_heater = _run(held, clock, config.TARGET_TEMP, 5)
+    raised_heater = _run(raised, clock, config.TARGET_TEMP, 5)
+
+    assert raised.temp_setpoint == config.TARGET_TEMP  # the base setpoint is unchanged
+    assert raised.target == pytest.approx(config.TARGET_TEMP + 4.0)
+    assert raised_heater > held_heater + 0.1  # heats towards the raised target
+    assert raised.diagnostics["target_offset"] == 4.0
+    assert held.diagnostics["target_offset"] == 0.0
+
+
+def test_non_finite_target_offset_is_ignored(flow_zero: Mock) -> None:
+    p = PController(initial_temperature=22.0, flow=flow_zero)
+
+    p.set_target_offset(math.nan)
+
+    assert p.target == config.TARGET_TEMP

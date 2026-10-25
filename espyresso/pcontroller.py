@@ -29,6 +29,7 @@ class PController:
     def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
         self.temp_setpoint = config.TARGET_TEMP
+        self.target_offset = 0.0
 
         self.reset(initial_temperature)
 
@@ -47,6 +48,17 @@ class PController:
 
     def set_target_temp(self, temperature: float) -> None:
         self.temp_setpoint = temperature
+
+    def set_target_offset(self, offset: float) -> None:
+        """Regulate to the setpoint plus ``offset`` (K), e.g. a hotter boiler
+        while the group head warms (espyresso.warmup). The setpoint itself,
+        which the safety limits use, is unchanged."""
+        self.target_offset = offset if math.isfinite(offset) else 0.0
+
+    @property
+    def target(self) -> float:
+        """What the controller regulates the modelled water to."""
+        return self.temp_setpoint + self.target_offset
 
     def reset(self, temperature: float) -> None:
         """Initialise every thermal mass from one measurement, as at boot."""
@@ -261,7 +273,7 @@ class PController:
         # only correct other masses when close to steady state otherwise it can diverge
         # wildly due to modelling errors
         steadystate = (
-            abs(self.waterTemp - self.temp_setpoint) < config.MPC_STEADY_BAND
+            abs(self.waterTemp - self.target) < config.MPC_STEADY_BAND
             and abs(elementTempDelta + delta_to_apply)
             < deltaTime * config.MPC_STEADY_STATE
         )
@@ -311,6 +323,7 @@ class PController:
             "resync": resync_reason,
             "boost": False,
             "flow_horizon_s": 0.0,
+            "target_offset": self.target_offset,
         }
 
         if not boiling:
@@ -332,7 +345,7 @@ class PController:
 
         # we want the water to reach target temperature in the next 15s so calculate the necessary average temperature of the shell
         desiredWaterInputPower = (
-            (self.temp_setpoint - self.waterTemp)
+            (self.target - self.waterTemp)
             * config.SPEC_HEAT_WATER_100
             * config.BOILER_VOLUME
             / 15.0
@@ -358,13 +371,13 @@ class PController:
             (
                 brewHeadToAmbientPower * 20.0
                 + waterToFlowPower * flow_horizon
-                - (self.waterTemp - self.temp_setpoint)
+                - (self.waterTemp - self.target)
                 * config.SPEC_HEAT_WATER_100
                 * config.BOILER_VOLUME
             )
             / config.SPEC_HEAT_ALUMINIUM
             / config.MASS_BOILER_SHELL
-            + self.temp_setpoint
+            + self.target
         )
         logger.debug("maxStableAverageShellTemp: %s", maxStableAverageShellTemp)
         desiredAverageShellTemp = min(

@@ -55,8 +55,12 @@ On top of that model:
   measurement instead of integrating a long step. The model corrects all its
   masses near any setpoint (brew or steam). It works from any starting state:
   cold, warm, or hot after a crash.
-- **Warm-up boost.** On the first valid reading the element runs at full power
+- **Boot boost.** On the first valid reading the element runs at full power
   for up to 6 s, sized to the temperature deficit (none when already hot).
+- **Warm-up** (`espyresso/warmup.py`). While the group head is still cold, the
+  boiler is held above its setpoint so early shots come out close to those
+  from a warm machine; it switches itself off once the group is warm (see
+  below).
 - **Heat budget for Pi shots.** During a shot the Pi runs, it knows how much
   water is still to come and lets the boiler store the heat that water will
   take, so the temperature drops less. Shots on the machine's own switch don't
@@ -68,28 +72,62 @@ On top of that model:
 
 ## 1. Boot from cold
 
-| | Measured (2026-10-25, from 35.5 °C) | Simulated, from 35.5 °C | Simulated, from 22.6 °C |
-|---|---|---|---|
-| Display reaches setpoint | 63 s | 59 s | 75 s |
-| Display peak | +2.7 °C (101.7 °C) | +2.2 °C | +2.3 °C |
-| Boiler water within 1 °C | not measurable | 192 s | 216 s |
-| Boiler water peak | not measurable | +0.7 °C | +0.8 °C |
-| Boiler water settled within ±0.5 °C | not measurable | 6.2 min | 6.7 min |
-| Display back near its idle level | 99.9 °C at 7 min | | |
+The boiler is at temperature a few minutes after switching on; the group
+head and portafilter (1.6 kg of brass) take much longer, and a cold group
+cools the water on its way to the coffee. So the first good shot waits for
+the group, not the boiler.
 
-The display overshoots more than the water: the element and wall run hotter
-than the water while heating. The display is at setpoint after about a
-minute, but **the boiler water needs about 3 to 3.5 minutes, and the group
-head much longer** (see brewing). A warm restart does not overshoot: from
-98.6 °C the display peaked at 99.8 °C (measured; the old controller went to
-104-106 °C).
+**The warm-up** works around that. The controller keeps an estimate of the
+group's temperature (it isn't measured: a single thermal mass bolted to the
+boiler wall, warmed by water flowing through it) and, while the group is
+cold, holds the boiler above the setpoint: 1 °C per °C the group is below
+warm, beyond a 2 °C dead-band, at most 4 °C. Hotter water makes up for the
+cold group, the heater stays at full power longer at the start, and the
+offset fades as the group warms. It is exactly zero once the group is warm,
+about 5 minutes after a cold start, so holding temperature, shots and steam
+on a warm machine are untouched. The screen's target shows it: "→103°" right
+after switching on, counting down to "→99°" when the warm-up is over.
+
+The group estimate starts as warm as the first reading, so after a short
+restart (boiler and group still warm) there is no warm-up rather than a hot
+shot. Settings: `WARMUP_*` in `espyresso/config.py`; `WARMUP_MAX_OFFSET = 0`
+turns it off.
+
+A Pi shot after a cold start, compared with one from a fully warm machine
+(simulated, main fit; `make sim` section `warmup`):
+
+| Shot at | 4 min | 5 min | 6 min | 7 min | Within 1 °C from |
+|---|---|---|---|---|---|
+| With warm-up | -2.9 °C | -1.1 °C | -0.6 °C | -0.3 °C | 6 min |
+| Without | -5.4 °C | -2.7 °C | -1.3 °C | -0.7 °C | 7 min |
+
+On the other plants that fit the logs equally well, a shot is within 1 °C
+from 4 minutes instead of 5 to 6, and the warm-up never makes a shot more
+than 0.9 °C too hot. A preheat flush (short press on button one) still helps
+on top: flush at 1.5 minutes, shot at 5 minutes, -1.4 °C on the main fit.
+
+The boiler itself, booting from 35.5 °C:
+
+| | Measured, before the warm-up (2026-10-25) | Simulated without warm-up | Simulated with warm-up |
+|---|---|---|---|
+| Display reaches setpoint | 63 s | 59 s | 58 s |
+| Display peak | +2.7 °C (101.7 °C) | +2.2 °C | +6.2 °C |
+| Boiler water within 1 °C of setpoint | not measurable | 192 s | 139 s |
+| Boiler water peak | not measurable | +0.7 °C | +4.1 °C (the warm-up target) |
+| Display back near its idle level | 99.9 °C at 7 min | | warm-up over at about 5 min |
+
+The display overshoots more than the water: the element side runs hotter
+than the water while heating, more so with the warm-up's longer full-power
+start. The safety cut-off stays at setpoint + 15 °C; the warm-up never moves
+it. A warm restart does not overshoot: from 98.6 °C the display peaked at
+99.8 °C (measured; the old controller went to 104-106 °C).
 
 ## 2. Holding temperature (idle)
 
 | | Measured (25 min, 2026-10-25) | Simulated |
 |---|---|---|
-| Display mean vs setpoint | +0.57 °C | +0.58 °C |
-| Display standard deviation | 0.08 °C | 0.06 °C |
+| Display mean vs setpoint | +0.57 °C | +0.57 °C |
+| Display standard deviation | 0.08 °C | 0.05 °C |
 | Display range | +0.29 to +0.78 °C | +0.51 to +0.71 °C |
 | Boiler water mean vs setpoint | not measurable (model: -0.15 °C) | +0.09 °C |
 | Boiler water standard deviation | not measurable | 0.03 °C |
@@ -109,11 +147,11 @@ a cold boot.
 
 | | Pi shot (button) | Manual shot (machine switch) |
 |---|---|---|
-| Boiler water during the shot | 99.2 → 93.7 °C | 99.2 → 91.6 °C |
-| Water at the puck, mean | 94.1 °C (93.9 to 94.3) | 92.6 °C (92.6 to 92.7) |
-| Puck temperature range over the shot | 1.3 °C | 2.3 °C |
+| Boiler water during the shot | 99.1 → 93.7 °C | 99.1 → 91.6 °C |
+| Water at the puck, mean | 94.1 °C (93.9 to 94.3) | 92.7 °C (92.6 to 92.7) |
+| Puck temperature range over the shot | 1.3 °C | 2.4 °C |
 | Display peak (the element at full power) | 110.7 °C | 105.9 °C |
-| Boiler back within ±0.5 °C after the shot | 29 s | 36 s |
+| Boiler back within ±0.5 °C after the shot | 30 s | 37 s |
 | Boiler water overshoot after the shot | +0.4 °C | +0.3 °C |
 | Second shot 23 s after the first | +0.8 °C at the puck | |
 
@@ -144,7 +182,7 @@ to different degrees:
   (`PUCK_OFFSET` 6), between the model (94 °C at the puck) and the kits
   (91-92 °C), until the puck is measured once (see the simulation README).
 
-The boiler's recovery after a shot (29-36 s) is the least certain number:
+The boiler's recovery after a shot (30-37 s) is the least certain number:
 no shot has been logged since temperature logging started, and the warm-ups
 the model is fitted to don't pin it down well. One logged shot will.
 
@@ -162,7 +200,7 @@ so real steaming will run cooler than this:
 | | Simulated, from idle at 99 °C |
 |---|---|
 | Display reaches 134 °C | 32 s |
-| Boiler water after 60 s / 120 s | 129.2 °C / 132.8 °C |
+| Boiler water after 60 s / 120 s | 129.1 °C / 132.7 °C |
 | Display peak | 137.8 °C |
 | Back to brew temperature (±1 °C) after steaming | about 14 min |
 
@@ -184,17 +222,21 @@ the element side ran into the 145 °C safety cut-off.
 
 In order of expected benefit:
 
-1. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
+1. **Log a cold start with the warm-up** and compare it with the simulation
+   (display peak about +6 °C, target back to the setpoint after about 5
+   minutes). A shot at 5 minutes, and another at 15, show whether the
+   warm-up's compensation is right for this group.
+2. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
    removes the largest uncertainty (up to about 3.5 °C).
-2. **Log one Pi shot** after a 15 minute warm-up. Its boiler dip and
+3. **Log one Pi shot** after a 15 minute warm-up. Its boiler dip and
    recovery pin down the in-shot behaviour the model can't learn from
    warm-ups.
-3. **Add a second sensor on the group head.** The controller could then track
-   the real group temperature instead of estimating it, which matters most
-   for the first shots after a cold start.
-4. **Calibrate the flow meter and puck retention** (see the simulation
+4. **Add a second sensor on the group head.** The warm-up could then use the
+   real group temperature instead of its estimate, which is what limits it
+   now.
+5. **Calibrate the flow meter and puck retention** (see the simulation
    README), so Pi shots stop at the right yield and the heat budget knows
    exactly how much water is still to come.
-5. **Measure the element and mains voltage**, and **refit the model** after a
+6. **Measure the element and mains voltage**, and **refit the model** after a
    few more cold starts (`make fetch-logs`, `make fit`), so the simulation
    matches this machine more closely.

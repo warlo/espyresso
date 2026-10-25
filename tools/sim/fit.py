@@ -6,8 +6,11 @@
 Replays the logged heater command through the plant (no controller, no sensor
 correction) and fits the coefficients so the plant's sensor matches the logged
 sensor. Uses every session in log/pi that starts cold (< 40 C) with the boiler
-on for most of the run. ``--write`` saves espyresso/sim/plant_fit.json; then
-run the regression tests and tools/sim/report.py.
+on for most of the run. ``--write`` saves espyresso/sim/plant_fit.json and the
+other plants that fit the logs about as well (each session left out in turn,
+and the masses fitted too) as espyresso/sim/plant_candidates.json, which the
+tests and the report use to check that control changes hold on all of them;
+then run the regression tests and tools/sim/report.py.
 
 Logs from before the self-healing controller (no ``heater_cmd`` column) had
 ~5-7 s of blind full power before the first tick when booting with the boiler
@@ -33,7 +36,7 @@ from scipy.optimize import least_squares
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 sys.path.insert(0, ROOT)
 
-from espyresso.sim.plant import FIT_PATH, nominal, replay_sensor  # noqa: E402
+from espyresso.sim.plant import CANDIDATES_PATH, FIT_PATH, nominal, replay_sensor  # noqa: E402
 
 # name, lower, upper (multipliers of the controller's constant, a_s absolute),
 # prior sigma in log units (None = free). Power and the group's coupling are
@@ -70,18 +73,41 @@ def replay(p, t, u, T0):
     return np.asarray(replay_sensor(p, t, u, T0))
 
 
-def unpack(x, base):
+def unpack(x, base, spec):
     p = dict(base)
-    for (name, _lo, _hi, _sig), v in zip(SPEC, x):
+    for (name, _lo, _hi, _sig), v in zip(spec, x):
         p[name] = v if name == "a_s" else base[name] * v
     return p
 
 
-def residuals(x, base, sessions, stride=5):
-    p = unpack(x, base)
+def residuals(x, base, sessions, spec, stride=5):
+    p = unpack(x, base, spec)
     res = [(replay(p, t, u, T[0]) - T)[::stride] for t, T, u in sessions.values()]
-    res += [np.array([np.log(v) / sig * 3.0]) for (_n, _l, _h, sig), v in zip(SPEC, x) if sig]
+    res += [np.array([np.log(v) / sig * 3.0]) for (_n, _l, _h, sig), v in zip(spec, x) if sig]
     return np.concatenate(res)
+
+
+def fit(base, sessions, spec):
+    """Least-squares fit; returns (params, multipliers)."""
+    x0 = np.array([1.0] * (len(spec) - 1) + [0.99])
+    bounds = (np.array([s[1] for s in spec]), np.array([s[2] for s in spec]))
+    result = least_squares(residuals, x0, args=(base, sessions, spec), bounds=bounds, diff_step=1e-3, max_nfev=300)
+    return unpack(result.x, base, spec), result.x
+
+
+def at_bounds(spec, x):
+    """Parameters the fit pushed onto a bound of their plausible range."""
+    return [name for (name, lo, hi, _sig), v in zip(spec, x) if v <= lo * 1.01 or v >= hi * 0.99]
+
+
+def save(path, params):
+    with open(path, "w") as fh:
+        json.dump(params, fh, indent=1)
+    print(f"wrote {path}")
+
+
+def _rounded(params):
+    return {k: round(float(v), 6) for k, v in params.items()}
 
 
 def report(p, sessions, label):
@@ -98,8 +124,7 @@ def main():
     ap.add_argument("--write", action="store_true", help="save espyresso/sim/plant_fit.json")
     ap.add_argument("--free-masses", action="store_true", help="also fit shell mass and water volume")
     args = ap.parse_args()
-    if args.free_masses:
-        SPEC[1:1] = MASS_SPEC
+    spec = SPEC[:1] + MASS_SPEC + SPEC[1:] if args.free_masses else SPEC
 
     sessions = load_sessions(args.logs)
     if not sessions:
@@ -107,37 +132,45 @@ def main():
     base = nominal()
     report(base, sessions, "controller's own constants, open loop")
 
-    x0 = np.array([1.0] * (len(SPEC) - 1) + [0.99])
-    bounds = (np.array([s[1] for s in SPEC]), np.array([s[2] for s in SPEC]))
-    fit = least_squares(residuals, x0, args=(base, sessions), bounds=bounds, diff_step=1e-3, max_nfev=300)
-    p = unpack(fit.x, base)
+    p, x = fit(base, sessions, spec)
     report(p, sessions, "fitted plant")
-    at_bounds = []
-    for (name, lo, hi, _sig), v in zip(SPEC, fit.x):
-        flag = ""
-        if v <= lo * 1.01 or v >= hi * 0.99:
-            flag = "  <- at its bound"
-            at_bounds.append(name)
+    stuck = at_bounds(spec, x)
+    for name, _lo, _hi, _sig in spec:
+        flag = "  <- at its bound" if name in stuck else ""
         print(f"   {name:8s} {base[name]:10.4f} -> {p[name]:10.4f}{flag}")
-    if at_bounds:
+    if stuck:
         print(
-            f"WARNING: {', '.join(at_bounds)} at their bounds: the plant can't explain these "
+            f"WARNING: {', '.join(stuck)} at their bounds: the plant can't explain these "
             "sessions with plausible physics (e.g. a non-uniform start). Check before --write."
         )
+
+    # Other plants that explain the logs: kept unless a parameter with a prior
+    # (power, masses, couplings) ran onto its bound, i.e. implausible physics.
+    candidates = {}
+
+    def consider(name, spec_c, sessions_c):
+        params, xc = fit(base, sessions_c, spec_c)
+        stuck = [n for n in at_bounds(spec_c, xc) if dict((s[0], s[3]) for s in spec_c)[n]]
+        if stuck:
+            print(f"   ({name}: not a candidate, {', '.join(stuck)} at their bounds)")
+        else:
+            candidates[name] = params
+        return params
 
     if len(sessions) > 1:
         print("== leave-one-out (fit without a session, predict it)")
         for held in sessions:
             rest = {k: v for k, v in sessions.items() if k != held}
-            f = least_squares(residuals, x0, args=(base, rest), bounds=bounds, diff_step=1e-3, max_nfev=300)
+            params = consider(f"without {held}", spec, rest)
             t, T, u = sessions[held]
-            err = replay(unpack(f.x, base), t, u, T[0]) - T
+            err = replay(params, t, u, T[0]) - T
             print(f"   {held}: RMSE {np.sqrt(np.mean(err ** 2)):.2f} C, above 80 C bias {err[T > 80].mean():+.2f}")
+    if not args.free_masses:
+        report(consider("masses free", SPEC[:1] + MASS_SPEC + SPEC[1:], sessions), sessions, "masses fitted too")
 
     if args.write:
-        with open(FIT_PATH, "w") as fh:
-            json.dump(p, fh, indent=1)
-        print(f"wrote {FIT_PATH}")
+        save(FIT_PATH, _rounded(p))
+        save(CANDIDATES_PATH, {name: _rounded(c) for name, c in candidates.items()})
 
 
 if __name__ == "__main__":

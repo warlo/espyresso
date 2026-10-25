@@ -18,7 +18,7 @@ booting, idling, brewing and steaming) see
 ```
 
 `espyresso/sim/closedloop.py` runs the **real control path**: `Temperature`
-(the control tick, warm-up boost, safety guard), `PController`, `Boiler` and
+(the control tick, boot boost, warm-up, safety guard), `PController`, `Boiler` and
 the `Watchdog`. Only the hardware is replaced:
 
 | Real | Simulated |
@@ -97,6 +97,17 @@ them, just as on the machine, which is why the closed-loop match is better.
 (`espyresso/tests/fixtures/`, made with `tools/sim/make_fixture.py`), so a
 refit that makes the plant worse fails the tests.
 
+**Other plants that fit (`plant.candidates()`).** `make fit FIT_ARGS=--write`
+also saves `espyresso/sim/plant_candidates.json`: the fit repeated with each
+session left out, plus the masses fitted too (dropped when a parameter with
+a prior runs onto its bound, as it does now). They agree on everything the
+sensor saw and disagree on what it can't see: two of them put the sensor on
+the plain side and couple the element and wall tightly, and during a cold
+start their water differs from the main fit's by up to 11 °C. A control
+change that depends on those details (the warm-up does) is tested on all of
+them (`test_warm_up_*` in `espyresso/tests/test_closed_loop.py`, and the
+report's `warmup` section).
+
 **Calibrating `eps` against published data.** A 2005 thermocouple study of a
 PID-controlled Classic (setpoint 99.5 °C, 60 mL in 30 s after a 20 minute
 warm-up) measured the water above the puck falling 7.5-10 °C over the shot.
@@ -148,6 +159,8 @@ make test                          # includes closed-loop and plant regression t
 ```
 
 Report sections: `precision` (by state: boot, idle, brewing, steaming),
+`warmup` (how soon after a cold start a shot matches a warm machine's, with
+and without the warm-up, on every candidate plant and three stress cases),
 `restarts` (from cold, warm, at setpoint, hot, after a crash), `faults`
 (control stall, failed first reading, detached sensor), `shots` (Pi, manual,
 preheat; `eps` 0.6, 0.7 and 0.5) and `setpoints` (setpoint to puck
@@ -168,7 +181,7 @@ run = closedloop.simulate(
     flow=scenarios.preheat_then_shot(90, 420), # or pi_shots([...]), manual_shots([...]), steam(...)
     log_dir="log/sim",                         # optional: write a Pi-format session
 )
-run.max("water", after=420)                    # rows have t, sensor, duty, flow, water, puck, ...
+run.max("water", after=420)                    # rows: t, sensor, duty, flow, water, puck, target, ...
 ```
 
 With `log_dir`, the run is logged through the production `ShotLogger` on
@@ -198,7 +211,8 @@ Logs are not in git (`log/` is ignored). Tick rows are flushed at least every
 | `FLOW_HEAT_HORIZON_MAX` | in-shot heat budget for Pi shots | `make sim` shots: drop vs back-to-back |
 | `BREW_TARGET_YIELD_G`, `BREW_DOSE_G` | shot recipe (volume stop without a scale) | recipe |
 | `BREW_RETAINED_ML_PER_G` | inlet water the puck/basket keeps | **measure** (below) |
-| `BOOT_BOOST_*` | warm-up boost sized from the first reading | `make sim` restarts |
+| `BOOT_BOOST_*` | full power for a few seconds on the first reading | `make sim` restarts |
+| `WARMUP_*` | hotter boiler while the group is cold | `make sim` warmup: shots within 1 °C sooner, none too hot on any candidate |
 | `STEAM_SECONDS`, `STEAM_REFILL_PWM` | steam mode length, optional refill | `make sim` precision |
 | `MPC_*` | model self-healing thresholds | data-backed defaults; see comments |
 | `SAFETY_*`, `CONTROL_STALE_SECONDS` | safety limits | leave unless a log shows a false trip |

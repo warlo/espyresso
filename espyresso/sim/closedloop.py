@@ -207,6 +207,7 @@ def simulate(
                     puck=plant.puck,
                     m_water=pc.waterTemp,
                     m_head=pc.brewHeadTemp,
+                    target=pc.target,
                     boiling=1.0 if boiler.get_boiling() else 0.0,
                 )
             )

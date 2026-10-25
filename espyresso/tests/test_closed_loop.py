@@ -19,6 +19,14 @@ from espyresso.sim import closedloop, plant, scenarios
 SP = config.TARGET_TEMP
 
 
+@pytest.fixture
+def no_warmup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the controller's own behaviour; the warm-up (a deliberate hotter
+    boiler while the group is cold) is tested on its own below."""
+    monkeypatch.setattr(config, "WARMUP_MAX_OFFSET", 0.0)
+
+
+@pytest.mark.usefixtures("no_warmup")
 def test_cold_start_reaches_setpoint_without_large_overshoot() -> None:
     run = closedloop.simulate(duration=360, start=plant.uniform(22.6))
 
@@ -33,6 +41,7 @@ def test_restart_at_setpoint_does_not_overshoot() -> None:
     assert run.max("water") < SP + 1.0
 
 
+@pytest.mark.usefixtures("no_warmup")
 def test_restart_15_below_setpoint_heats_quickly_without_overshoot() -> None:
     # e.g. a reboot at 80 C with a 95 C setpoint
     run = closedloop.simulate(duration=300, start=plant.uniform(SP - 15.0, head=SP - 23.0, body=SP - 25.0))
@@ -49,6 +58,7 @@ def test_hot_start_after_crash_heals() -> None:
     assert abs(run.at(600)["water"] - SP) < 1.0
 
 
+@pytest.mark.usefixtures("no_warmup")
 def test_control_stall_turns_heater_off_and_recovers() -> None:
     run = closedloop.simulate(duration=500, start=plant.uniform(60.0), stall=(100.0, 130.0))
 
@@ -171,3 +181,67 @@ def test_plant_reproduces_published_puck_drop_of_a_pid_classic() -> None:
     fraction of the measured drop."""
     assert 7.5 < _published_pid_shot_puck_drop() < 10.0
     assert _published_pid_shot_puck_drop(eps=1.0) < 4.0
+
+
+
+# ------------------------------------------------------------------ #
+#  Warm-up (espyresso/warmup.py): hotter boiler while the group is cold.
+#  Checked on every plant that fits the logs (plant.candidates()), since
+#  they disagree on exactly what the warm-up depends on.
+# ------------------------------------------------------------------ #
+
+
+def _shot_puck(params: dict, at: float, preheat: bool = False) -> float:
+    flow = scenarios.preheat_then_shot(90.0, at) if preheat else scenarios.pi_shots([at])
+    run = closedloop.simulate(duration=at + 60, start=plant.uniform(22.6), params=params, flow=flow, auto_off=False)
+    pucks = [r["puck"] for r in run.window(at, at + scenarios.SHOT_SECONDS) if r["flow"] > 0]
+    return sum(pucks) / len(pucks)
+
+
+def _warm_machine_puck(params: dict) -> float:
+    return _shot_puck(params, 2400.0)
+
+
+def test_warm_up_brings_an_early_shot_close_to_a_warm_one(monkeypatch: pytest.MonkeyPatch) -> None:
+    params = plant.fitted()
+    warm = _warm_machine_puck(params)
+
+    with_warm_up = _shot_puck(params, 300.0) - warm
+    monkeypatch.setattr(config, "WARMUP_MAX_OFFSET", 0.0)
+    without = _shot_puck(params, 300.0) - warm
+
+    assert abs(with_warm_up) < 1.5
+    assert abs(with_warm_up) < abs(without) - 1.0
+
+
+@pytest.mark.parametrize("name", sorted(plant.candidates()))
+def test_warm_up_never_makes_early_shots_much_too_hot(name: str) -> None:
+    params = plant.candidates()[name]
+    warm = _warm_machine_puck(params)
+
+    for minutes in (4, 5, 6, 7):
+        assert _shot_puck(params, minutes * 60.0) - warm < 1.2, minutes
+    for minutes in (4, 6):  # after a preheat flush at 1.5 min
+        assert _shot_puck(params, minutes * 60.0, preheat=True) - warm < 1.2, minutes
+
+
+def test_warm_up_hands_back_an_untouched_machine(monkeypatch: pytest.MonkeyPatch) -> None:
+    run = closedloop.simulate(duration=1500, start=plant.uniform(22.6), auto_off=False)
+    monkeypatch.setattr(config, "WARMUP_MAX_OFFSET", 0.0)
+    plain = closedloop.simulate(duration=1500, start=plant.uniform(22.6), auto_off=False)
+
+    assert run.max("target", after=600) == SP  # exactly off once the group is warm
+
+    def idle(r: closedloop.Run) -> float:
+        rows = r.window(900, 1500)
+        return sum(x["water"] for x in rows) / len(rows)
+
+    assert idle(run) == pytest.approx(idle(plain), abs=0.05)
+
+
+@pytest.mark.parametrize("name", sorted(plant.candidates()) + ["1240 W element"])
+def test_warm_up_keeps_the_display_clear_of_the_safety_limit(name: str) -> None:
+    params = plant.fitted(P_max=1240.0) if name == "1240 W element" else plant.candidates()[name]
+    run = closedloop.simulate(duration=600, start=plant.uniform(22.6), params=params, auto_off=False)
+
+    assert run.max("sensor") < SP + config.SAFETY_MAX_ABOVE_SETPOINT - 3.0

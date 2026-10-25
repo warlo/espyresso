@@ -204,3 +204,66 @@ def test_switching_boiler_on_after_a_fault_resumes_heating(rig_factory) -> None:
 
     assert rig.tick(23.5) == 1.0
     assert rig.boiler.fault is None
+
+
+# ------------------------------------------------------------------ #
+#  Warm-up: hotter boiler while the group head is cold (espyresso.warmup)
+# ------------------------------------------------------------------ #
+
+
+def test_cold_start_raises_the_target_while_the_group_warms(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.tick(22.6, seconds=1.0)
+    rig.tick(23.0)
+
+    pc = rig.temperature.pcontroller
+    assert pc.target_offset == pytest.approx(config.WARMUP_MAX_OFFSET)
+    assert pc.temp_setpoint == config.TARGET_TEMP
+    # the screen shows what the boiler is heading for
+    assert rig.temperature.temp_queue.target_y == pytest.approx(pc.target)
+
+
+def test_warm_start_has_no_offset(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(config.TARGET_TEMP + 0.5, 999.0))
+    rig.tick(config.TARGET_TEMP + 0.5, seconds=1.0)
+    rig.tick(config.TARGET_TEMP + 0.5)
+
+    assert rig.temperature.pcontroller.target_offset == 0.0
+    assert rig.temperature.temp_queue.target_y == config.TARGET_TEMP
+
+
+def test_no_offset_in_steam_mode(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.temperature.set_steam_temp()
+    rig.tick(22.6, seconds=1.0)
+    rig.tick(23.0)
+
+    assert rig.temperature.pcontroller.target_offset == 0.0
+    assert rig.temperature.temp_queue.target_y == config.TARGET_STEAM_TEMP
+
+    rig.temperature.set_brew_temp()
+    rig.tick(23.1)
+    assert rig.temperature.pcontroller.target_offset > 0.0
+
+
+def test_warm_up_never_raises_the_safety_limit(rig_factory) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.tick(22.6, seconds=1.0)
+    assert rig.temperature.pcontroller.target_offset > 0.0
+
+    hot = config.TARGET_TEMP + config.SAFETY_MAX_ABOVE_SETPOINT + 0.5
+    duty = rig.tick(hot)
+
+    assert duty == 0.0
+    assert rig.temperature.last_safety
+
+
+def test_warm_up_is_logged(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(22.6, 999.0))
+    rig.tick(22.6, seconds=1.0)
+    rig.tick(23.0)
+    session.close()
+
+    rows = _rows(session.tick_path)
+    assert float(rows[-1]["target_offset"]) == pytest.approx(config.WARMUP_MAX_OFFSET)
+    assert float(rows[-1]["warmup_group"]) == pytest.approx(22.6, abs=0.5)

@@ -270,6 +270,27 @@ BOOT_BOOST_MAX_SECONDS = 6.0
 BOOT_BOOST_HEAT_CAPACITY = 1200.0
 BOOT_BOOST_FRACTION = 0.5
 
+# Warm-up (espyresso/warmup.py): run the boiler hotter while the group head is
+# still cold. The boiler is at temperature a few minutes after a cold start,
+# but the group (1.6 kg of brass) takes much longer, and a cold group cools
+# the water on its way to the coffee. The boiler target is raised by
+# WARMUP_GAIN K per K the estimated group is below warm, beyond
+# WARMUP_DEADBAND, up to WARMUP_MAX_OFFSET, so an early shot comes out close
+# to one from a warm machine. It is exactly zero once the group is warm, so a
+# warm machine (holding, shots, steam) is untouched. WARMUP_MAX_OFFSET = 0
+# turns it off. Simulated on every plant that fits the logs: shots are within
+# 1 C of a warm machine 1-2 minutes sooner and never more than about 1 C hot
+# (tools/sim/report.py warmup).
+WARMUP_MAX_OFFSET = 4.0
+WARMUP_GAIN = 1.0
+WARMUP_DEADBAND = 2.0
+# The group estimate. Boiler-to-group coupling as fitted to this machine's
+# logs: every plant consistent with them gives 5.1-5.4 W/K (the controller
+# keeps Tom's 3.6 for regular control). Flowing water gives the group this
+# fraction of its excess heat (eps in the simulator, calibrated at 0.6).
+WARMUP_GROUP_COUPLING = 5.3
+WARMUP_FLOW_EXCHANGE = 0.6
+
 # In-shot heat budget for shots the Pi runs (it knows how much water is still
 # to come). The incoming cold water is a known heat sink, so the shell may
 # hold the energy it will remove over the remaining shot time, up to this many

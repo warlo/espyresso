@@ -4,7 +4,8 @@
     python3 tools/sim/report.py            # everything
     python3 tools/sim/report.py setpoints  # one section
 
-Sections: restarts, faults, shots, setpoints. Pure Python (no numpy needed).
+Sections: precision, warmup, restarts, faults, shots, setpoints. Pure Python
+(no numpy needed).
 The boiler side is fitted to logs; puck numbers also depend on how much heat
 the brew head takes from the water on its way to the coffee (eps), which no
 sensor here measures. eps 0.52-0.68 reproduces a published thermocouple study
@@ -12,11 +13,12 @@ of a PID Classic (puck falling 7.5-10 C over a 60 mL shot); central 0.6, range
 shown 0.5-0.7. The absolute puck level is less certain than that range (see
 tools/sim/README.md).
 """
+import contextlib
 import logging
 import math
 import os
 import sys
-from typing import Callable, Dict, List
+from typing import Callable, Dict, Iterator, List
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -178,7 +180,60 @@ def precision() -> None:
     )
 
 
-SECTIONS = dict(precision=precision, restarts=restarts, faults=faults, shots=shots, setpoints=setpoints)
+@contextlib.contextmanager
+def _warmup_off() -> Iterator[None]:
+    saved = config.WARMUP_MAX_OFFSET
+    config.WARMUP_MAX_OFFSET = 0.0
+    try:
+        yield
+    finally:
+        config.WARMUP_MAX_OFFSET = saved
+
+
+WARMUP_SHOTS = (3, 4, 5, 6, 7, 8, 10)
+
+
+def warmup() -> None:
+    """How soon after a cold start a shot matches one from a warm machine,
+    with and without the warm-up, on every plant that fits the logs and on
+    stress cases outside them."""
+    fit = plant.fitted()
+    plants = dict(plant.candidates())
+    plants["stress: 1240 W element"] = plant.fitted(P_max=1240.0)
+    plants["stress: group coupling x0.6"] = plant.fitted(k_bh=fit["k_bh"] * 0.6)
+    plants["stress: group coupling x1.5"] = plant.fitted(k_bh=fit["k_bh"] * 1.5)
+
+    def puck(params: Dict[str, float], at: float, preheat: bool = False) -> float:
+        flow = scenarios.preheat_then_shot(90.0, at) if preheat else scenarios.pi_shots([at])
+        run = closedloop.simulate(duration=at + 60, start=plant.uniform(22.6), params=params, flow=flow, auto_off=False)
+        return _shot_stats(run, at)["puck"]
+
+    def ready(errors: List[float], tolerance: float) -> float:
+        for i in range(len(WARMUP_SHOTS)):
+            if all(abs(e) <= tolerance for e in errors[i:]):
+                return WARMUP_SHOTS[i]
+        return math.inf
+
+    print(f"\n== warm-up: Pi shot after a cold start minus a warm machine's shot (C); setpoint {SP:.1f}")
+    print("   shot at (min)          " + " ".join(f"{m:>5d}" for m in WARMUP_SHOTS)
+          + "  | within 1 / 0.5 C from (min) | display peak | flush@1.5, shot@5")
+    for name, params in plants.items():
+        warm = puck(params, 2400.0)
+        print(f"   {name}")
+        for label, ctx in (("now", contextlib.nullcontext), ("no warm-up", _warmup_off)):
+            with ctx():
+                errors = [puck(params, m * 60.0) - warm for m in WARMUP_SHOTS]
+                flushed = puck(params, 300.0, preheat=True) - warm
+                run = closedloop.simulate(duration=900, start=plant.uniform(22.6), params=params, auto_off=False)
+            off = [r["t"] for r in run.rows if r["target"] > SP]
+            ends = f", warm-up off at {off[-1] / 60:4.1f} min" if off else ""
+            print(
+                f"     {label:20s} " + " ".join(f"{e:+5.1f}" for e in errors)
+                + f"  | {_fmt(ready(errors, 1.0))} / {_fmt(ready(errors, 0.5))}       | {run.max('sensor') - SP:+5.1f}       | {flushed:+5.1f}{ends}"
+            )
+
+
+SECTIONS = dict(precision=precision, warmup=warmup, restarts=restarts, faults=faults, shots=shots, setpoints=setpoints)
 
 if __name__ == "__main__":
     # The fault scenarios trip the real safety code, which logs loudly.

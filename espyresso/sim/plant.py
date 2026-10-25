@@ -18,6 +18,12 @@ from typing import Dict, List, Optional, Sequence
 from espyresso import config as C
 
 FIT_PATH = os.path.join(os.path.dirname(__file__), "plant_fit.json")
+CANDIDATES_PATH = os.path.join(os.path.dirname(__file__), "plant_candidates.json")
+
+# How much heat the brew head takes from the water on its way to the puck:
+# with a controller blind to flow, 0.52-0.68 reproduces the 7.5-10 C puck drop
+# a 2005 thermocouple study measured on a PID Classic (60 mL in 30 s).
+EPS = 0.6
 
 STATE_KEYS = ("elem", "shell", "water", "body", "head", "sensor")
 
@@ -45,14 +51,26 @@ def nominal() -> Dict[str, float]:
 
 
 def fitted(**overrides: float) -> Dict[str, float]:
-    """Parameters fitted to this machine's logs. eps defaults to 0.6: with a
-    controller blind to flow, 0.52-0.68 reproduces the 7.5-10 C puck drop a
-    2005 thermocouple study measured on a PID Classic (60 mL in 30 s)."""
+    """Parameters fitted to this machine's logs (eps = EPS)."""
     with open(FIT_PATH) as f:
         params: Dict[str, float] = json.load(f)
-    params["eps"] = 0.6
+    params["eps"] = EPS
     params.update(overrides)
     return params
+
+
+def candidates() -> Dict[str, Dict[str, float]]:
+    """Every plant that explains the logs about as well as the fit: the fit
+    itself, each session left out in turn, and the masses fitted too. They
+    agree on the sensor and disagree on what it can't see (the water during
+    warm-up, the boiler's internal split), so control changes should hold on
+    all of them. Written by tools/sim/fit.py --write."""
+    with open(CANDIDATES_PATH) as f:
+        others: Dict[str, Dict[str, float]] = json.load(f)
+    plants = {"fitted": fitted()}
+    for name, params in others.items():
+        plants[name] = dict(params, eps=EPS)
+    return plants
 
 
 def uniform(temperature: float, head: Optional[float] = None, body: Optional[float] = None) -> Dict[str, float]:

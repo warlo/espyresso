@@ -43,7 +43,9 @@ The element is never left to the controller alone:
   start and after every stop, including crashes (pigpiod keeps a hardware PWM
   running after its client dies).
 - The controller re-syncs its model after gaps or large errors, sizes the
-  warm-up boost from the first reading, and recovers from any starting state.
+  boot boost from the first reading, and recovers from any starting state.
+  While the group head is still cold it holds the boiler a little hotter
+  (`espyresso/warmup.py`), never past the safety limits.
 - `sudo services/install.sh` (on the Pi) installs the unit, the Pi's hardware
   watchdog and a persistent journal.
 

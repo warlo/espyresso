@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 from espyresso import config, shot_logger
 from espyresso.pcontroller import PController, boot_boost_seconds
 from espyresso.safety import SafetyGuard
+from espyresso.warmup import GroupWarmUp
 
 # from espyresso.pid import PID
 from espyresso.tsic import Measurement, TsicInputChannel
@@ -39,6 +40,8 @@ class Temperature:
         # Called after every completed control tick; feeds the watchdog.
         self.heartbeat = heartbeat
         self.guard = SafetyGuard()
+        self.warmup = GroupWarmUp()
+        self._brew_mode = True
         self.last_safety = ""
         self._started = False
         self._had_valid_tick = False
@@ -90,13 +93,16 @@ class Temperature:
         )
 
     def set_steam_temp(self) -> None:
+        self._brew_mode = False
         self.pcontroller.set_target_temp(config.TARGET_STEAM_TEMP)
+        self.pcontroller.set_target_offset(0.0)
         self.temp_queue.target_y = config.TARGET_STEAM_TEMP
         sl = shot_logger.get()
         if sl is not None:
             sl.log_event("setpoint", target=config.TARGET_STEAM_TEMP, mode="steam")
 
     def set_brew_temp(self) -> None:
+        self._brew_mode = True
         self.pcontroller.set_target_temp(config.TARGET_TEMP)
         self.temp_queue.target_y = config.TARGET_TEMP
         sl = shot_logger.get()
@@ -169,6 +175,7 @@ class Temperature:
             self.guard.clear()
         self._prev_boiling = boiling
 
+        self._update_warmup(temp)
         heater_cmd, temp_tuple = self.pcontroller.update(
             temperature=temp, boiling=boiling
         )
@@ -210,6 +217,7 @@ class Temperature:
                 bodyTemp=temp_tuple[3],
                 brewHeadTemp=temp_tuple[4],
                 modeledSensorTemp=temp_tuple[5],
+                warmup_group=self.warmup.group,
                 **self.pcontroller.diagnostics,
             )
 
@@ -223,6 +231,20 @@ class Temperature:
 
         if self.heartbeat is not None:
             self.heartbeat()
+
+    def _update_warmup(self, temp: float) -> None:
+        """Hold the boiler hotter while the group head is cold (brew mode
+        only); the screen's target shows what the boiler is heading for."""
+        offset = self.warmup.update(
+            time.perf_counter(),
+            boiler=temp,
+            water=self.pcontroller.waterTemp,
+            flow_rate=self.flow.get_flow_rate() or 0.0,
+            setpoint=self.pcontroller.temp_setpoint,
+        )
+        if self._brew_mode:
+            self.pcontroller.set_target_offset(offset)
+            self.temp_queue.target_y = self.pcontroller.target
 
     def log_power(self, temp: float, timestamp: float, heater_value: float) -> None:
         with open(config.LOG_POWER_FILE, "a+") as f:
