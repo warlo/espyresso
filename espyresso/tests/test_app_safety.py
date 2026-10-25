@@ -111,3 +111,37 @@ def test_stop_leaves_heater_and_pump_off(tsic: Mock) -> None:
     pump_writes = [c.args for c in pi.write.call_args_list if c.args[0] == config.PUMP_OUT_GPIO]
     assert pump_writes[-1] == (config.PUMP_OUT_GPIO, 0)
     assert not app.watchdog.is_alive() or app.watchdog._stop_event.is_set()
+
+
+def test_sighup_is_handled_before_construction(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run directly under systemd the app is a session leader; pygame's
+    framebuffer driver opens a tty, which then becomes the controlling
+    terminal and sends SIGHUP during construction. The default action would
+    kill the app before it reports READY."""
+    import signal
+
+    from espyresso import app as app_module
+
+    seen = {}
+
+    class FakeEspyresso:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            seen["sighup"] = signal.getsignal(signal.SIGHUP)
+
+        def signal_handler(self, *args: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+    saved = {s: signal.getsignal(s) for s in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)}
+    monkeypatch.setattr(config, "DEBUG", False)
+    monkeypatch.setattr(app_module, "Espyresso", FakeEspyresso)
+    monkeypatch.setattr(app_module, "_configure_logging", lambda: None)
+    try:
+        app_module.run()
+    finally:
+        for s, handler in saved.items():
+            signal.signal(s, handler)
+
+    assert seen["sighup"] not in (signal.SIG_DFL, None)

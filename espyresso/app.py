@@ -233,12 +233,16 @@ class Espyresso:
 
 
 def handler(signum: int, *args: Any) -> None:
-    """Why is systemd sending sighups?"""
+    """SIGHUP comes from the framebuffer's tty (see run()); ignore it."""
     logger.warning(f"Got a {signum} signal. Doing nothing")
 
 
 def run() -> None:
     _configure_logging()
+    # Before anything opens a tty: run directly by systemd the app is a
+    # session leader, so the framebuffer's tty becomes its controlling
+    # terminal and sends SIGHUP during construction.
+    signal.signal(signal.SIGHUP, handler)
     logger.info("constructing Espyresso")
     try:
         if not config.DEBUG:
@@ -254,7 +258,6 @@ def run() -> None:
     logger.info("Espyresso constructed, installing signal handlers")
 
     try:
-        signal.signal(signal.SIGHUP, handler)
         signal.signal(signal.SIGINT, espyresso.signal_handler)
         signal.signal(signal.SIGTERM, espyresso.signal_handler)
         espyresso.start()
