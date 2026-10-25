@@ -344,7 +344,7 @@ SENSOR_XFER_COEFF = 0.02656
 # Set False to skip the bluetooth notify loop entirely. The scale is optional;
 # when disabled, get_scale_weight() returns 0 and the display loop is not
 # coupled to bluetooth init at all.
-BLUETOOTH_ENABLED = False
+BLUETOOTH_ENABLED = True
 BLUETOOTH_NOTIFY_UUID = "0000fff1-0000-1000-8000-00805f9b34fb"
 BLUETOOTH_SCALE_ADDRESS = (
     "08D33DC9-564F-83B6-9788-DD1E1F6672A2"
