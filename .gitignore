@@ -1,3 +1,5 @@
 venv
 shot_count.txt
 log/
+__pycache__/
+shot_stat.txt
