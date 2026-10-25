@@ -44,9 +44,11 @@ SCL_GPIO = 3
 # reaches the coffee has lost heat to the group on the way. BREW_PUCK_TEMP is
 # what you want at the puck (Tim Wendelboe-style light roasts: 93-94 C) and
 # PUCK_OFFSET how much hotter the boiler must be to deliver it. Not measured
-# yet: the simulation says about 6 (tools/sim/report.py setpoints), PID kits
-# assume 7-8; see docs/temperature-control.md. Measure the puck temperature
-# once and correct it here.
+# yet: during the default 18 g -> 36 g shot the simulation puts the water
+# reaching the cup about 10 under the setpoint (tools/sim/report.py
+# setpoints; it said 6 while the logged shot flows were read at half), PID
+# kits assume 7-8; see docs/temperature-control.md. Measure the puck
+# temperature once and correct it here.
 BREW_PUCK_TEMP = 93.0
 PUCK_OFFSET = 6.0
 TARGET_TEMP = BREW_PUCK_TEMP + PUCK_OFFSET
@@ -114,8 +116,11 @@ WATCHDOG_INTERVAL = 0.5
 # is unaffected; this only makes a dead screen visible in the logs.
 DISPLAY_STALE_SECONDS = 30.0
 # Heater cut while the raw sensor reads above setpoint + this margin, and above
-# an absolute cap (TSIC 306 tops out at 150 C). Heals when it cools.
-SAFETY_MAX_ABOVE_SETPOINT = 15.0
+# an absolute cap (TSIC 306 tops out at 150 C). Heals when it cools. Normal
+# control stays below it: shots peak about 16 C over the setpoint in
+# simulation (the element pushing heat into the incoming water), and the
+# machine's first warm-up peaked 1-3 C above its simulation.
+SAFETY_MAX_ABOVE_SETPOINT = 20.0
 SAFETY_MAX_TEMPERATURE = 145.0
 # Sensor-detached detection: near full power for this long, far below
 # setpoint, no water flowing, and the sensor rose less than this. Latched

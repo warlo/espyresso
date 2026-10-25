@@ -133,8 +133,6 @@ class PController:
 
         flow_rate = self.flow.get_flow_rate() or 0
         logger.debug("FLOWRATE %s", flow_rate)
-        # Max flow rate
-        flow_rate = flow_rate if flow_rate < 2.0 else 2.0
 
         # TODO: verify flow
         waterToFlowPower = (
@@ -358,10 +356,6 @@ class PController:
             + desiredWaterInputPower / config.BOILER_WATER_XFER_COEFF_NOFLOW
         )
         logger.debug("desiredAverageShellTemp: %s", desiredAverageShellTemp)
-
-        # TODO: Flow 0
-        if flow_rate > 1.0:
-            desiredAverageShellTemp = self.waterTemp + desiredWaterInputPower / 25.0
 
         # now clip the temperature so that it won't take more than 20s to lose excess heat to ambient
         flow_horizon = (

@@ -35,14 +35,15 @@ def test_guard_passes_normal_heater_values() -> None:
 
 def test_guard_cuts_heater_above_setpoint_margin() -> None:
     g = SafetyGuard()
-    heater, reason = g.limit(now=0, temperature=110.5, heater=0.4, setpoint=95.0, flowing=False)
+    hot = 95.0 + config.SAFETY_MAX_ABOVE_SETPOINT + 0.5
+    heater, reason = g.limit(now=0, temperature=hot, heater=0.4, setpoint=95.0, flowing=False)
     assert heater == 0.0
     assert reason == "overtemp"
 
 
 def test_guard_overtemp_heals_when_temperature_drops() -> None:
     g = SafetyGuard()
-    g.limit(now=0, temperature=111.0, heater=0.4, setpoint=95.0, flowing=False)
+    g.limit(now=0, temperature=95.0 + config.SAFETY_MAX_ABOVE_SETPOINT + 1.0, heater=0.4, setpoint=95.0, flowing=False)
     assert g.limit(now=1, temperature=100.0, heater=0.4, setpoint=95.0, flowing=False) == (0.4, "")
 
 

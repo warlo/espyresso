@@ -121,7 +121,7 @@ range holds however hard their PID worked.
 `test_plant_reproduces_published_puck_drop_of_a_pid_classic` pins this.
 
 On the same 60 mL shot this controller gives a 5.5 °C drop on a manual
-shot (the flow meter's feed-forward) and 3.6 °C on a Pi shot (the heat
+shot (the flow meter's feed-forward) and 3.3 °C on a Pi shot (the heat
 budget).
 
 ### What it can't tell you
@@ -224,8 +224,9 @@ After changing any of these, run `make test` and `make sim`.
 
 **Puck temperature (`PUCK_OFFSET`).** Put a thermocouple tip just above the
 puck (a cheap K-type through a spare basket, or a Scace-style device), pull a
-shot at the current setpoint and note the average reading over the shot.
-`PUCK_OFFSET += BREW_PUCK_TEMP - measured`. A second TSIC on the group head
+shot at the current setpoint and note the average reading after the first
+7 s (the fill, which only wets the puck; `make sim` reports the same
+"extraction" number). `PUCK_OFFSET += BREW_PUCK_TEMP - measured`. A second TSIC on the group head
 would let the controller learn this on its own.
 
 **Shot yield (`BREW_RETAINED_ML_PER_G`).** First check the flow meter: run a

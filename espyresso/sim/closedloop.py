@@ -208,7 +208,9 @@ def simulate(
                     m_water=pc.waterTemp,
                     m_head=pc.brewHeadTemp,
                     target=pc.target,
-                    state=temperature.brew_state().value,
+                    # Labels ride along with the numbers.
+                    state=temperature.brew_state().value,  # type: ignore[dict-item]
+                    safety=temperature.last_safety,  # type: ignore[dict-item]
                     boiling=1.0 if boiler.get_boiling() else 0.0,
                 )
             )

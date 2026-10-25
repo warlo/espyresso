@@ -40,9 +40,13 @@ def _fmt(v: float) -> str:
 def _shot_stats(run: closedloop.Run, t0: float) -> Dict[str, float]:
     rows = [r for r in run.window(t0, t0 + scenarios.SHOT_SECONDS) if r["flow"] > 0]
     pucks = [r["puck"] for r in rows]
+    cup = [r for r in rows if r["t"] >= t0 + scenarios.FILL_SECONDS]
     return dict(
         puck=sum(pucks) / len(pucks),
         drop=max(pucks) - min(pucks),
+        # After the fill, weighted by flow: the water that reaches the cup.
+        extraction=sum(r["puck"] * r["flow"] for r in cup) / sum(r["flow"] for r in cup),
+        extraction_range=max(r["puck"] for r in cup) - min(r["puck"] for r in cup),
         water_min=min(r["water"] for r in rows),
         head=run.at(t0)["head"],
         head_model=run.at(t0)["m_head"],
@@ -83,7 +87,7 @@ def faults() -> None:
 
 def shots() -> None:
     print(f"\n== shots (setpoint {SP:.1f}); puck = water reaching the coffee")
-    print("   scenario                      group     puck  drop  boiler min  head(true/model)  post water  display peak")
+    print("   scenario                      group     puck  drop  extraction  boiler min  head(true/model)  post water  display peak")
     cases = [
         ("Pi shot at 10 min", lambda: scenarios.pi_shots([600.0]), [600.0]),
         ("same, no heat budget", lambda: scenarios.pi_shots([600.0], heat_budget=False), [600.0]),
@@ -96,7 +100,8 @@ def shots() -> None:
             run = closedloop.simulate(duration=starts[-1] + 120, start=plant.uniform(22.6), params=params(), flow=flow())
             s = _shot_stats(run, starts[-1])
             print(
-                f"   {name:29s} {group:8s} {s['puck']:5.1f} {s['drop']:5.1f}   {s['water_min']:6.1f}"
+                f"   {name:29s} {group:8s} {s['puck']:5.1f} {s['drop']:5.1f}  {s['extraction']:5.1f}±{s['extraction_range'] / 2:3.1f}"
+                f"   {s['water_min']:6.1f}"
                 f"      {s['head']:5.1f}/{s['head_model']:5.1f}       {s['post_water']:5.1f}       {s['display_peak']:5.1f}"
             )
     first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
@@ -107,12 +112,12 @@ def shots() -> None:
 
 
 def setpoints() -> None:
-    print("\n== setpoint -> mean puck temperature, Pi shot at 10 min (eps 0.6 / 0.7 / 0.5)")
-    for sp in [93.0 + 0.5 * i for i in range(17)]:
+    print("\n== setpoint -> puck temperature after the fill (what reaches the cup), Pi shot at 10 min (eps 0.6 / 0.7 / 0.5)")
+    for sp in [93.0 + 0.5 * i for i in range(25)]:
         cells = []
         for group, params in GROUPS.items():
             run = closedloop.simulate(duration=720, start=plant.uniform(22.6), params=params(), setpoint=sp, flow=scenarios.pi_shots([600.0]))
-            cells.append(_shot_stats(run, 600.0)["puck"])
+            cells.append(_shot_stats(run, 600.0)["extraction"])
         idle = closedloop.simulate(duration=600, start=plant.uniform(22.6), setpoint=sp).window(500, 600)
         idle_water = sum(r["water"] for r in idle) / len(idle)
         print(f"   {sp:5.1f}: {cells[0]:5.1f} / {cells[1]:5.1f} / {cells[2]:5.1f}   idle boiler water {idle_water:5.1f}")
@@ -165,6 +170,8 @@ def precision() -> None:
         print(
             f"      {name}: boiler water {run.at(600)['water']:.1f} -> min {s['water_min']:.1f} | puck {s['puck']:.1f} C"
             f" ({pucks['eps 0.7']['puck']:.1f}..{pucks['eps 0.5']['puck']:.1f}), drop over shot {s['drop']:.1f} C"
+            f" | after the fill {s['extraction']:.1f} C ({pucks['eps 0.7']['extraction']:.1f}..{pucks['eps 0.5']['extraction']:.1f})"
+            f" range {s['extraction_range']:.1f}"
             f" | back within +-0.5 C {_fmt(_settled(run, SP, 0.5, end))} after | post-shot water peak {s['post_water'] - SP:+.2f}"
         )
     first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0

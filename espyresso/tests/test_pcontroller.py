@@ -303,3 +303,31 @@ def test_non_finite_target_offset_is_ignored(flow_zero: Mock) -> None:
     p.set_target_offset(math.nan)
 
     assert p.target == config.TARGET_TEMP
+
+
+def _flowing(clock: Clock, rate: float) -> PController:
+    """Mid-shot: water 10 C under the setpoint, a known shot still running."""
+    flow = Mock()
+    flow.get_flow_rate.return_value = rate
+    p = PController(initial_temperature=config.TARGET_TEMP - 10.0, flow=flow)
+    p.set_flow_horizon(20.0)
+    clock.advance(0.1)
+    p.update(temperature=config.TARGET_TEMP - 10.0, boiling=True)
+    return p
+
+
+def test_model_counts_all_the_water_a_shot_draws(clock: Clock) -> None:
+    """Shots fill the group at about 4 mL/s. A 2.0 mL/s cap dated from when
+    the flow meter read half, so the model missed half the cold water."""
+    p = _flowing(clock, 4.2)
+
+    assert p.diagnostics["flow_rate"] == pytest.approx(4.2)
+
+
+def test_more_flow_never_asks_for_a_cooler_boiler(clock: Clock) -> None:
+    """The boiler temperature asked for comes from the model's own water
+    coupling at any flow; a switch to 25 W/K above 1 mL/s cut the request
+    just as the shot's extraction started."""
+    requests = [_flowing(clock, rate).diagnostics["desiredAverageShellTemp"] for rate in (0.95, 1.05)]
+
+    assert requests[1] >= requests[0]

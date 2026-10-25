@@ -11,6 +11,8 @@ compared relative to each other, not asserted as absolute truths.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from espyresso import config
@@ -309,3 +311,44 @@ def test_never_ready_while_steaming_or_far_too_hot_after() -> None:
 
     assert _states(run, after=590.0) == ["READY", "STEAM", "COOL", "READY"]
     assert all(r["water"] < SP + 2.5 for r in run.rows if r["t"] > 720 and r["state"] == "READY")
+
+
+@pytest.mark.parametrize("preinfuse", [True, False])
+def test_recipe_shot_delivers_its_volume_in_its_time(preinfuse: bool) -> None:
+    flow = scenarios.recipe_shot([0.0], inlet_ml=66.0, seconds=28.0, preinfuse=preinfuse)
+    unused: Any = None  # the shot's flow doesn't depend on the controller
+    ticks = [i * 0.1 for i in range(300)]
+
+    volume = sum(flow(t, unused)[0] * 0.1 for t in ticks)
+
+    assert volume == pytest.approx(66.0, rel=0.03)
+    assert flow(28.5, unused)[0] == 0.0
+
+
+@pytest.mark.parametrize("name", list(plant.candidates()))
+def test_model_water_follows_the_boiler_through_a_recipe_shot(name: str) -> None:
+    """The controller acts on its own estimate of the water; during and
+    after a shot that estimate drifted up to 7 C warm when the model saw
+    only half the fill flow. Holds on every plant that explains the logs."""
+    params = dict(plant.candidates()[name])
+    run = closedloop.simulate(
+        duration=720, start=plant.uniform(22.6), params=params, flow=scenarios.recipe_shot([600.0]), auto_off=False
+    )
+
+    error = [abs(r["m_water"] - r["water"]) for r in run.window(600.0, 690.0)]
+    assert sum(error) / len(error) < 1.5
+    assert max(error) < 3.5
+
+
+@pytest.mark.parametrize("preinfuse", [True, False])
+def test_recipe_shot_never_trips_the_safety_cut_off(preinfuse: bool) -> None:
+    """During a shot the element runs well above the setpoint to push heat
+    into the incoming water; the model-independent cut-off must sit above
+    that, or it fights normal control on every shot."""
+    for name, params in plant.candidates().items():
+        run = closedloop.simulate(
+            duration=720, start=plant.uniform(22.6), params=params,
+            flow=scenarios.recipe_shot([600.0], preinfuse=preinfuse), auto_off=False,
+        )
+
+        assert not [r["t"] for r in run.window(600.0, 720.0) if r["safety"]], name

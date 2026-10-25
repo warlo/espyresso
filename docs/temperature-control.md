@@ -65,7 +65,7 @@ On top of that model:
   water is still to come and lets the boiler store the heat that water will
   take, so the temperature drops less. Shots on the machine's own switch don't
   get this (the Pi can't know when they end).
-- **Safety**, independent of the model: a raw-sensor cut-off (setpoint + 15 °C,
+- **Safety**, independent of the model: a raw-sensor cut-off (setpoint + 20 °C,
   never above 145 °C), detached-sensor detection, a watchdog that turns the
   heater off when control stalls, and systemd hooks that switch the outputs
   off if the program dies. See the README's safety section.
@@ -98,13 +98,13 @@ A Pi shot after a cold start, compared with one from a fully warm machine
 
 | Shot at | 4 min | 5 min | 6 min | 7 min | Within 1 °C from |
 |---|---|---|---|---|---|
-| With warm-up | -3.7 °C | -1.8 °C | -1.2 °C | -0.7 °C | 7 min |
-| Without | -6.2 °C | -3.4 °C | -1.9 °C | -1.0 °C | 8 min |
+| With warm-up | -3.4 °C | -1.8 °C | -1.2 °C | -0.7 °C | 7 min |
+| Without | -6.1 °C | -3.3 °C | -1.9 °C | -1.0 °C | 8 min |
 
 The other plants that fit the logs equally well gain about a minute too; on
 the one that puts the sensor on the plain side the warm-up makes a 5 minute
-shot up to 1.1 °C too hot. A preheat flush (short press on button one) still
-helps on top: flush at 1.5 minutes, shot at 5 minutes, -1.6 °C on the main
+shot up to 1.0 °C too hot. A preheat flush (short press on button one) still
+helps on top: flush at 1.5 minutes, shot at 5 minutes, -1.7 °C on the main
 fit.
 
 ### Ready to brew: what the screen says
@@ -157,7 +157,7 @@ The boiler itself, booting from about 35 °C. The first run with the warm-up
 The display overshoots more than the water: the element side runs hotter
 than the water while heating, more so with the warm-up's longer full-power
 start. On the machine the first climb peaked 1-3 °C higher than simulated;
-from 4 minutes on the two agree within 0.5 °C. The safety cut-off stays at setpoint + 15 °C; the warm-up never moves
+from 4 minutes on the two agree within 0.5 °C. The safety cut-off stays at setpoint + 20 °C; the warm-up never moves
 it. A warm restart does not overshoot: from 98.6 °C the display peaked at
 99.8 °C (measured; the old controller went to 104-106 °C).
 
@@ -180,25 +180,51 @@ element's side, which runs a little hotter than the water.
 ## 3. While brewing
 
 No shot has been pulled since temperature logging started, so this is
-**simulated only**. A shot here is 7 s of preinfusion at ~1.4 mL/s then 30 s
-at ~0.95 mL/s (the median of the 34 logged Pi shots), pulled 10 minutes after
-a cold boot.
+**simulated only**. The shot is the default recipe, 18 g in and 36 g out in
+28 s: the flow shape of the 15 logged Pi shots with a puck (the flow meter
+read half the real flow until 2026-10-25; corrected here), scaled to 66 mL
+in, since the puck keeps about 30 mL. It fills the group and wets the puck
+at about 4 mL/s for 7 s, then extracts at 1.4-1.8 mL/s. It is pulled 10
+minutes after a cold boot.
 
 | | Pi shot (button) | Manual shot (machine switch) |
 |---|---|---|
-| Boiler water during the shot | 99.3 → 92.5 °C | 99.3 → 90.3 °C |
-| Water at the puck, mean | 93.1 °C (92.9 to 93.4) | 91.8 °C (91.7 to 91.9) |
-| Puck temperature range over the shot | 1.6 °C | 2.9 °C |
-| Display peak (the element at full power) | 110.7 °C | 106.1 °C |
-| Boiler back within ±0.5 °C after the shot | 100 s | 41 s |
+| Boiler water during the shot | 99.3 → 84.5 °C | 99.3 → 82.6 °C |
+| Water reaching the cup (after the 7 s fill), mean | 89.2 °C (88.6 to 89.8) | 88.1 °C (87.5 to 88.8) |
+| Its range over the shot | 1.2 °C | 0.8 °C |
+| Water at the puck over the whole shot, mean | 89.7 °C | 88.8 °C |
+| Display peak (the element at full power) | 114.7 °C | 110.5 °C |
+| Boiler back within ±0.5 °C after the shot | 49 s | 53 s |
 | Boiler water overshoot after the shot | +0.5 °C | +0.5 °C |
-| Second shot 23 s after the first | +0.8 °C at the puck | |
+| Second shot 23 s after the first | +0.2 °C | |
 
-The boiler loses 7-9 °C during a shot because the cold water coming in is a
-large heat sink for a small boiler; the puck sees less of that because the
-group head buffers it. Pi shots do better because of the heat budget. The
-display jumps well above the setpoint during a shot: that is the heating
-element running at full power, not the water.
+The fill is the big heat sink: about 26 mL of cold water in 7 s into a
+100 mL boiler, faster than the 1.1-1.4 kW element can heat it. The boiler
+water drops about 15 °C, and the water at the puck goes from 93 °C for the
+first drops to 89 °C by the end of the fill. That water wets the puck. What
+reaches the cup comes after it, and the controller holds that within about
+1 °C. With or without preinfusion it is the same within 0.1 °C, so choose
+preinfusion for the extraction, not for temperature. Pi shots run about 1 °C
+warmer than manual ones because of the heat budget. The display jumps well
+above the setpoint during a shot: that is the heating element running at
+full power, not the water.
+
+**Flatter or hotter in-shot is limited by physics, not the controller.**
+Heat reaches the water through the boiler wall (12-24 W/K in the fits), so
+feeding the ~550 W the extraction water takes needs the wall and element
+some 30 °C above the water, and the heat stored in the metal for that comes
+out after the shot. Simulated alternatives (letting the boiler store more
+heat, a higher target while water flows) raised the cup by under 1 °C, made
+it less even over the shot, and overshot by 2-7 °C after it.
+
+Until 2026-10-25 the controller assumed the flow never exceeded 2 mL/s, and
+above 1 mL/s it asked the boiler for less heat. Both limits dated from
+2022, when the flow meter read half the real flow. Since they were removed,
+the controller's estimate of the water stays within about 1 °C of the
+simulated boiler through a shot and the minute after it (before: off by up
+to 7 °C). On the same shot that took the second of two back-to-back shots
+from 0.9 °C colder to 0.2 °C warmer than the first, and the recovery from
+84 s to 49 s.
 
 **How sure is this?** Two things decide the puck numbers, and they are known
 to different degrees:
@@ -207,24 +233,25 @@ to different degrees:
   from the water (`eps` in the simulation). It is calibrated against a 2005
   thermocouple study of a PID Classic, which measured the puck water falling
   7.5-10 °C over a 60 mL shot; the simulation reproduces 9.2 °C. On that
-  same shot this controller gives 5.5 °C on a manual shot and 3.6 °C on a
+  same shot this controller gives 5.5 °C on a manual shot and 3.3 °C on a
   Pi shot: the flow feed-forward and the heat budget cut a plain PID's drop
-  by about 40 % and 60 %. The numbers in brackets are the range
+  by about 40 % and 65 %. The numbers in brackets are the range
   over the plausible `eps`.
-- **The level** (93.1 °C) is less certain. The same study measured the puck
-  starting about 91 °C with its PID at 99.5 °C; this simulation would give
-  94.0 °C. Their sensor sat elsewhere on the boiler, so the two setpoints
-  don't mean the same water, but the real puck here could be up to about
-  3 °C lower than simulated. PID kits for the Classic assume 7-8 °C
-  between the boiler sensor and the brew water (Gaggiuino's default is
-  7 °C), which points the same way. The setpoint is 99 °C (`PUCK_OFFSET`
-  6): the model puts the puck at 93 °C there, the kits' offset at 91-92 °C.
-  Measure the puck once to settle it (see the simulation README).
+- **The level** (89 °C after the fill) is less certain, and it is the
+  number that matters most for taste. At setpoint 99 °C the simulation puts
+  the water reaching the cup about 10 °C under the setpoint
+  (`make sim` section `setpoints`; 93 °C would need a setpoint of about
+  103.5 °C). The same study measured the puck starting about 91 °C with its
+  PID at 99.5 °C, where this simulation gives 94 °C, so the real puck could
+  be up to about 3 °C colder still. PID kits for the Classic assume 7-8 °C
+  (Gaggiuino's default is 7 °C). All three put the puck below the 93 °C
+  that `BREW_PUCK_TEMP` asks for, by 1-7 °C. `PUCK_OFFSET` stays at 6 until
+  the puck is measured once (see the simulation README).
 
-The boiler's recovery after a shot is the least certain number: no shot has
-been logged since temperature logging started, and the warm-ups the model is
-fitted to don't pin it down (adding the latest warm-up moved it from 30 to
-100 s). One logged shot will.
+The boiler's recovery after a shot is less certain than the shot itself: the
+warm-ups the model is fitted to don't pin down how fast the water exchanges
+heat with the wall (adding the latest warm-up moved the recovery a lot). One
+logged shot will.
 
 The group head also matters for the first shot of the day: it warms far more
 slowly than the boiler. The screen says FLUSH while a preheat flush helps
@@ -262,11 +289,12 @@ the element side ran into the 145 °C safety cut-off.
 
 In order of expected benefit:
 
-1. **Pull a shot 5 minutes after a cold start, and another at 15.** The
+1. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
+   is the largest uncertainty, and the evidence so far says the water
+   reaching the cup is 1-7 °C under the 93 °C asked for (section 3).
+2. **Pull a shot 5 minutes after a cold start, and another at 15.** The
    first warm-up run matched the simulation on the boiler side; the two
    shots show whether its compensation is right for this group.
-2. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
-   removes the largest uncertainty (up to about 3.5 °C).
 3. **Log one Pi shot** after a 15 minute warm-up. Its boiler dip and
    recovery pin down the in-shot behaviour the model can't learn from
    warm-ups.
