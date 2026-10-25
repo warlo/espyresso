@@ -240,3 +240,22 @@ def test_sd_notify_sends_to_notify_socket(monkeypatch: pytest.MonkeyPatch) -> No
 def test_sd_notify_without_systemd_is_a_no_op(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NOTIFY_SOCKET", raising=False)
     sd_notify("WATCHDOG=1")
+
+
+def test_control_events_distinguish_start_from_recovery(rig: dict, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from espyresso import shot_logger
+
+    sl = shot_logger.init(str(tmp_path))
+    try:
+        rig["wd"].heartbeat()
+        rig["wd"].check()  # first tick after start
+        rig["clock"].now += config.CONTROL_STALE_SECONDS + 0.1
+        rig["wd"].check()  # stalled
+        rig["wd"].heartbeat()
+        rig["wd"].check()  # back
+    finally:
+        sl.close()
+        shot_logger._INSTANCE = None
+
+    reasons = [line.split("reason=")[1].strip() for line in open(sl.event_path) if "reason=" in line]
+    assert reasons == ["control_started", "control_stale", "control_resumed"]

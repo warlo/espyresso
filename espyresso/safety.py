@@ -101,6 +101,7 @@ class Watchdog(threading.Thread):
 
         self._last_control: Optional[float] = None
         self._was_fresh = False
+        self._had_control = False
         self._ready_sent = False
         self._pump_on_since: Optional[float] = None
         self._flow_seen_ml = flow.lifetime_ml
@@ -128,8 +129,12 @@ class Watchdog(threading.Thread):
                 if sl is not None:
                     sl.log_event("safety", reason="control_stale")
         elif not self._was_fresh and self._last_control is not None and sl is not None:
-            sl.log_event("safety", reason="control_resumed")
+            sl.log_event(
+                "safety",
+                reason="control_resumed" if self._had_control else "control_started",
+            )
         self._was_fresh = fresh
+        self._had_control = self._had_control or fresh
 
         if self.pump is not None and self.pump.pumping:
             if self._pump_on_since is None:
