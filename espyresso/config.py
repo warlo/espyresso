@@ -342,7 +342,16 @@ SENSOR_XFER_COEFF = 0.02656
 # Set False to skip the bluetooth notify loop entirely. The scale is optional;
 # when disabled, get_scale_weight() returns 0 and the display loop is not
 # coupled to bluetooth init at all.
-BLUETOOTH_ENABLED = False
+BLUETOOTH_ENABLED = True
+# Searching for the scale (asleep or away) is what loads the Pi Zero: each
+# attempt has BlueZ scan and hand every nearby advertisement to Python. Each
+# attempt gets BLUETOOTH_CONNECT_TIMEOUT seconds, and the wait between them
+# doubles from BLUETOOTH_RETRY_SECONDS up to BLUETOOTH_RETRY_MAX_SECONDS;
+# starting a shot tries at once. Connected, it is a few small notifications
+# a second.
+BLUETOOTH_CONNECT_TIMEOUT = 5.0
+BLUETOOTH_RETRY_SECONDS = 10.0
+BLUETOOTH_RETRY_MAX_SECONDS = 60.0
 BLUETOOTH_NOTIFY_UUID = "0000fff1-0000-1000-8000-00805f9b34fb"
 BLUETOOTH_SCALE_ADDRESS = (
     "08D33DC9-564F-83B6-9788-DD1E1F6672A2"

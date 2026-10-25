@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from espyresso import config, shot_logger
 
@@ -13,11 +13,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def retry_delay(failures: int) -> float:
+    """Seconds before the next connection attempt after ``failures`` in a
+    row: searching for a scale that is asleep or away loads the Pi Zero."""
+    return float(
+        min(
+            config.BLUETOOTH_RETRY_MAX_SECONDS,
+            config.BLUETOOTH_RETRY_SECONDS * 2 ** max(0, failures - 1),
+        )
+    )
+
+
 class BluetoothScale:
     current_weight_timestamp: float = 0
     current_weight: float = 0.0
     _logged_weight: Optional[float] = None
     _logged_at: float = 0.0
+    _loop: Any = None
+    _wake: Any = None
     bleak_client: "BleakClient" = None
     stop_event: Optional["Event"] = None
     disconnect_event: Optional["Event"] = None
@@ -64,6 +77,7 @@ class BluetoothScale:
             self.bleak_client = BleakClient(
                 config.BLUETOOTH_SCALE_ADDRESS,
                 disconnected_callback=self.disconnected,
+                timeout=config.BLUETOOTH_CONNECT_TIMEOUT,
             )
             asyncio.run(self.notify())
         except Exception:
@@ -77,6 +91,13 @@ class BluetoothScale:
     def stop(self) -> None:
         if self.stop_event is not None:
             self.stop_event.set()
+
+    def request_connect(self) -> None:
+        """Try to connect now instead of after the back-off, e.g. a shot is
+        starting and the scale was just woken. Safe from any thread."""
+        loop, wake = self._loop, self._wake
+        if loop is not None and wake is not None:
+            loop.call_soon_threadsafe(wake.set)
 
     def disconnected(self, client: "BleakClient") -> None:
         if not self.disconnect_event:
@@ -112,9 +133,13 @@ class BluetoothScale:
 
         self.stop_event = asyncio.Event()
         self.disconnect_event = asyncio.Event()
+        self._wake = asyncio.Event()
+        self._loop = asyncio.get_running_loop()
+        failures = 0
         while not self.stop_event.is_set():
             try:
                 async with self.bleak_client as client:
+                    failures = 0
                     await client.start_notify(
                         config.BLUETOOTH_NOTIFY_UUID, self.callback
                     )
@@ -123,12 +148,15 @@ class BluetoothScale:
                     self._log_connection("disconnected")
                     await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
             except Exception as e:
-                logger.debug("start_notify failed: %s", e)
-                # Back off before retrying — without this, a missing
-                # scale produced a tight reconnect loop that allocated
-                # async resources on every iteration.
-                await asyncio.sleep(5)
+                failures += 1
+                logger.debug("scale not reachable (%s attempts): %s", failures, e)
 
             # Reuse the event across iterations instead of replacing it,
             # which used to leak one Event per reconnect attempt.
             self.disconnect_event.clear()
+            if failures:
+                self._wake.clear()
+                try:
+                    await asyncio.wait_for(self._wake.wait(), retry_delay(failures))
+                except asyncio.TimeoutError:
+                    pass

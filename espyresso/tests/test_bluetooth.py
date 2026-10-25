@@ -53,3 +53,15 @@ def test_readings_are_logged_at_most_once_a_second(monkeypatch: pytest.MonkeyPat
     scale.callback(0, _packet(4.0))
 
     assert [c.kwargs["grams"] for c in session.log_event.call_args_list] == [1.0, 4.0]
+
+
+def test_searching_backs_off_to_a_minute() -> None:
+    """Searching for an asleep scale is what loads the Pi Zero (BlueZ hands
+    every nearby advertisement to Python), so retries thin out."""
+    from espyresso.bluetooth import retry_delay
+
+    assert [retry_delay(n) for n in (1, 2, 3, 4, 5, 9)] == [10.0, 20.0, 40.0, 60.0, 60.0, 60.0]
+
+
+def test_request_connect_before_the_loop_runs_is_harmless() -> None:
+    BluetoothScale().request_connect()
