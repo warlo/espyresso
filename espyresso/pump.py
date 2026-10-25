@@ -66,6 +66,7 @@ class Pump:
         # callbacks; only the first caller may log the shot.
         self._brew_active = False
         self._brew_lock = threading.Lock()
+        self.steaming = False
 
         self.set_pwm_value(0.75)
         self.pump_thread = threading.Thread(target=self.brew_shot_routine)
@@ -165,18 +166,23 @@ class Pump:
         self.brewing_timer.disable_automatic_timing()
 
         started = time.perf_counter()
+        self.steaming = True
         self.temperature.set_steam_temp()
         self.boiler.turn_on_boiler()
-        # Pump on, as in pulse_pump_routine; the loop below only modulates
-        # its power. Without this the loop never ran and steam lasted ~1 ms.
-        self.toggle_pump()
+        refill = config.STEAM_REFILL_PWM
+        if refill > 0:
+            self.toggle_pump()
 
-        while self.pumping and time.perf_counter() - started < 120:
-            self.set_pwm_value(0.4)
-            time.sleep(0.5)
-            self.set_pwm_value(0)
-            time.sleep(0.5)
+        while self.steaming and time.perf_counter() - started < config.STEAM_SECONDS:
+            if refill > 0:
+                self.set_pwm_value(refill)
+                time.sleep(0.5)
+                self.set_pwm_value(0)
+                time.sleep(0.5)
+            else:
+                time.sleep(0.2)
 
+        self.steaming = False
         self.temperature.set_brew_temp()
         self.reset()
         if sl is not None:
@@ -301,6 +307,7 @@ class Pump:
         )
 
     def reset(self) -> None:
+        self.steaming = False
         self.stop_pump()
         self.set_pwm_value(0.75)
         self.boiler.set_pwm_override(None)

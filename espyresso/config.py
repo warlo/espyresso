@@ -68,6 +68,14 @@ BREW_MAX_SECONDS = 45.0
 # At ~1.4 mL/s every logged shot hit the 7 s limit first.
 PREINFUSE_MAX_SECONDS = 7.0
 PREINFUSE_TARGET_ML = 30.0
+# Steam mode (long press on button one): hold TARGET_STEAM_TEMP for up to
+# STEAM_SECONDS. STEAM_REFILL_PWM > 0 pulses the pump (0.5 s on / 0.5 s off)
+# to refill the boiler while steaming. Off by default: a 2 min session only
+# boils off ~25-35 g of the ~120 mL boiler, and in simulation a refill of
+# ~1 mL/s kept the water around 110 C while the element side ran into the
+# 145 C safety cap (the refill flow at this PWM was never measured).
+STEAM_SECONDS = 120.0
+STEAM_REFILL_PWM = 0.0
 # Brew head counts as warm once the model says it is within this of the
 # setpoint (was a fixed 80 C, which only fit a 95 C setpoint).
 BREWHEAD_READY_BELOW_SETPOINT = 15.0

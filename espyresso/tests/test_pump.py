@@ -45,10 +45,10 @@ def timer(flow: Flow) -> BrewingTimer:
 
 
 @pytest.fixture
-def pump(flow: Flow, timer: BrewingTimer) -> Pump:
+def pump(flow: Flow, timer: BrewingTimer) -> Iterator[Pump]:
     scale = Mock()
     scale.get_scale_weight.return_value = 0
-    return Pump(
+    p = Pump(
         pigpio_pi=Mock(),
         bluetooth_scale=scale,
         boiler=Mock(),
@@ -58,6 +58,12 @@ def pump(flow: Flow, timer: BrewingTimer) -> Pump:
         brewing_timer=timer,
         ranger=Mock(),
     )
+    yield p
+    # A failing routine test must not leave its thread pumping (and holding
+    # the test run open for the routine's full duration).
+    p.reset()
+    if p.pump_thread.is_alive():
+        p.pump_thread.join(timeout=3)
 
 
 def _finish_shot(pump: Pump, timer: BrewingTimer, flow: Flow, seconds: float, ml: float) -> None:
@@ -166,16 +172,30 @@ def test_brew_tells_the_controller_how_long_the_shot_has_left(
     assert seconds == pytest.approx(20.0, abs=1.0)
 
 
-def test_steam_routine_runs_the_pump_until_pressed_again(log_dir: Path, pump: Pump) -> None:
-    pump.ranger.has_enough_water.return_value = True
+def test_steam_holds_steam_setpoint_until_pressed_again_without_pumping(log_dir: Path, pump: Pump) -> None:
     pump.pulse_pump_steam()
 
-    assert _wait_for(lambda: pump.pumping)
-    pump.temperature.set_steam_temp.assert_called_once()
+    assert _wait_for(lambda: pump.temperature.set_steam_temp.called)
+    time.sleep(0.3)
+    assert pump.pump_thread.is_alive()  # still steaming
+    assert pump.pumping is False  # refill off by default
 
     pump.pulse_pump_steam()  # second press ends steaming
     assert _wait_for(lambda: not pump.pump_thread.is_alive())
     pump.temperature.set_brew_temp.assert_called_once()
+
+
+def test_steam_refill_pulses_the_pump_when_enabled(
+    log_dir: Path, pump: Pump, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(config, "STEAM_REFILL_PWM", 0.4)
+    pump.pulse_pump_steam()
+
+    assert _wait_for(lambda: pump.pumping)
+
+    pump.pulse_pump_steam()
+    assert _wait_for(lambda: not pump.pump_thread.is_alive())
+    assert pump.pumping is False
 
 
 def test_preheat_stops_once_the_brew_head_is_ready(log_dir: Path, pump: Pump) -> None:

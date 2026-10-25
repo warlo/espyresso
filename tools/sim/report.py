@@ -113,7 +113,69 @@ def setpoints() -> None:
         print(f"   {sp:5.1f}: {cells[0]:5.1f} / {cells[1]:5.1f} / {cells[2]:5.1f}   idle boiler water {idle_water:5.1f}")
 
 
-SECTIONS = dict(restarts=restarts, faults=faults, shots=shots, setpoints=setpoints)
+def _settled(run: closedloop.Run, target: float, band: float, after: float, hold: float = 60.0) -> float:
+    """First time after ``after`` from which the boiler water stays within
+    +-band of target for ``hold`` seconds."""
+    rows = [r for r in run.rows if r["t"] >= after]
+    for i, r in enumerate(rows):
+        if abs(r["water"] - target) < band:
+            j = i
+            while j < len(rows) and abs(rows[j]["water"] - target) < band:
+                if rows[j]["t"] - r["t"] >= hold:
+                    return r["t"] - after
+                j += 1
+    return math.inf
+
+
+def precision() -> None:
+    """Precision of the boiler water by operating state (simulated; the
+    sensor columns are what the display shows)."""
+    print(f"== precision by state (setpoint {SP:.1f}, steam {config.TARGET_STEAM_TEMP:.0f}); times in s")
+    print("   1. boot from cold")
+    for t0 in (22.6, 35.5):
+        run = closedloop.simulate(duration=900, start=plant.uniform(t0))
+        reach = run.first_time(lambda r: r["sensor"] >= SP - 0.5)
+        print(
+            f"      from {t0:4.1f} C: display at setpoint {reach:5.0f} | water within 1 C {_fmt(run.first_time(lambda r: abs(r['water'] - SP) < 1.0))}"
+            f" | settled +-0.5 C {_fmt(_settled(run, SP, 0.5, 0))} | water peak {run.max('water') - SP:+.2f} | display peak {run.max('sensor') - SP:+.2f}"
+        )
+    print("   2. maintaining (10-25 min after a cold boot)")
+    run = closedloop.simulate(duration=1500, start=plant.uniform(22.6))
+    idle = run.window(600, 1500)
+    for col, name in (("water", "water  "), ("sensor", "display")):
+        vals = [r[col] - SP for r in idle]
+        mean = sum(vals) / len(vals)
+        sd = (sum((v - mean) ** 2 for v in vals) / len(vals)) ** 0.5
+        print(f"      {name}: mean {mean:+.2f} C, sd {sd:.3f} C, range {min(vals):+.2f}..{max(vals):+.2f}")
+    print("   3. brewing (shot at 10 min; puck = central group, range over weak..strong)")
+    for name, flow in (("Pi shot   ", scenarios.pi_shots([600.0])), ("manual    ", scenarios.manual_shots([600.0]))):
+        pucks = {}
+        for group, params in GROUPS.items():
+            r = closedloop.simulate(duration=1000, start=plant.uniform(22.6), params=params(), flow=flow)
+            pucks[group] = _shot_stats(r, 600.0)
+            if group == "central":
+                run = r
+        s = pucks["central"]
+        end = 600.0 + scenarios.SHOT_SECONDS
+        print(
+            f"      {name}: boiler water {run.at(600)['water']:.1f} -> min {s['water_min']:.1f} | puck {s['puck']:.1f} C"
+            f" ({pucks['weak']['puck']:.1f}..{pucks['strong']['puck']:.1f}), drop over shot {s['drop']:.1f} C"
+            f" | back within +-0.5 C {_fmt(_settled(run, SP, 0.5, end))} after | post-shot water peak {s['post_water'] - SP:+.2f}"
+        )
+    first, second = 600.0, 600.0 + scenarios.SHOT_SECONDS + 23.0
+    run = closedloop.simulate(duration=900, start=plant.uniform(22.6), flow=scenarios.pi_shots([first, second]))
+    print(f"      back-to-back Pi shots 23 s apart: second {_shot_stats(run, second)['puck'] - _shot_stats(run, first)['puck']:+.2f} C at the puck")
+    print("   4. steaming (Pi steam mode from idle at 10 min, 120 s, no refill; steam draw not modelled)")
+    st = config.TARGET_STEAM_TEMP
+    run = closedloop.simulate(duration=600 + 120 + 1500, start=plant.uniform(22.6), flow=scenarios.steam(600.0, 120.0, refill_flow=0.0))
+    print(
+        f"      display at {st - 1:.0f} C after {run.first_time(lambda r: r['t'] > 600 and r['sensor'] >= st - 1) - 600:.0f}"
+        f" | water after 60 s {run.at(660)['water']:.1f}, after 120 s {run.at(720)['water']:.1f} | display peak {run.max('sensor', after=600, before=720):.1f}"
+        f" | back to brew +-1 C {_fmt(run.first_time(lambda r: r['t'] > 720 and abs(r['water'] - SP) < 1.0) - 720)} after steam ends"
+    )
+
+
+SECTIONS = dict(precision=precision, restarts=restarts, faults=faults, shots=shots, setpoints=setpoints)
 
 if __name__ == "__main__":
     # The fault scenarios trip the real safety code, which logs loudly.

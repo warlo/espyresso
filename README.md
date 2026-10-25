@@ -47,13 +47,15 @@ The element is never left to the controller alone:
 - `sudo services/install.sh` (on the Pi) installs the unit, the Pi's hardware
   watchdog and a persistent journal.
 
-## Simulation and tuning
+## Temperature control, simulation and tuning
 
-`espyresso/sim` runs the production control path against a plant fitted to
-this machine's logs; `make sim` prints restarts, faults, shots and the
-setpoint-to-puck mapping, and the closed-loop tests pin the behaviour. See
-[tools/sim/README.md](tools/sim/README.md) for the workflow and for
-calibrating the puck offset and shot yield with real measurements.
+- [docs/temperature-control.md](docs/temperature-control.md): how the
+  controller works and how precise the temperature is when booting from cold,
+  holding temperature, brewing and steaming (measured and simulated).
+- [tools/sim/README.md](tools/sim/README.md): how the simulation works, how
+  well it matches the machine, the analysis workflow (`make sim`, `make fit`,
+  `make fetch-logs`), the log formats, and calibrating the puck offset and shot
+  yield with real measurements.
 
 ## Inspiration
 

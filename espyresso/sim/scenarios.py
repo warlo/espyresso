@@ -57,3 +57,28 @@ def preheat_then_shot(preheat_at: float, shot_at: float, flow_rate: float = 1.5)
         return shot(t, temperature)
 
     return flow
+
+
+def steam(start_at: float, seconds: float = 120.0, refill_flow: float = 2.0) -> FlowFn:
+    """The Pi's steam routine (long press on button one): steam setpoint for
+    up to ``seconds``, the pump pulsing 0.5 s on / 0.5 s off to refill the
+    boiler (``refill_flow`` mL/s while on, an assumption: the flow at pump
+    PWM 0.4 was never measured), then back to the brew setpoint. Uses the
+    production set_steam_temp/set_brew_temp. The steam drawn through the
+    wand (latent heat) is not modelled."""
+    state = {"phase": "before"}
+
+    def flow(t: float, temperature: Temperature) -> Tuple[float, Optional[float]]:
+        if state["phase"] == "before" and t >= start_at:
+            temperature.set_steam_temp()
+            state["phase"] = "steam"
+        if state["phase"] == "steam":
+            if t >= start_at + seconds:
+                temperature.set_brew_temp()
+                state["phase"] = "after"
+                return 0.0, None
+            on = int((t - start_at) / 0.5) % 2 == 0
+            return (refill_flow if on else 0.0), None
+        return 0.0, None
+
+    return flow
