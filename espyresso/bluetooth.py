@@ -77,7 +77,6 @@ class BluetoothScale:
             self.bleak_client = BleakClient(
                 config.BLUETOOTH_SCALE_ADDRESS,
                 disconnected_callback=self.disconnected,
-                timeout=config.BLUETOOTH_CONNECT_TIMEOUT,
             )
             asyncio.run(self.notify())
         except Exception:
