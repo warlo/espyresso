@@ -185,6 +185,7 @@ def simulate(
             if not stalled:
                 temperature.callback(Measurement(_quantize(reading), clock[0]))
             if clock[0] >= next_watchdog:
+                watchdog.display_heartbeat()  # the simulated display is always drawing
                 watchdog.check()
                 next_watchdog = clock[0] + config.WATCHDOG_INTERVAL
 

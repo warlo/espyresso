@@ -128,7 +128,7 @@ class Espyresso:
         self.watchdog.start()
         try:
             self._construct_rest()
-        except Exception:
+        except BaseException:  # includes SystemExit from a stop signal
             self.temperature.stop()
             self.watchdog.stop()
             raise
@@ -170,6 +170,7 @@ class Espyresso:
                 "flow": self.flow_queue,
                 "boiler": self.boiler_queue,
             },
+            on_frame=self.watchdog.display_heartbeat,
         )
 
     def reset_started_time(self) -> None:
@@ -237,12 +238,22 @@ def handler(signum: int, *args: Any) -> None:
     logger.warning(f"Got a {signum} signal. Doing nothing")
 
 
+def _stop_during_startup(signum: int, *args: Any) -> None:
+    """A stop before the app is fully built: abort construction (which stops
+    control and switches the heater off) and exit. Installed before pygame so
+    SDL doesn't claim SIGTERM/SIGINT and swallow them as quit events."""
+    logger.warning("signal %s during start-up: exiting", signum)
+    raise SystemExit(128 + signum)
+
+
 def run() -> None:
     _configure_logging()
     # Before anything opens a tty: run directly by systemd the app is a
     # session leader, so the framebuffer's tty becomes its controlling
     # terminal and sends SIGHUP during construction.
     signal.signal(signal.SIGHUP, handler)
+    signal.signal(signal.SIGINT, _stop_during_startup)
+    signal.signal(signal.SIGTERM, _stop_during_startup)
     logger.info("constructing Espyresso")
     try:
         if not config.DEBUG:
@@ -251,8 +262,8 @@ def run() -> None:
             from espyresso.simulator_mock import get_espyresso_simulator
 
             espyresso = get_espyresso_simulator()
-    except Exception:
-        logger.exception("Espyresso construction failed")
+    except BaseException:
+        logger.exception("Espyresso construction failed or was stopped")
         failsafe.outputs_off()
         raise
     logger.info("Espyresso constructed, installing signal handlers")

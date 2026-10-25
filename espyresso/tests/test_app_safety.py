@@ -145,3 +145,93 @@ def test_sighup_is_handled_before_construction(monkeypatch: pytest.MonkeyPatch) 
             signal.signal(s, handler)
 
     assert seen["sighup"] not in (signal.SIG_DFL, None)
+
+
+# ------------------------------------------------------------------ #
+#  Display start-up: abandoned graphics-mode consoles and early stops
+# ------------------------------------------------------------------ #
+
+
+class FakeConsoles:
+    """Linux VT ioctls at the OS boundary: /dev/ttyN with a KD mode each."""
+
+    KDGETMODE, KDSETMODE = 0x4B3B, 0x4B3A
+
+    def __init__(self, modes: dict) -> None:
+        self.modes = dict(modes)  # tty number -> 0 text / 1 graphics
+        self.fds: dict = {}
+
+    def open(self, path: str, flags: int) -> int:
+        n = int(path.replace("/dev/tty", ""))
+        if n not in self.modes:
+            raise FileNotFoundError(path)
+        fd = 100 + n
+        self.fds[fd] = n
+        return fd
+
+    def close(self, fd: int) -> None:
+        self.fds.pop(fd, None)
+
+    def ioctl(self, fd: int, request: int, arg: object = 0) -> object:
+        import struct
+
+        n = self.fds[fd]
+        if request == self.KDGETMODE:
+            return struct.pack("i", self.modes[n])
+        if request == self.KDSETMODE:
+            self.modes[n] = int(arg)  # type: ignore[call-overload]
+            return 0
+        raise OSError("unexpected ioctl")
+
+
+def test_abandoned_graphics_consoles_are_reset_to_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A killed SDL app leaves its VT in graphics mode; the kernel then ignores
+    # every VT switch away from it and the next display start hangs forever.
+    fake = FakeConsoles({1: 0, 2: 1, 3: 0})
+    monkeypatch.setattr(failsafe.os, "open", fake.open)
+    monkeypatch.setattr(failsafe.os, "close", fake.close)
+    monkeypatch.setattr(failsafe.fcntl, "ioctl", fake.ioctl)
+
+    failsafe.reset_stale_consoles()
+
+    assert fake.modes == {1: 0, 2: 0, 3: 0}
+
+
+def test_display_resets_stale_consoles_before_starting_pygame(monkeypatch: pytest.MonkeyPatch) -> None:
+    from espyresso.display import Display
+    from espyresso.tests.test_display import make_display
+
+    fake = FakeConsoles({1: 0, 2: 1})
+    monkeypatch.setattr(failsafe.os, "open", fake.open)
+    monkeypatch.setattr(failsafe.os, "close", fake.close)
+    monkeypatch.setattr(failsafe.fcntl, "ioctl", fake.ioctl)
+
+    assert isinstance(make_display(), Display)
+    assert fake.modes[2] == 0
+
+
+def test_stop_signal_during_startup_exits_with_heater_off(tsic: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A stop that arrives while the app is still being constructed must end
+    the process promptly with the heater off (SDL would otherwise swallow
+    SIGTERM and systemd falls back to SIGKILL after 90 s)."""
+    import os
+    import signal
+
+    from espyresso import app as app_module
+
+    pi = Mock()
+    monkeypatch.setattr(config, "DEBUG", False)
+    monkeypatch.setattr(app_module, "_configure_logging", lambda: None)
+    monkeypatch.setattr(app_module.pigpio, "pi", lambda: pi)
+    monkeypatch.setattr(app_module.failsafe, "outputs_off", lambda: None)
+    monkeypatch.setattr(app_module, "Display", lambda **kw: os.kill(os.getpid(), signal.SIGTERM))
+    saved = {s: signal.getsignal(s) for s in (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)}
+    try:
+        with pytest.raises(SystemExit):
+            app_module.run()
+    finally:
+        for s, handler in saved.items():
+            signal.signal(s, handler)
+
+    tsic.stop.assert_called()
+    assert _duties(pi, config.BOILER_PWM_GPIO)[-1] == 0

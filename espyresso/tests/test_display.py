@@ -305,3 +305,20 @@ def test_header_shows_off_without_a_fault(display: Display) -> None:
     texts = [t for t, _ in rendered]
     assert any("OFF" in t for t in texts)
     assert not any("FAULT" in t for t in texts)
+
+
+def test_display_loop_reports_each_frame(display: Display) -> None:
+    import threading
+    import time
+
+    frames = []
+    display.on_frame = lambda: frames.append(1)
+    t = threading.Thread(target=display.start)
+    t.start()
+    deadline = time.perf_counter() + 2
+    while len(frames) < 3 and time.perf_counter() < deadline:
+        time.sleep(0.01)
+    display.stop()
+    t.join(timeout=2)
+
+    assert len(frames) >= 3

@@ -91,6 +91,10 @@ AUTO_OFF_MIN_FLOW_ML = 10.0
 # (the longest logged gap between ticks is 0.7 s).
 CONTROL_STALE_SECONDS = 2.0
 WATCHDOG_INTERVAL = 0.5
+# Logged (safety event display_stale) when the display hasn't drawn a frame for
+# this long, including a display that never got going after start-up. Control
+# is unaffected; this only makes a dead screen visible in the logs.
+DISPLAY_STALE_SECONDS = 30.0
 # Heater cut while the raw sensor reads above setpoint + this margin, and above
 # an absolute cap (TSIC 306 tops out at 150 C). Heals when it cools.
 SAFETY_MAX_ABOVE_SETPOINT = 15.0

@@ -283,3 +283,41 @@ def test_watchdog_thread_survives_a_failing_check_and_forces_heater_off(rig: dic
     assert calls["n"] >= 2  # kept looping after the first failure
     assert alive
     assert _boiler_duties(rig["pi"])[-1] == 0
+
+
+def test_stalled_display_is_logged_once(rig: dict, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from espyresso import shot_logger
+
+    sl = shot_logger.init(str(tmp_path))
+    try:
+        rig["wd"].heartbeat()
+        rig["wd"].display_heartbeat()
+        rig["wd"].check()
+        for _ in range(3):  # display frozen, control still fine
+            rig["clock"].now += config.DISPLAY_STALE_SECONDS
+            rig["wd"].heartbeat()
+            rig["wd"].check()
+        rig["wd"].display_heartbeat()  # display back
+        rig["wd"].check()
+    finally:
+        sl.close()
+        shot_logger._INSTANCE = None
+
+    reasons = [line.split("reason=")[1].strip() for line in open(sl.event_path) if "reason=display" in line]
+    assert reasons == ["display_stale", "display_resumed"]
+
+
+def test_display_that_never_starts_is_logged(rig: dict, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    from espyresso import shot_logger
+
+    sl = shot_logger.init(str(tmp_path))
+    try:
+        rig["wd"].heartbeat()
+        rig["clock"].now += config.DISPLAY_STALE_SECONDS + 1  # still constructing / stuck
+        rig["wd"].heartbeat()
+        rig["wd"].check()
+    finally:
+        sl.close()
+        shot_logger._INSTANCE = None
+
+    assert "reason=display_stale" in open(sl.event_path).read()

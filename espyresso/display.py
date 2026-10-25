@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple
 
 import pygame
 
-from espyresso import config
+from espyresso import config, failsafe
 
 # Cap on cached rendered-text surfaces. Each entry is a tiny SDL surface
 # (a few KB at most for the fonts used here). 512 entries covers all
@@ -56,13 +56,19 @@ class Display:
         flow: "Flow",
         get_started_time: Callable[[], float],
         wave_queues: Dict[str, WaveQueue],
+        on_frame: Optional[Callable[[], None]] = None,
         **kwargs: Any,
     ) -> None:
+        # Called after every frame; lets the watchdog notice a frozen display.
+        self.on_frame = on_frame
         os.environ["SDL_FBDEV"] = "/dev/fb1"
         # Uncomment if you have a touch panel and find the X value for your device
         # os.environ["SDL_MOUSEDRV"] = "TSLIB"
         # os.environ["SDL_MOUSEDEV"] = "/dev/input/eventX"
 
+        # A previous run that was killed can leave its console in graphics
+        # mode; SDL then waits forever for a console switch the kernel ignores.
+        failsafe.reset_stale_consoles()
         pygame.display.init()
         pygame.mouse.set_visible(False)
         pygame.font.init()
@@ -548,6 +554,8 @@ class Display:
                     frame += 1
                     if frame == 1 or frame % 240 == 0:
                         logger.info("display heartbeat: frame=%d", frame)
+                    if self.on_frame is not None:
+                        self.on_frame()
 
                     clock.tick(config.DISPLAY_FPS)
                 except Exception:

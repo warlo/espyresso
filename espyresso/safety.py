@@ -104,12 +104,19 @@ class Watchdog(threading.Thread):
         self._had_control = False
         self._ready_sent = False
         self._pump_on_since: Optional[float] = None
+        self._created_at = clock()
+        self._last_display: Optional[float] = None
+        self._display_stale = False
         self._flow_seen_ml = flow.lifetime_ml
         self._stop_event = threading.Event()
 
     def heartbeat(self) -> None:
         """Called by the control loop after each completed tick."""
         self._last_control = self.clock()
+
+    def display_heartbeat(self) -> None:
+        """Called by the display loop after each frame."""
+        self._last_display = self.clock()
 
     def control_is_fresh(self) -> bool:
         return (
@@ -135,6 +142,17 @@ class Watchdog(threading.Thread):
             )
         self._was_fresh = fresh
         self._had_control = self._had_control or fresh
+
+        since_frame = now - (self._last_display if self._last_display is not None else self._created_at)
+        if since_frame > config.DISPLAY_STALE_SECONDS and not self._display_stale:
+            self._display_stale = True
+            logger.error("display has not drawn a frame for %.0f s", since_frame)
+            if sl is not None:
+                sl.log_event("safety", reason="display_stale")
+        elif since_frame <= config.DISPLAY_STALE_SECONDS and self._display_stale:
+            self._display_stale = False
+            if sl is not None:
+                sl.log_event("safety", reason="display_resumed")
 
         if self.pump is not None and self.pump.pumping:
             if self._pump_on_since is None:

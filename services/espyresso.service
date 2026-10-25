@@ -19,6 +19,8 @@ Type=notify
 NotifyAccess=main
 WatchdogSec=15
 TimeoutStartSec=120
+# A clean stop takes a few seconds; don't wait 90 s on a stuck one.
+TimeoutStopSec=20
 Restart=always
 RestartSec=5
 
