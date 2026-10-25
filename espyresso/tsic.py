@@ -77,6 +77,8 @@ class ZacWireInputChannel(object):
         self.pi = pigpio_pi
         self.gpio = gpio
         self.__pi_callback = None
+        self.lag_ms = 0.0
+        """ How long after its last edge the latest packet was handled. """
         if self.pi.connected:
             self.pi.set_mode(self.gpio, pigpio.INPUT)
             self.pi.set_pull_up_down(self.gpio, pigpio.PUD_OFF)
@@ -217,6 +219,7 @@ class ZacWireInputChannel(object):
                                 # second on the Pi Zero.
                                 self.__pass_any_packet_to_callback(self.STATUS_OK)
                                 self.__reset_packet()
+                                self.__measure_lag(tick)
                         elif self.__bit_count > 9:
                             # more bits than expected (8 bits + 1 __parity)
                             self.__pass_any_packet_to_callback(
@@ -233,6 +236,14 @@ class ZacWireInputChannel(object):
             self.pi.set_watchdog(self.gpio, 0)
             self.__pass_any_packet_to_callback(self.STATUS_OK)
             self.__reset_packet()
+
+    def __measure_lag(self, tick):
+        """How long after the packet's last edge Python got to it (pigpio's
+        tick is when the edge happened). Never at the cost of a reading."""
+        try:
+            self.lag_ms = pigpio.tickDiff(tick, self.pi.get_current_tick()) / 1000.0
+        except Exception:
+            pass
 
     def __check_parity(self):
         if self.__parity % 2 != 0:
@@ -325,6 +336,11 @@ class TsicInputChannel(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.stop()
+
+    @property
+    def lag_ms(self):
+        """How long after it was sent the latest reading was decoded (ms)."""
+        return self.__zacwire_channel.lag_ms
 
     def measure_once(self, timeout=None):
         """

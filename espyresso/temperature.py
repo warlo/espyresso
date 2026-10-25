@@ -242,6 +242,7 @@ class Temperature:
                 brewHeadTemp=temp_tuple[4],
                 modeledSensorTemp=temp_tuple[5],
                 warmup_group=self.warmup.group,
+                tsic_lag_ms=getattr(self.tsic, "lag_ms", 0.0),
                 **self.pcontroller.diagnostics,
             )
 

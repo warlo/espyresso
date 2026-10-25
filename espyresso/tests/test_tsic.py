@@ -52,3 +52,23 @@ def test_two_byte_packet_is_delivered_on_its_last_bit_without_a_watchdog(monkeyp
 
     received.assert_called_once_with(ZacWireInputChannel.STATUS_OK, [0x03, 0xE8])
     assert all(c.args[1] == 0 for c in pi.set_watchdog.call_args_list)
+
+
+def test_lag_between_the_packet_and_its_handling_is_measured(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Python may handle edges long after they happened on a busy Pi; pigpio's
+    tick says when, so the delay can be logged."""
+    monkeypatch.setattr(pigpio, "tickDiff", lambda t1, t2: (t2 - t1) & 0xFFFFFFFF, raising=False)
+    pi = Mock()
+    pi.connected = True
+    channel = ZacWireInputChannel(pi, 24)
+    channel.start(Mock())
+    edge = pi.callback.call_args.args[2]
+    first, t = _byte_edges(0x03, 2000)
+    second, end = _byte_edges(0xE8, t + 200)
+    last_edge_tick = second[-1][1]
+    pi.get_current_tick.return_value = last_edge_tick + 2_500_000  # handled 2.5 s late
+
+    for level, tick in [(pigpio.HIGH, 0)] + first + second:
+        edge(24, level, tick)
+
+    assert channel.lag_ms == 2500.0
