@@ -101,7 +101,7 @@ class Flow:
     def get_millilitres(self) -> float:
         return self.total_volume
 
-    def get_flow_rate(self) -> Optional[float]:
+    def get_flow_rate(self) -> float:
         """mL/s, from the recent pulse period; falls off once pulses stop."""
         rate = self.get_pulse_rate_for_volume()
         if not rate:
