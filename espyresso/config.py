@@ -44,7 +44,7 @@ SCL_GPIO = 3
 # reaches the coffee has lost heat to the group on the way. BREW_PUCK_TEMP is
 # what you want at the puck (Tim Wendelboe-style light roasts: 93-94 C) and
 # PUCK_OFFSET how much hotter the boiler must be to deliver it. Not measured
-# yet: the simulation says about 5 (tools/sim/report.py setpoints), PID kits
+# yet: the simulation says about 6 (tools/sim/report.py setpoints), PID kits
 # assume 7-8; see docs/temperature-control.md. Measure the puck temperature
 # once and correct it here.
 BREW_PUCK_TEMP = 93.0
@@ -279,15 +279,17 @@ BOOT_BOOST_FRACTION = 0.5
 # to one from a warm machine. It is exactly zero once the group is warm, so a
 # warm machine (holding, shots, steam) is untouched. WARMUP_MAX_OFFSET = 0
 # turns it off. Simulated on every plant that fits the logs: shots are within
-# 1 C of a warm machine 1-2 minutes sooner and never more than about 1 C hot
-# (tools/sim/report.py warmup).
+# 1 C of a warm machine about a minute sooner and never more than about 1 C
+# hot (tools/sim/report.py warmup). First real run, 2026-10-25 from 35 C: off
+# after 279 s, as simulated (281 s).
 WARMUP_MAX_OFFSET = 4.0
 WARMUP_GAIN = 1.0
 WARMUP_DEADBAND = 2.0
-# The group estimate. Boiler-to-group coupling as fitted to this machine's
-# logs: every plant consistent with them gives 5.1-5.4 W/K (the controller
-# keeps Tom's 3.6 for regular control). Flowing water gives the group this
-# fraction of its excess heat (eps in the simulator, calibrated at 0.6).
+# The group estimate. Boiler-to-group coupling: the plants consistent with
+# the logs give 4.6-5.5 W/K. The high end makes the estimate warm faster, so
+# the warm-up ends early rather than late (4.6 runs one candidate 2 C hot).
+# The controller keeps Tom's 3.6 for regular control. Flowing water gives the
+# group this fraction of its excess heat (eps in the simulator, 0.6).
 WARMUP_GROUP_COUPLING = 5.3
 WARMUP_FLOW_EXCHANGE = 0.6
 

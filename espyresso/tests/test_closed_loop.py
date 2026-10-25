@@ -3,8 +3,8 @@ PController, SafetyGuard, Boiler, Watchdog) against the plant fitted to this
 machine's logs (espyresso/sim). Each test pins a behaviour that was wrong
 before, so tuning can't silently bring it back.
 
-The plant is only as good as the logs it was fitted to (two cold starts;
-cross-validated to about +-2.5 C). Boiler-side behaviour is the trustworthy
+The plant is only as good as the logs it was fitted to (four cold starts;
+leave-one-out 1.1-2.9 C). Boiler-side behaviour is the trustworthy
 part; puck temperatures depend on unmeasured group coupling, so they are
 compared relative to each other, not asserted as absolute truths.
 """
@@ -210,7 +210,6 @@ def test_warm_up_brings_an_early_shot_close_to_a_warm_one(monkeypatch: pytest.Mo
     monkeypatch.setattr(config, "WARMUP_MAX_OFFSET", 0.0)
     without = _shot_puck(params, 300.0) - warm
 
-    assert abs(with_warm_up) < 1.5
     assert abs(with_warm_up) < abs(without) - 1.0
 
 

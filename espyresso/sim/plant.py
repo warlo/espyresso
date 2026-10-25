@@ -4,7 +4,7 @@ Same six-mass structure as espyresso.pcontroller, with every coefficient a
 parameter. Two additions the controller does not model:
 
 * ``a_s``: the sensor follows a_s*element + (1-a_s)*shell (the controller
-  assumes the element only; the fit puts it about three quarters element).
+  assumes the element only; the fit puts it about two thirds element).
 * ``eps``: fraction of the flowing water's excess heat the brew head absorbs
   on the way to the puck (the controller assumes 1). Not identifiable from a
   boiler sensor; the puck estimate is ``water - eps*(water - head)``.
@@ -21,8 +21,8 @@ FIT_PATH = os.path.join(os.path.dirname(__file__), "plant_fit.json")
 CANDIDATES_PATH = os.path.join(os.path.dirname(__file__), "plant_candidates.json")
 
 # How much heat the brew head takes from the water on its way to the puck:
-# with a controller blind to flow, 0.52-0.68 reproduces the 7.5-10 C puck drop
-# a 2005 thermocouple study measured on a PID Classic (60 mL in 30 s).
+# with a controller blind to flow, about 0.55-0.7 reproduces the 7.5-10 C puck
+# drop a 2005 thermocouple study measured on a PID Classic (60 mL in 30 s).
 EPS = 0.6
 
 STATE_KEYS = ("elem", "shell", "water", "body", "head", "sensor")

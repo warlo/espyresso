@@ -43,7 +43,7 @@ added that the controller doesn't model:
 
 - **Where the sensor sits** (`a_s`): it follows a mix of element and wall
   temperature. The controller assumes the element only; the fit puts it about
-  three quarters element, with a faster response (about 13 s instead of 28 s).
+  two thirds element, with a faster response (about 12 s instead of 28 s).
 - **How much heat the brew head takes from the water** on its way to the puck
   (`eps`). A boiler sensor can't see this, so it is calibrated against a
   published measurement instead (below): 0.6, with 0.5 to 0.7 shown as the
@@ -72,24 +72,25 @@ What the fit changes from Tom's constants:
 
 | | Tom's (controller) | Fitted | Notes |
 |---|---|---|---|
-| Element power | 1350 W | 1106 W | Tom's element measured 42.7 Ω, 1350 W at 240 V; about 1240 W at 230 V. 1106 W matches 218 V mains or a slightly higher resistance |
-| Element to wall | 14 W/K | 3.8 W/K | |
-| Boiler to water (no flow) | 14.7 W/K | 24 W/K | weakly pinned, see below |
-| Boiler to brew head | 3.6 W/K | 5.3 W/K | Tom insulated his boiler and used heat-sink paste at the group joint |
-| Boiler to body | 1.8 W/K | 0.42 W/K | |
-| Body heat capacity | 395 J/K | 190 J/K | |
-| Sensor | element, 28 s | 76 % element, 13 s | |
+| Element power | 1350 W | 1116 W | Tom's element measured 42.7 Ω, 1350 W at 240 V; about 1240 W at 230 V. 1116 W matches 218 V mains or a slightly higher resistance |
+| Element to wall | 14 W/K | 4.6 W/K | |
+| Boiler to water (no flow) | 14.7 W/K | 18 W/K | weakly pinned, see below |
+| Boiler to brew head | 3.6 W/K | 4.6 W/K | Tom insulated his boiler and used heat-sink paste at the group joint |
+| Boiler to body | 1.8 W/K | 0.65 W/K | |
+| Body heat capacity | 395 J/K | 224 J/K | |
+| Sensor | element, 28 s | 67 % element, 12 s | |
 
 ### How good it is
 
 | Check | Result |
 |---|---|
 | Controller's constants, replaying logged heater duty | sensor off by 9-12 °C above 80 °C |
-| Fitted plant, the three cold starts it was fitted on (2026-05-15, 06-27, 10-25) | RMSE 1.3, 1.1 and 2.1 °C |
-| Leave-one-out (fit on two, predict the third) | RMSE 1.3 to 4.2 °C; bias -4.1 to +2.8 °C above 80 °C |
-| Closed loop vs the 2026-10-25 warm-up (controller reacting) | within 0.35 °C at 63, 132, 203, 300 and 420 s; up to 2.9 °C off during the first climb |
-| Idle display, closed loop | +0.58 °C (real +0.57 °C) |
-| Published PID Classic shot, controller blind to flow (below) | puck drop 8.7 °C (measured 7.5-10 °C) |
+| Fitted plant, the four cold starts it was fitted on (2026-05-15, 06-27, 10-25 09:30 and 13:55) | RMSE 1.5, 1.1, 1.8 and 1.5 °C |
+| Leave-one-out (fit on three, predict the fourth) | RMSE 1.1 to 2.9 °C; bias -2.7 to +2.2 °C above 80 °C |
+| Out of sample: the first warm-up run (13:55), predicted before it was added | open-loop RMSE 1.8 °C; closed loop, warm-up off at 279 s (simulated 281 s), display within 0.5 °C from 4 minutes, first climb peaked 1-3 °C above the simulation |
+| Closed loop vs the 09:30 cold start (controller reacting) | within 0.3 °C at 63, 132, 203, 300 and 420 s; up to 1.7 °C off during the first climb |
+| Idle display, closed loop | +0.57 °C (real +0.57 °C) |
+| Published PID Classic shot, controller blind to flow (below) | puck drop 9.2 °C (measured 7.5-10 °C) |
 
 Open loop the errors accumulate; closed loop the controller corrects for
 them, just as on the machine, which is why the closed-loop match is better.
@@ -101,9 +102,9 @@ refit that makes the plant worse fails the tests.
 also saves `espyresso/sim/plant_candidates.json`: the fit repeated with each
 session left out, plus the masses fitted too (dropped when a parameter with
 a prior runs onto its bound, as it does now). They agree on everything the
-sensor saw and disagree on what it can't see: two of them put the sensor on
-the plain side and couple the element and wall tightly, and during a cold
-start their water differs from the main fit's by up to 11 °C. A control
+sensor saw and disagree on what it can't see: one of them puts the sensor on
+the plain side and couples the element and wall tightly, and during a cold
+start such plants' water differs from the main fit's by up to 11 °C. A control
 change that depends on those details (the warm-up does) is tested on all of
 them (`test_warm_up_*` in `espyresso/tests/test_closed_loop.py`, and the
 report's `warmup` section).
@@ -112,33 +113,33 @@ report's `warmup` section).
 PID-controlled Classic (setpoint 99.5 °C, 60 mL in 30 s after a 20 minute
 warm-up) measured the water above the puck falling 7.5-10 °C over the shot.
 A plain PID can't see the flow, so `closedloop.simulate(...,
-controller_sees_flow=False)` reproduces it: `eps` 0.52 to 0.68 gives that
-drop (0.6 gives 8.7 °C). Tom's assumption (1.0, the water arrives at the
-brew head's temperature) gives 2.7 °C and is ruled out. Even a controller
+controller_sees_flow=False)` reproduces it: `eps` 0.55 to 0.7 gives that
+drop (0.6 gives 9.2 °C). Tom's assumption (1.0, the water arrives at the
+brew head's temperature) gives 2.5 °C and is ruled out. Even a controller
 that didn't react to the shot at all would need `eps` 0.6 to 0.75, so the
 range holds however hard their PID worked.
 `test_plant_reproduces_published_puck_drop_of_a_pid_classic` pins this.
 
-On the same 60 mL shot this controller gives a 4.6 °C drop on a manual
-shot (the flow meter's feed-forward) and 2.7 °C on a Pi shot (the heat
+On the same 60 mL shot this controller gives a 5.5 °C drop on a manual
+shot (the flow meter's feed-forward) and 3.6 °C on a Pi shot (the heat
 budget).
 
 ### What it can't tell you
 
 - **The absolute puck temperature.** The drop over a shot is calibrated; the
   level is not. The study measured the puck starting at about 91 °C with the
-  PID at 99.5 °C; the simulator, at 99.5 °C, starts at 94.5 °C. Their sensor
+  PID at 99.5 °C; the simulator, at 99.5 °C, starts at 94.0 °C. Their sensor
   saw much less of the shot (a 0.5-1 °C dip, where ours dips about 4 °C in
   the model), so it sat elsewhere on the boiler and its "99.5" meant
   different water. Plant changes that bring the simulated puck down to 91 °C
   break the fit to this machine's own warm-ups. So the real puck may be up
-  to about 3.5 °C below what the report says; only a measurement settles it.
+  to about 3 °C below what the report says; only a measurement settles it.
 - **The boiler during and right after a shot.** No shot has been logged
   since the temperature logging started, so how fast the boiler water
-  exchanges heat with its walls is pinned only by warm-ups: two fits that
-  matched them equally well differed by almost 2x (13 and 24 W/K). Recovery
-  times after a shot are the least certain numbers. One logged Pi shot fixes
-  this.
+  exchanges heat with its walls is pinned only by warm-ups: fits that match
+  them equally well range from 12 to 24 W/K, and adding one more warm-up
+  moved the simulated recovery after a shot from 30 to 100 s. Recovery times
+  after a shot are the least certain numbers. One logged Pi shot fixes this.
 - **Steam drawn through the wand** (its latent heat) is not modelled; steam
   mode results are for heating and holding only.
 - **Non-uniform starts**: every simulated start has the machine at one

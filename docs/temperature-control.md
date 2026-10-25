@@ -98,27 +98,31 @@ A Pi shot after a cold start, compared with one from a fully warm machine
 
 | Shot at | 4 min | 5 min | 6 min | 7 min | Within 1 °C from |
 |---|---|---|---|---|---|
-| With warm-up | -2.9 °C | -1.1 °C | -0.6 °C | -0.3 °C | 6 min |
-| Without | -5.4 °C | -2.7 °C | -1.3 °C | -0.7 °C | 7 min |
+| With warm-up | -3.7 °C | -1.8 °C | -1.2 °C | -0.7 °C | 7 min |
+| Without | -6.2 °C | -3.4 °C | -1.9 °C | -1.0 °C | 8 min |
 
-On the other plants that fit the logs equally well, a shot is within 1 °C
-from 4 minutes instead of 5 to 6, and the warm-up never makes a shot more
-than 0.9 °C too hot. A preheat flush (short press on button one) still helps
-on top: flush at 1.5 minutes, shot at 5 minutes, -1.4 °C on the main fit.
+The other plants that fit the logs equally well gain about a minute too; on
+the one that puts the sensor on the plain side the warm-up makes a 5 minute
+shot up to 1.1 °C too hot. A preheat flush (short press on button one) still
+helps on top: flush at 1.5 minutes, shot at 5 minutes, -1.6 °C on the main
+fit.
 
-The boiler itself, booting from 35.5 °C:
+The boiler itself, booting from about 35 °C. The first run with the warm-up
+(2026-10-25 13:55) behaved as simulated:
 
-| | Measured, before the warm-up (2026-10-25) | Simulated without warm-up | Simulated with warm-up |
+| | Measured, before the warm-up (09:30) | Measured, with the warm-up (13:55) | Simulated with warm-up |
 |---|---|---|---|
-| Display reaches setpoint | 63 s | 59 s | 58 s |
-| Display peak | +2.7 °C (101.7 °C) | +2.2 °C | +6.2 °C |
-| Boiler water within 1 °C of setpoint | not measurable | 192 s | 139 s |
-| Boiler water peak | not measurable | +0.7 °C | +4.1 °C (the warm-up target) |
-| Display back near its idle level | 99.9 °C at 7 min | | warm-up over at about 5 min |
+| Display reaches setpoint | 63 s | 62 s | 58 s |
+| Display peak | +2.7 °C (101.7 °C at 69 s) | +7.6 °C (106.6 °C at 74 s), +6.3 °C at 3.6 min | +6.2 °C at 3.7 min |
+| Warm-up switched off | | after 279 s | after 281 s |
+| Boiler water within 1 °C of setpoint | not measurable | not measurable | 130 s |
+| Boiler water peak | not measurable | not measurable | +4.5 °C (the warm-up target) |
+| Display at 10 minutes | 99.9 °C | 99.7 °C | 99.6 °C |
 
 The display overshoots more than the water: the element side runs hotter
 than the water while heating, more so with the warm-up's longer full-power
-start. The safety cut-off stays at setpoint + 15 °C; the warm-up never moves
+start. On the machine the first climb peaked 1-3 °C higher than simulated;
+from 4 minutes on the two agree within 0.5 °C. The safety cut-off stays at setpoint + 15 °C; the warm-up never moves
 it. A warm restart does not overshoot: from 98.6 °C the display peaked at
 99.8 °C (measured; the old controller went to 104-106 °C).
 
@@ -127,16 +131,16 @@ it. A warm restart does not overshoot: from 98.6 °C the display peaked at
 | | Measured (25 min, 2026-10-25) | Simulated |
 |---|---|---|
 | Display mean vs setpoint | +0.57 °C | +0.57 °C |
-| Display standard deviation | 0.08 °C | 0.05 °C |
+| Display standard deviation | 0.08 °C | 0.06 °C |
 | Display range | +0.29 to +0.78 °C | +0.51 to +0.71 °C |
-| Boiler water mean vs setpoint | not measurable (model: -0.15 °C) | +0.09 °C |
-| Boiler water standard deviation | not measurable | 0.03 °C |
+| Boiler water mean vs setpoint | not measurable (model: -0.15 °C) | +0.24 °C |
+| Boiler water standard deviation | not measurable | 0.04 °C |
 | Heater power | about 4 % (55 W) | 3-4 % |
 
 At idle the temperature is **stable to about ±0.1 °C**, at the limit of the
-sensor's resolution. The display sits about 0.5 °C above the setpoint while
-the boiler water is on it: the sensor is mostly on the element's side, which
-runs a little hotter than the water.
+sensor's resolution. The display sits about 0.6 °C above the setpoint and
+the boiler water about 0.2 °C above it: the sensor is mostly on the
+element's side, which runs a little hotter than the water.
 
 ## 3. While brewing
 
@@ -147,15 +151,15 @@ a cold boot.
 
 | | Pi shot (button) | Manual shot (machine switch) |
 |---|---|---|
-| Boiler water during the shot | 99.1 → 93.7 °C | 99.1 → 91.6 °C |
-| Water at the puck, mean | 94.1 °C (93.9 to 94.3) | 92.7 °C (92.6 to 92.7) |
-| Puck temperature range over the shot | 1.3 °C | 2.4 °C |
-| Display peak (the element at full power) | 110.7 °C | 105.9 °C |
-| Boiler back within ±0.5 °C after the shot | 30 s | 37 s |
-| Boiler water overshoot after the shot | +0.4 °C | +0.3 °C |
+| Boiler water during the shot | 99.3 → 92.5 °C | 99.3 → 90.3 °C |
+| Water at the puck, mean | 93.1 °C (92.9 to 93.4) | 91.8 °C (91.7 to 91.9) |
+| Puck temperature range over the shot | 1.6 °C | 2.9 °C |
+| Display peak (the element at full power) | 110.7 °C | 106.1 °C |
+| Boiler back within ±0.5 °C after the shot | 100 s | 41 s |
+| Boiler water overshoot after the shot | +0.5 °C | +0.5 °C |
 | Second shot 23 s after the first | +0.8 °C at the puck | |
 
-The boiler loses 5-8 °C during a shot because the cold water coming in is a
+The boiler loses 7-9 °C during a shot because the cold water coming in is a
 large heat sink for a small boiler; the puck sees less of that because the
 group head buffers it. Pi shots do better because of the heat budget. The
 display jumps well above the setpoint during a shot: that is the heating
@@ -167,24 +171,25 @@ to different degrees:
 - **The drop over a shot** depends on how much heat the group head takes
   from the water (`eps` in the simulation). It is calibrated against a 2005
   thermocouple study of a PID Classic, which measured the puck water falling
-  7.5-10 °C over a 60 mL shot; the simulation reproduces 8.7 °C. On that
-  same shot this controller gives 4.6 °C on a manual shot and 2.7 °C on a
+  7.5-10 °C over a 60 mL shot; the simulation reproduces 9.2 °C. On that
+  same shot this controller gives 5.5 °C on a manual shot and 3.6 °C on a
   Pi shot: the flow feed-forward and the heat budget cut a plain PID's drop
-  roughly in half and by two thirds. The numbers in brackets are the range
+  by about 40 % and 60 %. The numbers in brackets are the range
   over the plausible `eps`.
-- **The level** (94.1 °C) is less certain. The same study measured the puck
+- **The level** (93.1 °C) is less certain. The same study measured the puck
   starting about 91 °C with its PID at 99.5 °C; this simulation would give
-  94.5 °C. Their sensor sat elsewhere on the boiler, so the two setpoints
+  94.0 °C. Their sensor sat elsewhere on the boiler, so the two setpoints
   don't mean the same water, but the real puck here could be up to about
-  3.5 °C lower than simulated. PID kits for the Classic assume 7-8 °C
+  3 °C lower than simulated. PID kits for the Classic assume 7-8 °C
   between the boiler sensor and the brew water (Gaggiuino's default is
-  7 °C), which points the same way. That is why the setpoint is 99 °C
-  (`PUCK_OFFSET` 6), between the model (94 °C at the puck) and the kits
-  (91-92 °C), until the puck is measured once (see the simulation README).
+  7 °C), which points the same way. The setpoint is 99 °C (`PUCK_OFFSET`
+  6): the model puts the puck at 93 °C there, the kits' offset at 91-92 °C.
+  Measure the puck once to settle it (see the simulation README).
 
-The boiler's recovery after a shot (30-37 s) is the least certain number:
-no shot has been logged since temperature logging started, and the warm-ups
-the model is fitted to don't pin it down well. One logged shot will.
+The boiler's recovery after a shot is the least certain number: no shot has
+been logged since temperature logging started, and the warm-ups the model is
+fitted to don't pin it down (adding the latest warm-up moved it from 30 to
+100 s). One logged shot will.
 
 The group head also matters for the first shot of the day: it warms far more
 slowly than the boiler. The Pi's preheat routine (short press on button one
@@ -199,10 +204,10 @@ so real steaming will run cooler than this:
 
 | | Simulated, from idle at 99 °C |
 |---|---|
-| Display reaches 134 °C | 32 s |
-| Boiler water after 60 s / 120 s | 129.1 °C / 132.7 °C |
-| Display peak | 137.8 °C |
-| Back to brew temperature (±1 °C) after steaming | about 14 min |
+| Display reaches 134 °C | 33 s |
+| Boiler water after 60 s / 120 s | 129.1 °C / 133.3 °C |
+| Display peak | 137.7 °C |
+| Back to brew temperature (±1 °C) after steaming | about 15 min |
 
 The boiler water lags the display by several degrees while heating for steam,
 so give it a minute before steaming. Getting back down to brew temperature
@@ -222,10 +227,9 @@ the element side ran into the 145 °C safety cut-off.
 
 In order of expected benefit:
 
-1. **Log a cold start with the warm-up** and compare it with the simulation
-   (display peak about +6 °C, target back to the setpoint after about 5
-   minutes). A shot at 5 minutes, and another at 15, show whether the
-   warm-up's compensation is right for this group.
+1. **Pull a shot 5 minutes after a cold start, and another at 15.** The
+   first warm-up run matched the simulation on the boiler side; the two
+   shots show whether its compensation is right for this group.
 2. **Measure the puck temperature** once and correct `PUCK_OFFSET`. This
    removes the largest uncertainty (up to about 3.5 °C).
 3. **Log one Pi shot** after a 15 minute warm-up. Its boiler dip and

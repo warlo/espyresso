@@ -8,7 +8,7 @@ Sections: precision, warmup, restarts, faults, shots, setpoints. Pure Python
 (no numpy needed).
 The boiler side is fitted to logs; puck numbers also depend on how much heat
 the brew head takes from the water on its way to the coffee (eps), which no
-sensor here measures. eps 0.52-0.68 reproduces a published thermocouple study
+sensor here measures. eps 0.55-0.7 reproduces a published thermocouple study
 of a PID Classic (puck falling 7.5-10 C over a 60 mL shot); central 0.6, range
 shown 0.5-0.7. The absolute puck level is less certain than that range (see
 tools/sim/README.md).
