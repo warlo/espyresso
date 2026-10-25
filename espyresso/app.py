@@ -88,7 +88,7 @@ class Espyresso:
         )
         self.boiler = Boiler(
             pigpio_pi=self.pigpio_pi,
-            boiling=config.DEBUG,
+            boiling=True,
             reset_started_time=self.reset_started_time,
             add_to_queue=self.boiler_queue.add_to_queue,
         )
