@@ -1,15 +1,16 @@
-
 [Unit]
 Description=Espyresso
 After=pigpiod.service
-#After=pigpiod.service systemd-logind.service systemd-user-sessions.service display-manager.service graphical.target
+Requires=pigpiod.service
 
 [Service]
 User=root
 WorkingDirectory=/home/pi/espyresso
+ExecStartPre=/bin/sleep 2
 ExecStart=/usr/bin/stdbuf -oL /home/pi/espyresso/start.sh
 Type=idle
-SendSIGHUP=no
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
