@@ -1,8 +1,12 @@
+import functools
+import logging
 import math
 from collections import deque
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from espyresso.config import ZOOM
+
+logger = logging.getLogger(__name__)
 
 
 class WaveQueue(deque):  # type: ignore
@@ -87,3 +91,21 @@ def linear_transform(x: float, a: float, b: float, c: float, d: float) -> float:
 
     y = (x - a) / (b - a) * (d - c) + c
     return y
+
+
+def safe_callback(func: Callable[..., Any]) -> Callable[..., None]:
+    """Wrap a pigpio callback so it can never raise.
+
+    pigpio runs every GPIO callback on one notification thread without any
+    exception handling. A single exception ends that thread, which silently
+    stops the temperature sensor (and therefore control) while the hardware
+    PWM keeps the element at its last duty."""
+
+    @functools.wraps(func)
+    def wrapper(*args: Any) -> None:
+        try:
+            func(*args)
+        except Exception:
+            logger.exception("GPIO callback %s failed", getattr(func, "__qualname__", func))
+
+    return wrapper

@@ -8,7 +8,7 @@ DEBUG = PLATFORM == "darwin"
 if DEBUG:
     import sys
 
-    from mock import MagicMock
+    from unittest.mock import MagicMock
 
     sys.modules["pigpio"] = MagicMock()
 
@@ -40,7 +40,15 @@ BUTTON_TWO_GPIO = 20
 SDA_GPIO = 2  # TODO: Add support for pressure meter
 SCL_GPIO = 3
 
-TARGET_TEMP = 95.0
+# Brew temperature. The controller regulates the boiler water; the water that
+# reaches the coffee has lost heat to the group on the way. BREW_PUCK_TEMP is
+# what you want at the puck (Tim Wendelboe-style light roasts: 93-94 C) and
+# PUCK_OFFSET how much hotter the boiler must be to deliver it. The offset is a
+# simulation estimate (tools/sim/report.py setpoints, central case): measure the
+# puck temperature once and correct it here.
+BREW_PUCK_TEMP = 93.0
+PUCK_OFFSET = 6.0
+TARGET_TEMP = BREW_PUCK_TEMP + PUCK_OFFSET
 TARGET_STEAM_TEMP = 135.0
 KP = 0.0762
 KI = 0.0616
@@ -48,7 +56,45 @@ KD = 0.905
 IMIN = 0.0
 IMAX = 1.0
 
-TURN_OFF_SECONDS = 600.0
+# Brew routine (Pi button shots). Tim Wendelboe's espresso: 19-20 g in,
+# 42-45 g out, 25-35 s. Without a scale the shot stops on inlet volume from the
+# flow meter: yield + water retained by the puck and basket. The retention is
+# an estimate: weigh a few shots and adjust (tools/sim/README.md).
+BREW_DOSE_G = 20.0
+BREW_TARGET_YIELD_G = 44.0
+BREW_RETAINED_ML_PER_G = 1.25
+BREW_MAX_SECONDS = 45.0
+# Preinfusion at low pump power until this volume or time, whichever first.
+# At ~1.4 mL/s every logged shot hit the 7 s limit first.
+PREINFUSE_MAX_SECONDS = 7.0
+PREINFUSE_TARGET_ML = 30.0
+# Brew head counts as warm once the model says it is within this of the
+# setpoint (was a fixed 80 C, which only fit a 95 C setpoint).
+BREWHEAD_READY_BELOW_SETPOINT = 15.0
+
+# Boiler auto-off after this long without a Pi button action or water flow.
+TURN_OFF_SECONDS = 1800.0
+# Flow that postpones auto-off; smaller amounts are meter noise.
+AUTO_OFF_MIN_FLOW_ML = 10.0
+
+# Safety (espyresso/safety.py). These act on the raw sensor and the control
+# heartbeat only, so they hold even when the model is wrong.
+# Heater forced off when the controller hasn't completed a tick for this long
+# (the longest logged gap between ticks is 0.7 s).
+CONTROL_STALE_SECONDS = 2.0
+WATCHDOG_INTERVAL = 0.5
+# Heater cut while the raw sensor reads above setpoint + this margin, and above
+# an absolute cap (TSIC 306 tops out at 150 C). Heals when it cools.
+SAFETY_MAX_ABOVE_SETPOINT = 15.0
+SAFETY_MAX_TEMPERATURE = 145.0
+# Sensor-detached detection: near full power for this long, far below
+# setpoint, no water flowing, and the sensor rose less than this. Latched
+# until the boiler is switched on again.
+SAFETY_RUNAWAY_SECONDS = 60.0
+SAFETY_RUNAWAY_MIN_RISE = 3.0
+SAFETY_RUNAWAY_BELOW_SETPOINT = 10.0
+# Longest legitimate pump run is the 120 s preheat/steam routine.
+PUMP_MAX_ON_SECONDS = 130.0
 
 WIDTH = 320
 HEIGHT = 240
@@ -185,6 +231,40 @@ SENSOR_XFER_COEFF = (
 
 MPC_STEADY_STATE = 0.5
 MPC_SMOOTHING = 0.5
+
+# Self-healing. Controller steps longer than this (stalled callbacks, the slow
+# first step after start-up) are not integrated: the correction gain is
+# dt * MPC_SMOOTHING, which overshoots for dt > 2 s and diverges for long gaps.
+# The model restarts from the measurement instead.
+MPC_MAX_DT = 1.0
+# A model-vs-sensor error this large (K) for this long (s) means the model has
+# lost track, e.g. the boiler heated while the app was down. Logged operation
+# never exceeded 2.4 K, so this only fires on real faults.
+MPC_RESYNC_ERROR = 5.0
+MPC_RESYNC_SECONDS = 1.0
+# Correct every thermal mass (not only the element) once the modelled water is
+# within this band of the setpoint and settled. Relative to the setpoint so it
+# works for any brew temperature and for steam.
+MPC_STEADY_BAND = 1.0
+
+# Warm-up boost: full power for a while after the first valid reading, before
+# the controller's own judgement takes over. Sized to deliver at most
+# BOOT_BOOST_FRACTION of the energy needed to lift water + shell (about
+# BOOT_BOOST_HEAT_CAPACITY J/K) to the setpoint, so it can never overshoot by
+# itself and is zero when the boiler is already hot. The model is told about
+# the energy, so control stays consistent afterwards.
+BOOT_BOOST_MAX_SECONDS = 6.0
+BOOT_BOOST_HEAT_CAPACITY = 1200.0
+BOOT_BOOST_FRACTION = 0.5
+
+# In-shot heat budget for shots the Pi runs (it knows how much water is still
+# to come). The incoming cold water is a known heat sink, so the shell may
+# hold the energy it will remove over the remaining shot time, up to this many
+# seconds. Must be refreshed by the brew routine; expires on its own so a dead
+# pump thread cannot leave it on. Manual shots (unknown end) get none: a fixed
+# horizon overheats after an unannounced stop (simulated: +2 K on a second shot).
+FLOW_HEAT_HORIZON_MAX = 20.0
+FLOW_HEAT_HORIZON_EXPIRY = 1.0
 
 """
 # Calculate best SENSOR_XFER_COEFF

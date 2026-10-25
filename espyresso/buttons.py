@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import pigpio
 
 from espyresso import config, shot_logger
+from espyresso.utils import safe_callback
 
 if TYPE_CHECKING:
     from pigpio import pi
@@ -47,16 +48,16 @@ class Buttons:
         self.pigpio_pi.set_pull_up_down(self.button_two, pigpio.PUD_DOWN)
 
         self.pigpio_pi.callback(
-            self.button_one, pigpio.RISING_EDGE, self.rising_button_one
+            self.button_one, pigpio.RISING_EDGE, safe_callback(self.rising_button_one)
         )
         self.pigpio_pi.callback(
-            self.button_one, pigpio.FALLING_EDGE, self.falling_button_one
+            self.button_one, pigpio.FALLING_EDGE, safe_callback(self.falling_button_one)
         )
         self.pigpio_pi.callback(
-            self.button_two, pigpio.RISING_EDGE, self.rising_button_two
+            self.button_two, pigpio.RISING_EDGE, safe_callback(self.rising_button_two)
         )
         self.pigpio_pi.callback(
-            self.button_two, pigpio.FALLING_EDGE, self.falling_button_two
+            self.button_two, pigpio.FALLING_EDGE, safe_callback(self.falling_button_two)
         )
 
     def get_notification(self) -> Optional[str]:
@@ -120,13 +121,11 @@ class Buttons:
             return
 
         if seconds < 5:
-            if self.temperature.get_latest_brewhead_temperature() < 80:
+            if not self.temperature.brewhead_ready():
                 _, notification = self.pump.pulse_pump()
-                self.button_one_status = notification
-
-            if self.temperature.get_latest_brewhead_temperature() > 80:
+            else:
                 _, notification = self.pump.brew_shot()
-                self.button_one_status = notification
+            self.button_one_status = notification
         else:
             self.pump.pulse_pump_steam()
 

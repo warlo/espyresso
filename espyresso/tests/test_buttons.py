@@ -92,3 +92,19 @@ def test_buttons_notification_timer_over_5sec(
     setattr(buttons, timestamp_attr, t)
 
     assert buttons.get_notification() == "7.0"
+
+
+@pytest.mark.parametrize("ready,routine", [(False, "pulse_pump"), (True, "brew_shot")])
+def test_short_press_preheats_until_brew_head_is_ready(ready: bool, routine: str) -> None:
+    pump = Mock()
+    pump.pulse_pump.return_value = (True, None)
+    pump.brew_shot.return_value = (True, None)
+    temperature = Mock()
+    temperature.brewhead_ready.return_value = ready
+    buttons = Buttons(pigpio_pi=Mock(), boiler=Mock(), temperature=temperature, pump=pump, turn_off_system=Mock())
+    buttons.button_one_timestamp = time.perf_counter() - 1.0
+
+    buttons.falling_button_one()
+
+    called = [name for name in ("pulse_pump", "brew_shot") if getattr(pump, name).called]
+    assert called == [routine]

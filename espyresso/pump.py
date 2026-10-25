@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def remaining_shot_seconds(target_ml: float, current_ml: float, flow_rate: float) -> float:
+    """Seconds of shot still to come at the current flow (floored at 0.3 mL/s
+    so a stalled meter doesn't claim an endless shot)."""
+    return max(0.0, target_ml - current_ml) / max(flow_rate, 0.3)
+
+
 class Pump:
     def __init__(
         self,
@@ -53,6 +59,13 @@ class Pump:
 
         self.started_preinfuse: Optional[float] = None
         self.stopped_preinfuse: Optional[float] = None
+        self.preinfuse_ml = 0.0
+        self._stop_reason = ""
+
+        # The end-of-shot path runs from both the pump thread and button
+        # callbacks; only the first caller may log the shot.
+        self._brew_active = False
+        self._brew_lock = threading.Lock()
 
         self.set_pwm_value(0.75)
         self.pump_thread = threading.Thread(target=self.brew_shot_routine)
@@ -113,7 +126,7 @@ class Pump:
         while (
             self.pumping
             and time.perf_counter() - started < 120
-            and self.temperature.get_latest_brewhead_temperature() < 80
+            and not self.temperature.brewhead_ready()
         ):
             self.set_pwm_value(0.5)
             time.sleep(1)
@@ -154,6 +167,9 @@ class Pump:
         started = time.perf_counter()
         self.temperature.set_steam_temp()
         self.boiler.turn_on_boiler()
+        # Pump on, as in pulse_pump_routine; the loop below only modulates
+        # its power. Without this the loop never ran and steam lasted ~1 ms.
+        self.toggle_pump()
 
         while self.pumping and time.perf_counter() - started < 120:
             self.set_pwm_value(0.4)
@@ -189,6 +205,8 @@ class Pump:
         if self.pumping:
             return self.reset_brew_routine()
 
+        self._brew_active = True
+
         # Reset flow meter
         self.flow.reset_pulse_count()
 
@@ -207,15 +225,18 @@ class Pump:
         if sl is not None:
             sl.log_event("brew", phase="preinfuse_start")
 
-        # Sleep until flow is above 30ml or 7seconds
+        # Preinfuse until the target volume or time, whichever comes first
         while self.pumping and not (
-            self.flow.get_millilitres() > 30
-            or (time.perf_counter() - self.started_preinfuse) > 7
+            self.flow.get_millilitres() > config.PREINFUSE_TARGET_ML
+            or (time.perf_counter() - self.started_preinfuse)
+            > config.PREINFUSE_MAX_SECONDS
         ):
+            self._report_remaining_shot()
             time.sleep(0.1)
 
         # Stop preinfuse timer
         self.stopped_preinfuse = time.perf_counter()
+        self.preinfuse_ml = self.flow.get_millilitres()
 
         # Start brewing timer
         self.brewing_timer.reset_timer()
@@ -226,16 +247,21 @@ class Pump:
                 "brew",
                 phase="preinfuse_stop",
                 preinfuse_seconds=self.stopped_preinfuse - self.started_preinfuse,
-                preinfuse_ml=self.flow.get_millilitres(),
+                preinfuse_ml=self.preinfuse_ml,
             )
 
+        self._stop_reason = "button"
         while self.pumping:
-            # current_ml = self.flow.get_millilitres()
-            target_grams = 35
+            target_grams = config.BREW_TARGET_YIELD_G
             current_grams = self.bluetooth_scale.get_scale_weight()
+            current_ml = self.flow.get_millilitres()
 
-            # 36 ml in cup, and 30 ml error in puck / pressure
             if current_grams >= target_grams:
+                self._stop_reason = "weight"
+                break
+            if not current_grams and current_ml >= self.target_inlet_ml():
+                # No scale reading: stop on the flow meter's inlet volume
+                self._stop_reason = "volume"
                 break
 
             # Gradually reduce pump pressure before end
@@ -244,15 +270,35 @@ class Pump:
 
             time_passed = self.brewing_timer.get_time_since_started()
 
-            # Gradually increase pump PWM to 100% over 5sec
+            # Ramp pump PWM from 0.5 to 0.7 over the first 5 s
             if time_passed < 5:
                 self.set_pwm_value(0.5 + 0.2 * (time_passed / 5))
-            if time_passed > 45:
-                return self.reset_brew_routine()
+            if time_passed > config.BREW_MAX_SECONDS:
+                self._stop_reason = "time"
+                break
 
+            self._report_remaining_shot()
             time.sleep(0.05)
 
         return self.reset_brew_routine()
+
+    def target_inlet_ml(self) -> float:
+        """Inlet volume for the target yield: cup + water held by the puck."""
+        return (
+            config.BREW_TARGET_YIELD_G
+            + config.BREW_DOSE_G * config.BREW_RETAINED_ML_PER_G
+        )
+
+    def _report_remaining_shot(self) -> None:
+        """Tell the controller how much shot is still to come, so it can heat
+        for the incoming water (expires on its own if this thread dies)."""
+        self.temperature.set_flow_horizon(
+            remaining_shot_seconds(
+                self.target_inlet_ml(),
+                self.flow.get_millilitres(),
+                self.flow.get_flow_rate() or 0.0,
+            )
+        )
 
     def reset(self) -> None:
         self.stop_pump()
@@ -260,12 +306,18 @@ class Pump:
         self.boiler.set_pwm_override(None)
 
     def reset_brew_routine(self) -> None:
+        with self._brew_lock:
+            was_active = self._brew_active
+            self._brew_active = False
         self.reset()
+        if not was_active:
+            return
         self.brewing_timer.stop_timer()
         self.log_shot()
+        shot_seconds = self.brewing_timer.get_time_since_started()
         logger.info(
             "shot complete: time=%ss pulses=%s",
-            self.brewing_timer.get_time_since_started(),
+            shot_seconds,
             self.flow.get_pulse_count(),
         )
         self.brewing_timer.enable_automatic_timing()
@@ -276,6 +328,7 @@ class Pump:
             sl.log_event(
                 "brew",
                 phase="end",
+                reason=self._stop_reason,
                 shot_seconds=shot_seconds,
                 total_ml=self.flow.get_millilitres(),
                 pulses=self.flow.get_pulse_count(),
@@ -297,17 +350,18 @@ class Pump:
     def log_shot(self) -> None:
         shot_time = self.brewing_timer.get_time_since_started()
 
-        # Skip seemingly invalid shots
-        if not (5 < shot_time < 45):
+        # Skip seemingly invalid shots (time-capped shots are still logged)
+        if not (5 < shot_time < config.BREW_MAX_SECONDS + 5):
             return
 
-        preinfuse_ml = (self.stopped_preinfuse or 0) - (self.started_preinfuse or 0)
+        preinfuse_seconds = (self.stopped_preinfuse or 0) - (self.started_preinfuse or 0)
         shot_log = (
             f"\n{time.strftime('%Y-%m-%dT%H:%M:%S%z')};"
             f"Time: {shot_time};"
             f"Shot mL: {self.flow.get_millilitres()};"
             f"Shot grams: {self.bluetooth_scale.get_scale_weight()};"
-            f"Preinfuse mL: {preinfuse_ml};"
+            f"Preinfuse s: {preinfuse_seconds:.1f};"
+            f"Preinfuse mL: {self.preinfuse_ml:.1f};"
         )
         with open(config.SHOT_STAT_FILE, "a") as f:
             f.write(shot_log)

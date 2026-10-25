@@ -31,6 +31,30 @@ Espyresso is a hobby Python project designed for the Gaggia Classic espresso mac
 
 - **PID and MPC Temperature Control:** Initially implemented PID temperature adjustment, later updated to an MPC (Model Predictive Controller) inspired by Tom Brazier's work [here](http://tomblog.firstsolo.net/index.php/solved-temperature-control/).
 
+## Safety and self-healing
+
+The element is never left to the controller alone:
+
+- `espyresso/safety.py`: a raw-sensor guard between controller and PWM
+  (over-temperature cut, detached-sensor detection) and a watchdog thread that
+  forces the heater off when control stalls, bounds pump run time, runs the
+  auto-off timer and feeds systemd's watchdog.
+- `espyresso/failsafe.py`: switches the outputs off from systemd before every
+  start and after every stop, including crashes (pigpiod keeps a hardware PWM
+  running after its client dies).
+- The controller re-syncs its model after gaps or large errors, sizes the
+  warm-up boost from the first reading, and recovers from any starting state.
+- `sudo services/install.sh` (on the Pi) installs the unit, the Pi's hardware
+  watchdog and a persistent journal.
+
+## Simulation and tuning
+
+`espyresso/sim` runs the production control path against a plant fitted to
+this machine's logs; `make sim` prints restarts, faults, shots and the
+setpoint-to-puck mapping, and the closed-loop tests pin the behaviour. See
+[tools/sim/README.md](tools/sim/README.md) for the workflow and for
+calibrating the puck offset and shot yield with real measurements.
+
 ## Inspiration
 
 Espyresso draws inspiration from the work of jam3sward ([int03.co.uk](http://int03.co.uk/blog/project-coffee-espiresso-machine/)) and Tom Brazier ([tomblog.firstsolo.net](http://tomblog.firstsolo.net/index.php/hobbies/pimping-my-coffee-machine/coffee-machine-features/)).

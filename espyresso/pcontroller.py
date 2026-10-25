@@ -3,7 +3,7 @@
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Any, Dict, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple
 
 from espyresso import config
 
@@ -13,18 +13,50 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def boot_boost_seconds(temperature: float, setpoint: float) -> float:
+    """Seconds of full power to apply after the first valid reading.
+
+    Delivers at most BOOT_BOOST_FRACTION of the energy needed to lift water +
+    shell from ``temperature`` to ``setpoint``; zero at or above setpoint."""
+    if not math.isfinite(temperature):
+        return 0.0
+    deficit = max(0.0, setpoint - temperature)
+    energy = deficit * config.BOOT_BOOST_HEAT_CAPACITY * config.BOOT_BOOST_FRACTION
+    return min(config.BOOT_BOOST_MAX_SECONDS, energy / config.MAX_BOILER_POWER)
+
+
 class PController:
     def __init__(self, initial_temperature: float, flow: "Flow") -> None:
 
         self.temp_setpoint = config.TARGET_TEMP
 
-        self.elementTemp = initial_temperature
-        self.shellTemp = initial_temperature
+        self.reset(initial_temperature)
+
+        self.pumpPowerRate = 0.0
+        self.heaterPower = 0.0
+        self.lastBoilerPidTime: float = time.perf_counter()
+        self.flow = flow
+
+        self.boost_until = 0.0
+        self._flow_horizon_s = 0.0
+        self._flow_horizon_until = 0.0
+        self._resync_error_since: Optional[float] = None
+        # Populated every update() so callers can introspect intermediate
+        # power terms, error, safety bounds, etc. without re-computing them.
+        self.diagnostics: Dict[str, Any] = {}
+
+    def set_target_temp(self, temperature: float) -> None:
+        self.temp_setpoint = temperature
+
+    def reset(self, temperature: float) -> None:
+        """Initialise every thermal mass from one measurement, as at boot."""
+        self.elementTemp = temperature
+        self.shellTemp = temperature
 
         self.ambientTemp = min(self.shellTemp, config.AMBIENT_TEMPERATURE)
 
-        self.waterTemp = initial_temperature
-        self.modeledSensorTemp = initial_temperature
+        self.waterTemp = temperature
+        self.modeledSensorTemp = temperature
 
         # based on heat transfer coefficients to and from brewhead, we can caluculate its steady state temp - use that
         self.brewHeadTemp = (
@@ -33,17 +65,27 @@ class PController:
         ) / (config.BREWHEAD_AMBIENT_XFER_COEFF + config.BOILER_BREWHEAD_XFER_COEFF)
 
         self.bodyTemp = self.shellTemp
+        self._resync_error_since = None
 
-        self.pumpPowerRate = 0.0
-        self.heaterPower = 0.0
-        self.lastBoilerPidTime: float = time.perf_counter()
-        self.flow = flow
-        # Populated every update() so callers can introspect intermediate
-        # power terms, error, safety bounds, etc. without re-computing them.
-        self.diagnostics: Dict[str, Any] = {}
+    def resync(self, temperature: float) -> None:
+        """Restart the boiler-side model from a measurement, as at boot.
+        The brew head and body are slow and unmeasured, so they keep their
+        estimates."""
+        self.elementTemp = temperature
+        self.shellTemp = temperature
+        self.waterTemp = temperature
+        self.modeledSensorTemp = temperature
+        self._resync_error_since = None
 
-    def set_target_temp(self, temperature: float) -> None:
-        self.temp_setpoint = temperature
+    def start_boost(self, seconds: float) -> None:
+        """Run the element at full power for ``seconds`` (while boiling)."""
+        self.boost_until = time.perf_counter() + max(0.0, seconds)
+
+    def set_flow_horizon(self, seconds: float) -> None:
+        """Seconds of shot still to come, for a shot the Pi controls.
+        Expires after FLOW_HEAT_HORIZON_EXPIRY unless refreshed."""
+        self._flow_horizon_s = min(max(0.0, seconds), config.FLOW_HEAT_HORIZON_MAX)
+        self._flow_horizon_until = time.perf_counter() + config.FLOW_HEAT_HORIZON_EXPIRY
 
     def update(
         self, *, temperature: float, boiling: bool
@@ -56,6 +98,26 @@ class PController:
         logger.debug("deltaTime: %s", deltaTime)
         self.lastBoilerPidTime = current_time
         logger.debug("lastBoilerPidTime: %s", self.lastBoilerPidTime)
+
+        if not math.isfinite(temperature):
+            # No usable measurement: heater off, model untouched.
+            self.heaterPower = 0.0
+            return 0, (
+                self.shellTemp,
+                self.elementTemp,
+                self.waterTemp,
+                self.bodyTemp,
+                self.brewHeadTemp,
+                self.modeledSensorTemp,
+                temperature,
+            )
+
+        resync_reason = ""
+        if deltaTime > config.MPC_MAX_DT:
+            # Integrating a long step diverges; restart from the measurement.
+            self.resync(temperature)
+            deltaTime = 0.0
+            resync_reason = "gap"
 
         flow_rate = self.flow.get_flow_rate() or 0
         logger.debug("FLOWRATE %s", flow_rate)
@@ -199,7 +261,7 @@ class PController:
         # only correct other masses when close to steady state otherwise it can diverge
         # wildly due to modelling errors
         steadystate = (
-            94 < self.waterTemp < 96
+            abs(self.waterTemp - self.temp_setpoint) < config.MPC_STEADY_BAND
             and abs(elementTempDelta + delta_to_apply)
             < deltaTime * config.MPC_STEADY_STATE
         )
@@ -211,6 +273,15 @@ class PController:
             self.brewHeadTemp += delta_to_apply
 
         # self.shellTemp = temperature
+
+        if abs(temperature - self.modeledSensorTemp) > config.MPC_RESYNC_ERROR:
+            if self._resync_error_since is None:
+                self._resync_error_since = current_time
+            elif current_time - self._resync_error_since >= config.MPC_RESYNC_SECONDS:
+                self.resync(temperature)
+                resync_reason = "error"
+        else:
+            self._resync_error_since = None
 
         self.diagnostics = {
             "deltaTime": deltaTime,
@@ -237,9 +308,15 @@ class PController:
             "maxAllowableElementToShellPower": math.nan,
             "maxAllowableElementTemp": math.nan,
             "maxAllowablePowerForElement": math.nan,
+            "resync": resync_reason,
+            "boost": False,
+            "flow_horizon_s": 0.0,
         }
 
         if not boiling:
+            # The element is off; don't let the model keep integrating the
+            # last commanded power.
+            self.heaterPower = 0.0
             return 0, (
                 self.shellTemp,
                 self.elementTemp,
@@ -274,9 +351,13 @@ class PController:
             desiredAverageShellTemp = self.waterTemp + desiredWaterInputPower / 25.0
 
         # now clip the temperature so that it won't take more than 20s to lose excess heat to ambient
+        flow_horizon = (
+            self._flow_horizon_s if current_time < self._flow_horizon_until else 0.0
+        )
         maxStableAverageShellTemp = (
             (
                 brewHeadToAmbientPower * 20.0
+                + waterToFlowPower * flow_horizon
                 - (self.waterTemp - self.temp_setpoint)
                 * config.SPEC_HEAT_WATER_100
                 * config.BOILER_VOLUME
@@ -358,6 +439,15 @@ class PController:
         normalizedHeaterPower = self.heaterPower / config.MAX_BOILER_POWER
         normalizedHeaterPower = max(normalizedHeaterPower, 0.0)
         normalizedHeaterPower = min(normalizedHeaterPower, 1.0)
+        if not math.isfinite(normalizedHeaterPower):
+            # min()/max() pass NaN through unchanged.
+            normalizedHeaterPower = 0.0
+            self.heaterPower = 0.0
+        boosting = current_time < self.boost_until
+        if boosting:
+            # Tell the model: the next step integrates full power.
+            normalizedHeaterPower = 1.0
+            self.heaterPower = config.MAX_BOILER_POWER
         logger.debug("heaterPower normalized %s", normalizedHeaterPower)
 
         self.diagnostics.update(
@@ -370,6 +460,8 @@ class PController:
                 "maxAllowableElementToShellPower": maxAllowableElementToShellPower,
                 "maxAllowableElementTemp": maxAllowableElementTemp,
                 "maxAllowablePowerForElement": maxAllowablePowerForElement,
+                "boost": boosting,
+                "flow_horizon_s": flow_horizon,
             }
         )
 

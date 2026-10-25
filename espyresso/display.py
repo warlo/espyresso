@@ -313,7 +313,8 @@ class Display:
 
         hero = f"{raw_temp:.1f}°"
         target = f"→{setpoint:.0f}°" if setpoint else "→---"
-        boil = "●BOIL" if boiling else "○OFF"
+        fault = self.boiler.fault
+        boil = "FAULT" if fault else ("●BOIL" if boiling else "○OFF")
         water_str = f"H2O {water:.0f}%"
         count_str = f"{countdown}s"
 
@@ -330,7 +331,7 @@ class Display:
         target_color = self.GREY if not boiling else self.WHITE
         self.screen.blit(self._render(target, 12, target_color), (120, 4))
 
-        boil_color = self.RED if boiling else self.GREY
+        boil_color = self.RED if boiling or fault else self.GREY
         self.screen.blit(self._render(boil, 12, boil_color), (120, 16))
 
         water_color = self.WHITE if water > 10 else self.RED

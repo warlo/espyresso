@@ -33,6 +33,7 @@ def make_display() -> Display:
     bluetooth_scale.get_scale_weight.return_value = 0.0
     boiler = MagicMock()
     boiler.get_boiling.return_value = False
+    boiler.fault = None
     boiler.pwm.get_display_value.return_value = "0.0"
     brewing_timer = MagicMock()
     brewing_timer.get_time_since_started.return_value = 0.0
@@ -286,3 +287,21 @@ def test_render_frame_skips_unchanged_zones(display: Display) -> None:
     # zones should be skipped. At most the header (countdown) can be
     # dirty if a second elapsed; we just assert it's strictly fewer.
     assert len(dirty) < 8, "second frame should not redraw every zone"
+
+
+def test_header_shows_fault_when_safety_switched_the_boiler_off(display: Display) -> None:
+    display.boiler.fault = "sensor not responding"
+
+    rendered = _spy_render(display)
+    display._redraw_header([])
+
+    assert any("FAULT" in t for t, _ in rendered)
+
+
+def test_header_shows_off_without_a_fault(display: Display) -> None:
+    rendered = _spy_render(display)
+    display._redraw_header([])
+
+    texts = [t for t, _ in rendered]
+    assert any("OFF" in t for t in texts)
+    assert not any("FAULT" in t for t in texts)

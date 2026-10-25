@@ -12,12 +12,14 @@ A single process-wide instance is exposed via :func:`init` / :func:`get` so
 modules deep in the call graph (pcontroller, boiler, pump, buttons, ...) can
 emit without threading a dependency through every constructor.
 """
+import json
 import logging
 import math
 import os
+import subprocess
 import threading
 import time
-from typing import Any, List, Optional, TextIO
+from typing import Any, Dict, List, Optional, TextIO
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +49,18 @@ class ShotLogger:
     # ``close()`` flushes any tail before exit, and we periodically flush
     # on each event so a crash mid-shot only loses tail tick rows.
     _BUFFER = 8192
+    # Tick rows are also flushed at least this often, so a power cut or a
+    # kernel hang loses at most a couple of seconds (the 8 KiB buffer alone
+    # held ~20 s at 10 Hz).
+    FLUSH_SECONDS = 2.0
 
     def __init__(self, base_dir: str = "log") -> None:
         os.makedirs(base_dir, exist_ok=True)
         ts = time.strftime("%Y%m%d-%H%M%S")
         self.tick_path = os.path.join(base_dir, f"shot-{ts}-tick.csv")
         self.event_path = os.path.join(base_dir, f"shot-{ts}-event.csv")
+        self.meta_path = os.path.join(base_dir, f"shot-{ts}-meta.json")
+        self._last_flush = time.perf_counter()
         self._tick_file: Optional[TextIO] = None
         self._tick_keys: List[str] = []
         self._event_file: TextIO = open(self.event_path, "w", buffering=self._BUFFER)
@@ -78,6 +86,9 @@ class ShotLogger:
                 row = [f"{self._now():.4f}"]
                 row.extend(_fmt(fields.get(k)) for k in self._tick_keys[1:])
                 self._tick_file.write(",".join(row) + "\n")
+                if time.perf_counter() - self._last_flush >= self.FLUSH_SECONDS:
+                    self._tick_file.flush()
+                    self._last_flush = time.perf_counter()
         except Exception:
             logger.exception("ShotLogger.log_tick failed")
 
@@ -95,14 +106,46 @@ class ShotLogger:
         except Exception:
             logger.exception("ShotLogger.log_event failed")
 
+    def write_meta(self, meta: Dict[str, Any]) -> None:
+        """Session metadata (code version, config) next to the CSVs, so every
+        log can be tied to the settings that produced it."""
+        try:
+            with open(self.meta_path, "w") as f:
+                json.dump(meta, f, indent=1, sort_keys=True, default=str)
+        except Exception:
+            logger.exception("ShotLogger.write_meta failed")
+
     def close(self) -> None:
         with self._lock:
             if self._tick_file is not None:
                 self._tick_file.flush()
                 self._tick_file.close()
                 self._tick_file = None
-            self._event_file.flush()
-            self._event_file.close()
+            if not self._event_file.closed:
+                self._event_file.flush()
+                self._event_file.close()
+
+
+def collect_metadata() -> Dict[str, Any]:
+    """Git commit and every upper-case config value."""
+    from espyresso import config
+
+    try:
+        commit = subprocess.run(
+            ["git", "describe", "--always", "--dirty"],
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.strip()
+    except Exception:
+        commit = ""
+    values = {
+        k: getattr(config, k)
+        for k in dir(config)
+        if k.isupper() and isinstance(getattr(config, k), (int, float, str, bool, tuple))
+    }
+    return {"commit": commit, "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "config": values}
 
 
 def init(base_dir: str = "log") -> ShotLogger:

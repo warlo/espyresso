@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 import pigpio
 
 from espyresso import config
+from espyresso.utils import safe_callback
 
 if TYPE_CHECKING:
     from pigpio import pi
@@ -37,11 +38,15 @@ class Flow:
         self.flow_in_gpio = config.FLOW_IN_GPIO
         self.pigpio_pi.set_mode(self.flow_in_gpio, pigpio.INPUT)
         self.pigpio_pi.callback(
-            self.flow_in_gpio, pigpio.RISING_EDGE, self.pulse_callback
+            self.flow_in_gpio, pigpio.RISING_EDGE, safe_callback(self.pulse_callback)
         )
 
         self.learning_mode = True
         self.total_volume: float = 0.0
+        # Never reset (unlike total_volume, which restarts every shot): lets
+        # the watchdog notice water flowing, e.g. shots pulled on the machine's
+        # own switch, to postpone auto-off.
+        self.lifetime_ml: float = 0.0
         self.pulse_count = 0
 
         self.flow_queue = flow_queue
@@ -104,6 +109,7 @@ class Flow:
         )
 
         self.total_volume += ml_per_pulse / 2.0
+        self.lifetime_ml += ml_per_pulse / 2.0
         average_rate = self.total_volume / (self.prev_pulse_time - self.pulse_start)
 
         self.flow_queue.add_to_queue((flow_rate, average_rate))

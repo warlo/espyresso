@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 import pigpio
 
-from espyresso import config, shot_logger
+from espyresso import config, failsafe, shot_logger
 from espyresso.bluetooth import BluetoothScale
 from espyresso.boiler import Boiler
 from espyresso.buttons import Buttons
@@ -15,6 +15,7 @@ from espyresso.display import Display
 from espyresso.flow import Flow
 from espyresso.pump import Pump
 from espyresso.ranger import Ranger
+from espyresso.safety import Watchdog
 from espyresso.temperature import Temperature
 from espyresso.timer import BrewingTimer
 from espyresso.utils import WaveQueue
@@ -55,7 +56,9 @@ class Espyresso:
         logger.debug("STARTING ESPYRESSO")
 
         if config.LOG_SHOT:
-            shot_logger.init(config.LOG_SHOT_DIR)
+            shot_logger.init(config.LOG_SHOT_DIR).write_meta(
+                shot_logger.collect_metadata()
+            )
 
         if not pigpio_pi:
             self.pigpio_pi = pigpio.pi()
@@ -93,6 +96,13 @@ class Espyresso:
             add_to_queue=self.boiler_queue.add_to_queue,
         )
         self.ranger = Ranger(pigpio_pi=self.pigpio_pi)
+        self.watchdog = Watchdog(
+            boiler=self.boiler,
+            pump=None,  # assigned once the pump exists
+            flow=self.flow,
+            get_started_time=self.get_started_time,
+            reset_started_time=self.reset_started_time,
+        )
 
         self.temp_queue = WaveQueue(
             90,
@@ -109,7 +119,21 @@ class Espyresso:
             boiler=self.boiler,
             flow=self.flow,
             temp_queue=self.temp_queue,
+            heartbeat=self.watchdog.heartbeat,
         )
+        # Control and the watchdog start now, before the slow parts (display,
+        # bluetooth) are built: no blind window where nothing governs the
+        # element, and the warm-up starts as early as possible.
+        self.temperature.start()
+        self.watchdog.start()
+        try:
+            self._construct_rest()
+        except Exception:
+            self.temperature.stop()
+            self.watchdog.stop()
+            raise
+
+    def _construct_rest(self) -> None:
         self.bluetooth_scale = BluetoothScale()
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
@@ -121,6 +145,7 @@ class Espyresso:
             brewing_timer=self.brewing_timer,
             ranger=self.ranger,
         )
+        self.watchdog.pump = self.pump
 
         self.buttons = Buttons(
             pigpio_pi=self.pigpio_pi,
@@ -175,11 +200,15 @@ class Espyresso:
         sys.exit(0)
 
     def stop(self) -> None:
+        # Outputs first, control callbacks before the element: a tick still
+        # in flight must not re-enable the heater after it was switched off.
+        self.temperature.stop()
+        self.pump.stop_pump()
+        self.boiler.turn_off_boiler()
+        self.watchdog.stop()
         # self.brewing_timer.stop()
         self.bluetooth_scale.stop()
-        self.boiler.turn_off_boiler()
         self.ranger.stop()
-        self.temperature.stop()
         self.display.stop()
         sl = shot_logger.get()
         if sl is not None:
@@ -220,6 +249,7 @@ def run() -> None:
             espyresso = get_espyresso_simulator()
     except Exception:
         logger.exception("Espyresso construction failed")
+        failsafe.outputs_off()
         raise
     logger.info("Espyresso constructed, installing signal handlers")
 

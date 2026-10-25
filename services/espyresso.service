@@ -6,10 +6,20 @@ Requires=pigpiod.service
 [Service]
 User=root
 WorkingDirectory=/home/pi/espyresso
+Environment=PYTHONUNBUFFERED=1
 ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/stdbuf -oL /home/pi/espyresso/start.sh
-Type=idle
-Restart=on-failure
+# Outputs off before every start and after every stop, including crashes and
+# kill -9: pigpiod keeps the element's hardware PWM running after the app dies.
+ExecStartPre=/usr/bin/python3 -m espyresso.failsafe
+ExecStart=/usr/bin/python3 -m espyresso
+ExecStopPost=/usr/bin/python3 -m espyresso.failsafe
+# The app reports READY after its first control tick and pings the watchdog
+# only while control is healthy, so a hung or stalled app is restarted.
+Type=notify
+NotifyAccess=main
+WatchdogSec=15
+TimeoutStartSec=120
+Restart=always
 RestartSec=5
 
 [Install]

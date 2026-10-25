@@ -27,6 +27,8 @@ from typing import Optional
 
 import pigpio
 
+from espyresso.utils import safe_callback
+
 logger = logging.getLogger().getChild(__name__)
 
 
@@ -98,7 +100,9 @@ class ZacWireInputChannel(object):
             self.__pi_callback = self.pi.callback(
                 self.gpio,
                 pigpio.EITHER_EDGE,
-                lambda gpio, level, tick: self.__gpio_callback(gpio, level, tick),
+                safe_callback(
+                    lambda gpio, level, tick: self.__gpio_callback(gpio, level, tick)
+                ),
             )
 
     def stop(self):

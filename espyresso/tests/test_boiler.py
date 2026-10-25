@@ -98,3 +98,65 @@ def test_set_value_normal_range(boiler: Boiler, queue_recorder: Mock) -> None:
     boiler.turn_on_boiler()
     boiler.set_value(0.456)
     queue_recorder.assert_called_once_with((45.6,))
+
+
+# ------------------------------------------------------------------ #
+#  Safety: what actually reaches the PWM hardware (pigpio boundary)
+# ------------------------------------------------------------------ #
+
+
+def _duties(pi: Mock) -> list:
+    """Duty cycles written to the boiler's hardware PWM, in order."""
+    from espyresso import config
+
+    return [c.args[2] for c in pi.hardware_PWM.call_args_list if c.args[0] == config.BOILER_PWM_GPIO]
+
+
+def test_boiling_at_boot_does_not_drive_the_element_blind(monkeypatch: pytest.MonkeyPatch) -> None:
+    from espyresso import config
+
+    monkeypatch.setattr(config, "DEBUG", False)  # behave as on the Pi
+    pi = Mock()
+    Boiler(pigpio_pi=pi, reset_started_time=Mock(), add_to_queue=Mock(), boiling=True)
+    # Heating waits for the controller's first measurement.
+    assert all(duty == 0 for duty in _duties(pi))
+
+
+def test_force_off_zeroes_pwm_even_when_not_boiling() -> None:
+    pi = Mock()
+    boiler = Boiler(pigpio_pi=pi, reset_started_time=Mock(), add_to_queue=Mock(), boiling=True)
+    boiler.set_value(0.6)
+    boiler.boiling = False  # e.g. turned off, but a stale duty is still on the pin
+
+    boiler.force_off()
+
+    assert _duties(pi)[-1] == 0
+
+
+def test_force_off_overrides_an_active_pwm_override() -> None:
+    pi = Mock()
+    boiler = Boiler(pigpio_pi=pi, reset_started_time=Mock(), add_to_queue=Mock(), boiling=True)
+    boiler.set_pwm_override(0.3)
+
+    boiler.force_off()
+
+    assert _duties(pi)[-1] == 0
+
+
+def test_set_value_treats_nan_as_off() -> None:
+    pi = Mock()
+    boiler = Boiler(pigpio_pi=pi, reset_started_time=Mock(), add_to_queue=Mock(), boiling=True)
+    boiler.set_value(0.5)
+
+    boiler.set_value(float("nan"))
+
+    assert _duties(pi)[-1] == 0
+
+
+def test_switching_on_again_clears_a_fault(boiler: Boiler) -> None:
+    boiler.fault = "sensor not responding"
+
+    boiler.toggle_boiler()
+
+    assert boiler.get_boiling() is True
+    assert boiler.fault is None

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Deque
 import pigpio
 
 from espyresso import config
-from espyresso.utils import linear_transform
+from espyresso.utils import linear_transform, safe_callback
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +31,11 @@ class Ranger(threading.Thread):
         self.pigpio_pi.set_mode(self.ranger_echo_in_gpio, pigpio.INPUT)
         self.pigpio_pi.set_mode(self.ranger_trigger_out_gpio, pigpio.OUTPUT)
 
-        self.pigpio_pi.callback(self.ranger_echo_in_gpio, pigpio.RISING_EDGE, self.rise)
         self.pigpio_pi.callback(
-            self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, self.fall
+            self.ranger_echo_in_gpio, pigpio.RISING_EDGE, safe_callback(self.rise)
+        )
+        self.pigpio_pi.callback(
+            self.ranger_echo_in_gpio, pigpio.FALLING_EDGE, safe_callback(self.fall)
         )
         self.done = threading.Event()
 

@@ -95,3 +95,21 @@ def test_flow_pulse_callback_increments_count_for_valid_pulse() -> None:
     # No previous change → first pulse always passes the debounce check
     flow.pulse_callback(0, 0, 0)
     assert flow.pulse_count == 1
+
+
+def test_lifetime_volume_keeps_counting_across_shot_resets() -> None:
+    import time
+
+    flow = Flow(pigpio_pi=Mock(), flow_queue=Mock())
+    for i in range(6):
+        flow.pulse_callback(5, 1, i)
+        time.sleep(0.25)  # ~4 pulses/s: a mid-range flow rate
+    first = flow.lifetime_ml
+    flow.reset_pulse_count()  # a new shot starts
+    for i in range(6):
+        flow.pulse_callback(5, 1, i)
+        time.sleep(0.25)
+
+    assert first > 0
+    assert flow.get_millilitres() < flow.lifetime_ml
+    assert flow.lifetime_ml > first
