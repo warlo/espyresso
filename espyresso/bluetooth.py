@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 class BluetoothScale:
     current_weight_timestamp: float = 0
-    current_weight: int = 0
+    current_weight: float = 0.0
+    _logged_weight: Optional[float] = None
+    _logged_at: float = 0.0
     bleak_client: "BleakClient" = None
     stop_event: Optional["Event"] = None
     disconnect_event: Optional["Event"] = None
@@ -24,7 +26,7 @@ class BluetoothScale:
     def get_scale_weight(self) -> float:
         if time.perf_counter() - self.current_weight_timestamp > 5:
             return 0
-        return self.current_weight / 10
+        return self.current_weight
 
     def start(self) -> None:
         """Spawn the bluetooth notify loop on its own thread.
@@ -83,12 +85,27 @@ class BluetoothScale:
         self.disconnect_event.set()
 
     def callback(self, sender: int, data: bytearray) -> None:
-        v_int = int.from_bytes(data[7:9], "little")
-        self.current_weight = v_int
-        self.current_weight_timestamp = time.perf_counter()
+        """Eureka Precisa weight notification: tenths of a gram in bytes 7-8
+        (little endian), the sign in byte 6."""
+        grams = int.from_bytes(data[7:9], "little") / 10
+        if data[6]:
+            grams = -grams
+        now = time.perf_counter()
+        self.current_weight = grams
+        self.current_weight_timestamp = now
+        # The scale notifies several times a second: log changes, at most once
+        # a second, so the Pi Zero isn't writing an event per notification.
+        if grams != self._logged_weight and now - self._logged_at >= 1.0:
+            self._logged_weight, self._logged_at = grams, now
+            sl = shot_logger.get()
+            if sl is not None:
+                sl.log_event("scale", grams=grams)
+
+    def _log_connection(self, state: str) -> None:
+        logger.info("scale %s", state)
         sl = shot_logger.get()
         if sl is not None:
-            sl.log_event("scale", grams=v_int / 10)
+            sl.log_event("scale_link", state=state)
 
     async def notify(self) -> None:
         import asyncio
@@ -101,7 +118,9 @@ class BluetoothScale:
                     await client.start_notify(
                         config.BLUETOOTH_NOTIFY_UUID, self.callback
                     )
+                    self._log_connection("connected")
                     await self.disconnect_event.wait()
+                    self._log_connection("disconnected")
                     await client.stop_notify(config.BLUETOOTH_NOTIFY_UUID)
             except Exception as e:
                 logger.debug("start_notify failed: %s", e)

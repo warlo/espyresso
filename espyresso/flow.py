@@ -29,6 +29,13 @@ _ML_PER_PULSE = (
     0.473, 0.477, 0.477, 0.472, 0.467, 0.466, 0.466, 0.469, 0.471, 0.473, 0.475,
 )
 _PULSE_INTERVAL = (_PULSE_RATES[-1] - _PULSE_RATES[0]) / (len(_PULSE_RATES) - 1)
+# No pulse for this long (or three periods): the water has stopped.
+_FLOW_STOPPED_SECONDS = 2.0
+
+
+def _tick_diff(earlier: int, later: int) -> int:
+    """Microseconds between two pigpio ticks (they wrap at 2**32)."""
+    return (later - earlier) & 0xFFFFFFFF
 
 
 class Flow:
@@ -52,67 +59,41 @@ class Flow:
         self.flow_queue = flow_queue
 
         self.pulse_start: float = time.perf_counter()
-
+        self.prev_tick: Optional[int] = None
         self.prev_pulse_time: float = 0.0
-        self.prev_change_time: float = 0.0
-
-        self.first_half_period: Optional[float] = None
-        self.second_half_period: Optional[float] = None
+        self.prev_period: Optional[float] = None
+        self.last_period: Optional[float] = None
 
     def reset_pulse_count(self) -> None:
         self.total_volume = 0.0
         self.pulse_count = 0
+        self.prev_tick = None
         self.prev_pulse_time = 0.0
-        self.prev_change_time = 0.0
-        self.first_half_period = None
-        self.second_half_period = None
+        self.prev_period = None
+        self.last_period = None
         self.pulse_start = time.perf_counter()
         self.flow_queue.clear()
 
     def pulse_callback(self, gpio: int, level: int, tick: int) -> None:
-
-        # Skip sub 20ms erratic pulses
-        current_time = time.perf_counter()
-        if (
-            self.prev_change_time
-            and current_time - self.prev_change_time < config.FLOW_METER_DEBOUNCE_TIME
-        ):
-            # Expected behaviour (pump vibration), not a warning. Demoted
-            # to DEBUG so the log isn't flooded ~20×/sec during a shot.
-            logger.debug("Skipping sub 20ms flow pulse")
-            self.prev_change_time = current_time
-            return None
-
+        """One rising edge per pulse of the meter. Periods come from pigpio's
+        tick (when the edge happened): Python may handle edges late and in
+        bursts when the Pi is busy."""
         self.pulse_count += 1
+        if self.prev_tick is not None:
+            period = _tick_diff(self.prev_tick, tick) / 1e6
+            if period > 0:
+                self.prev_period, self.last_period = self.last_period, period
+        self.prev_tick = tick
+        self.prev_pulse_time = time.perf_counter()
 
-        self.first_half_period, self.second_half_period = (
-            self.second_half_period,
-            current_time - self.prev_pulse_time,
-        )
-
-        pulse_rate = self.get_pulse_rate_for_volume()
-        ml_per_pulse = self.get_mls_per_pulse(pulse_rate)
-        flow_rate = self.get_flow_rate()
-
-        self.prev_pulse_time = current_time
-
-        if not flow_rate or not ml_per_pulse:
-            return
-
-        # Both at DEBUG: a brew shot fires ~60 pulses/sec and previously
-        # wrote ~60 INFO lines/sec to disk plus formatted an f-string for
-        # each. With %s-style lazy formatting nothing is built unless
-        # DEBUG logging is enabled.
-        logger.debug(
-            "pulse rate=%s ml/pulse=%s flow_rate=%s",
-            pulse_rate, ml_per_pulse, flow_rate,
-        )
-
-        self.total_volume += ml_per_pulse / 2.0
-        self.lifetime_ml += ml_per_pulse / 2.0
-        average_rate = self.total_volume / (self.prev_pulse_time - self.pulse_start)
-
-        self.flow_queue.add_to_queue((flow_rate, average_rate))
+        rate = self.get_pulse_rate_for_volume()
+        # The first pulse of a run has no rate yet: count it at the typical
+        # value; slower than the table goes: its slowest value.
+        ml_per_pulse = (self.get_mls_per_pulse(rate) or _ML_PER_PULSE[0]) if rate else _ML_PER_PULSE[-1]
+        self.total_volume += ml_per_pulse
+        self.lifetime_ml += ml_per_pulse
+        average_rate = self.total_volume / max(1e-3, self.prev_pulse_time - self.pulse_start)
+        self.flow_queue.add_to_queue((self.get_flow_rate(), average_rate))
 
     def get_pulse_count(self) -> int:
         return self.pulse_count
@@ -121,30 +102,23 @@ class Flow:
         return self.total_volume
 
     def get_flow_rate(self) -> Optional[float]:
-        if not self.second_half_period:
-            pulse_rate = 0.0
-        elif not self.first_half_period:
-            pulse_rate = 0.5 / self.second_half_period
-        else:
-            time_since_last_pulse = time.perf_counter() - self.prev_pulse_time
-            pulse_rate = 1 / (
-                max(time_since_last_pulse, self.first_half_period)
-                + self.second_half_period
-            )
+        """mL/s, from the recent pulse period; falls off once pulses stop."""
+        rate = self.get_pulse_rate_for_volume()
+        if not rate:
+            return 0.0
+        since = time.perf_counter() - self.prev_pulse_time
+        if since > max(_FLOW_STOPPED_SECONDS, 3.0 / rate):
+            return 0.0
+        rate = min(rate, 1.0 / since) if since > 1.0 / rate else rate
+        return rate * (self.get_mls_per_pulse(rate) or _ML_PER_PULSE[0])
 
-        return pulse_rate * (self.get_mls_per_pulse(pulse_rate) or 0)
-
-    def get_pulse_rate_for_volume(
-        self,
-    ) -> float:
-        if not self.second_half_period:
-            return 0
-
-        if not self.first_half_period:
-            pulse_rate = 0.5 / self.second_half_period
-        else:
-            pulse_rate = 1 / (self.first_half_period + self.second_half_period)
-        return pulse_rate
+    def get_pulse_rate_for_volume(self) -> float:
+        """Pulses per second over the last two periods."""
+        if not self.last_period:
+            return 0.0
+        if not self.prev_period:
+            return 1.0 / self.last_period
+        return 2.0 / (self.prev_period + self.last_period)
 
     @staticmethod
     def get_mls_per_pulse(pulse_rate: float) -> Optional[float]:
