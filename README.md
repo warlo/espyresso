@@ -9,6 +9,8 @@ Espyresso is a hobby Python project designed for the Gaggia Classic espresso mac
 
 **Note:** Espyresso is a project tailored for enthusiasts with a penchant for tinkering. Due to the custom requirements of the hardware, this wont work seamlessly out of the box. The software is designed to run on a Raspberry Pi Zero with custom soldered hardware. However feel free to use it as inspiration!
 
+**Pygame version:** Pygame is pinned to `1.9.6` on purpose. It is the only version that works on the Raspberry Pi Zero, so do not upgrade it. Dependencies in general are left as-is, since this is a small local device and not something that needs to track upstream.
+
 ## Features
 
 - **Boiler Controller with PWM:** Efficiently manages the boiler temperature using Pulse Width Modulation for precise control.

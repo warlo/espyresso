@@ -1,4 +1,4 @@
-pygame==1.9.6
+pygame==1.9.6  # Only version that works on the Pi Zero. Do not upgrade.
 mypy==0.982
 black==21.9b0
 isort==5.9.3
