@@ -62,6 +62,8 @@ class ZacWireInputChannel(object):
     """ Received data has a parity error. """
     STATUS_BIT_COUNT_ERROR = 2
     """ Received data has a wrong bit count. """
+    PACKET_BYTES = 2
+    """ A TSIC 206/306 packet: two bytes of temperature. """
 
     def __init__(self, pigpio_pi, gpio):
         """
@@ -204,7 +206,17 @@ class ZacWireInputChannel(object):
                         self.__parity += bit
                         if self.__bit_count == 9:
                             self.__check_parity()
-                            self.pi.set_watchdog(self.gpio, 1)  # 1 ms
+                            if (
+                                self.__received_bytes is not None
+                                and len(self.__received_bytes) == self.PACKET_BYTES
+                            ):
+                                # Deliver on the last bit. This used to arm a
+                                # 1 ms watchdog to find the packet's end, which
+                                # pigpio repeats every millisecond until the pin
+                                # changes: hundreds of empty Python callbacks a
+                                # second on the Pi Zero.
+                                self.__pass_any_packet_to_callback(self.STATUS_OK)
+                                self.__reset_packet()
                         elif self.__bit_count > 9:
                             # more bits than expected (8 bits + 1 __parity)
                             self.__pass_any_packet_to_callback(
