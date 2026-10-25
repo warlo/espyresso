@@ -155,15 +155,16 @@ def test_sighup_is_handled_before_construction(monkeypatch: pytest.MonkeyPatch) 
 class FakeConsoles:
     """Linux VT ioctls at the OS boundary: /dev/ttyN with a KD mode each."""
 
-    KDGETMODE, KDSETMODE = 0x4B3B, 0x4B3A
+    KDGETMODE, KDSETMODE, VT_UNLOCKSWITCH = 0x4B3B, 0x4B3A, 0x560C
 
-    def __init__(self, modes: dict) -> None:
+    def __init__(self, modes: dict, switch_locked: bool = False) -> None:
         self.modes = dict(modes)  # tty number -> 0 text / 1 graphics
+        self.switch_locked = switch_locked  # global, like the kernel's vt_dont_switch
         self.fds: dict = {}
 
     def open(self, path: str, flags: int) -> int:
         n = int(path.replace("/dev/tty", ""))
-        if n not in self.modes:
+        if n != 0 and n not in self.modes:
             raise FileNotFoundError(path)
         fd = 100 + n
         self.fds[fd] = n
@@ -176,6 +177,9 @@ class FakeConsoles:
         import struct
 
         n = self.fds[fd]
+        if request == self.VT_UNLOCKSWITCH:
+            self.switch_locked = False
+            return 0
         if request == self.KDGETMODE:
             return struct.pack("i", self.modes[n])
         if request == self.KDSETMODE:
@@ -195,6 +199,20 @@ def test_abandoned_graphics_consoles_are_reset_to_text(monkeypatch: pytest.Monke
     failsafe.reset_stale_consoles()
 
     assert fake.modes == {1: 0, 2: 0, 3: 0}
+
+
+def test_console_switch_lock_left_by_a_killed_display_is_cleared(monkeypatch: pytest.MonkeyPatch) -> None:
+    # SDL 1.2 fbcon locks console switching system-wide (VT_LOCKSWITCH) while
+    # it owns the screen and only unlocks on a clean exit. After a kill every
+    # switch is dropped and the next display start waits forever.
+    fake = FakeConsoles({1: 0, 2: 0, 3: 0}, switch_locked=True)
+    monkeypatch.setattr(failsafe.os, "open", fake.open)
+    monkeypatch.setattr(failsafe.os, "close", fake.close)
+    monkeypatch.setattr(failsafe.fcntl, "ioctl", fake.ioctl)
+
+    failsafe.reset_stale_consoles()
+
+    assert fake.switch_locked is False
 
 
 def test_display_resets_stale_consoles_before_starting_pygame(monkeypatch: pytest.MonkeyPatch) -> None:

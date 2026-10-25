@@ -7,9 +7,11 @@ this before the app starts and after it stops (``python3 -m
 espyresso.failsafe``). Falls back to driving the pins low with raspi-gpio when
 pigpiod itself is down.
 
-It also resets virtual consoles a killed app left in graphics mode: the kernel
-ignores every console switch away from such a console, so the next start's
-display (SDL fbcon waits for its switch) would hang forever.
+It also undoes what a killed display leaves behind. SDL 1.2's framebuffer
+driver (pygame) puts its console into graphics mode and locks console switching
+system-wide (VT_LOCKSWITCH) while it owns the screen, and only reverses both on
+a clean exit. After a kill the kernel drops every console switch, and the next
+start's display waits forever for its own switch.
 """
 import fcntl
 import logging
@@ -27,6 +29,7 @@ OUTPUT_GPIOS = (config.BOILER_PWM_GPIO, config.PUMP_OUT_GPIO, config.PUMP_PWM_GP
 
 KDGETMODE, KDSETMODE = 0x4B3B, 0x4B3A
 KD_TEXT, KD_GRAPHICS = 0, 1
+VT_UNLOCKSWITCH = 0x560C
 
 
 def outputs_off() -> None:
@@ -48,8 +51,18 @@ def outputs_off() -> None:
 
 
 def reset_stale_consoles(max_vt: int = 12) -> None:
-    """Put virtual consoles left in graphics mode back into text mode. Only
-    call while no display is running (before start-up, after a stop)."""
+    """Unlock console switching and put consoles left in graphics mode back
+    into text mode. Only call while no display is running (before start-up,
+    after a stop)."""
+    try:
+        fd = os.open("/dev/tty0", os.O_RDWR | os.O_NOCTTY)
+        try:
+            fcntl.ioctl(fd, VT_UNLOCKSWITCH, 0)
+        finally:
+            os.close(fd)
+    except OSError:
+        logger.debug("could not unlock console switching", exc_info=True)
+
     for n in range(1, max_vt + 1):
         path = "/dev/tty%d" % n
         try:
