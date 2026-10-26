@@ -365,12 +365,14 @@ SENSOR_XFER_COEFF = 0.02656
 # the lowest CPU priority (espyresso/scale.py): inside the app, each search
 # delayed temperature decoding by 3-4 s (tsic_lag_ms in the tick log).
 BLUETOOTH_ENABLED = True
-# Each search lasts BLUETOOTH_SEARCH_SECONDS (bleak's own 10 s: 5 s aborted
-# connections mid-setup and crashed the Eureka Precisa). The wait between
-# searches doubles from BLUETOOTH_RETRY_SECONDS up to
-# BLUETOOTH_RETRY_MAX_SECONDS. A scale process that dies is started again
+# Each search lasts BLUETOOTH_SEARCH_SECONDS; a connection gets
+# BLUETOOTH_CONNECT_SECONDS (at the lowest priority one took about 9 s; cutting
+# connections short at 5 s aborted them mid-setup and crashed the Eureka
+# Precisa). The wait between searches doubles from BLUETOOTH_RETRY_SECONDS up
+# to BLUETOOTH_RETRY_MAX_SECONDS. A scale process that dies is started again
 # after BLUETOOTH_RESTART_SECONDS.
 BLUETOOTH_SEARCH_SECONDS = 10.0
+BLUETOOTH_CONNECT_SECONDS = 20.0
 BLUETOOTH_RETRY_SECONDS = 10.0
 BLUETOOTH_RETRY_MAX_SECONDS = 60.0
 BLUETOOTH_RESTART_SECONDS = 30.0

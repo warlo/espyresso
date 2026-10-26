@@ -4,11 +4,12 @@ latest reading."""
 
 from __future__ import annotations
 
+import asyncio
 import io
 import signal
 import threading
 import time
-from typing import Any, Iterator, List
+from typing import Any, Iterator, List, Optional
 from unittest.mock import Mock
 
 import pytest
@@ -228,3 +229,27 @@ def test_scale_process_starts_at_the_lowest_priority(monkeypatch: pytest.MonkeyP
     bluetooth._spawn_scale_process()
 
     assert popen.call_args.args[0][:3] == ["nice", "-n", "19"]
+
+
+def test_the_scale_is_found_by_its_bluez_object_path() -> None:
+    assert scale.device_path("b8:ca:04:28:79:84") == "/org/bluez/hci0/dev_B8_CA_04_28_79_84"
+
+
+def test_search_waits_until_bluez_reports_the_scale() -> None:
+    """BlueZ searches (in C); the scale process only asks about one device,
+    instead of decoding every nearby advertisement at the lowest priority,
+    which fell further behind than it could catch up."""
+    answers = [None, None, -55]
+
+    async def rssi() -> Optional[int]:
+        return answers.pop(0)
+
+    assert asyncio.run(scale.wait_until_seen(rssi, seconds=1.0, poll=0.01)) is True
+    assert answers == []
+
+
+def test_search_gives_up_when_the_scale_stays_away() -> None:
+    async def rssi() -> Optional[int]:
+        return None
+
+    assert asyncio.run(scale.wait_until_seen(rssi, seconds=0.05, poll=0.01)) is False

@@ -2,12 +2,13 @@
 
     python3 -m espyresso.scale
 
-Bluetooth on the Pi Zero is Python work for every advertisement while
-searching and every notification while connected (bleak decodes BlueZ's
-D-Bus messages). Inside the app it competed with temperature decoding for
-the GIL and delayed readings by 3-4 s per search. Here it runs at the lowest
-CPU priority in its own interpreter, and only hands the app one line per
-reading on stdout:
+Bluetooth is Python work for every D-Bus message bleak decodes. Inside the
+app it competed with temperature decoding for the GIL and delayed readings
+by 3-4 s per search. Here it runs at the lowest CPU priority in its own
+interpreter. It never decodes advertisements: BlueZ searches, this process
+asks it about the scale alone once a second (at the lowest priority it fell
+behind decoding every nearby device's adverts), then connects to it by its
+object path. It hands the app one line per reading on stdout:
 
     w <grams>              a weight notification
     link connected         notifications started
@@ -20,7 +21,7 @@ import logging
 import os
 import signal
 import sys
-from typing import Any, Awaitable, Optional, TextIO
+from typing import Any, Awaitable, Callable, Optional, Sequence, TextIO
 
 from espyresso import config
 
@@ -45,6 +46,25 @@ def grams_from(data: bytearray) -> float:
     return -grams if data[6] else grams
 
 
+def device_path(address: str, adapter: str = "hci0") -> str:
+    """BlueZ's object for a device, e.g. /org/bluez/hci0/dev_B8_CA_04_28_79_84."""
+    return f"/org/bluez/{adapter}/dev_" + address.upper().replace(":", "_")
+
+
+async def wait_until_seen(
+    rssi: Callable[[], Awaitable[Optional[int]]], seconds: float, poll: float = 1.0
+) -> bool:
+    """Whether BlueZ reports the device (it has an RSSI only while its
+    search sees it) within ``seconds``."""
+    end = asyncio.get_running_loop().time() + seconds
+    while True:
+        if await rssi() is not None:
+            return True
+        if asyncio.get_running_loop().time() >= end:
+            return False
+        await asyncio.sleep(poll)
+
+
 async def _first(*aws: Awaitable[Any], timeout: Optional[float] = None) -> None:
     """Wait until the first of ``aws`` finishes (or ``timeout``)."""
     tasks = [asyncio.ensure_future(a) for a in aws]
@@ -61,7 +81,27 @@ async def _orphaned(parent: int) -> None:
 
 async def run(out: TextIO = sys.stdout) -> None:
     from bleak.backends.bluezdbus.client import BleakClientBlueZDBus as BleakClient
-    from bleak.backends.bluezdbus.scanner import BleakScannerBlueZDBus as BleakScanner
+    from bleak.backends.device import BLEDevice
+    from dbus_next import Message, MessageType, Variant
+    from dbus_next.aio import MessageBus
+    from dbus_next.constants import BusType
+
+    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    adapter = "/org/bluez/hci0"
+    path = device_path(config.BLUETOOTH_SCALE_ADDRESS)
+
+    async def bluez(obj: str, interface: str, member: str, signature: str = "", body: Sequence[Any] = ()) -> Any:
+        message = Message(
+            destination="org.bluez", path=obj, interface=interface, member=member, signature=signature, body=list(body)
+        )
+        return await bus.call(message)
+
+    async def rssi() -> Optional[int]:
+        reply = await bluez(path, "org.freedesktop.DBus.Properties", "Get", "ss", ("org.bluez.Device1", "RSSI"))
+        return None if reply.message_type == MessageType.ERROR else int(reply.body[0].value)
+
+    # The scale is Bluetooth LE: skip classic inquiry while searching.
+    await bluez(adapter, "org.bluez.Adapter1", "SetDiscoveryFilter", "a{sv}", ({"Transport": Variant("s", "le")},))
 
     loop = asyncio.get_running_loop()
     stop, wake = asyncio.Event(), asyncio.Event()
@@ -69,7 +109,6 @@ async def run(out: TextIO = sys.stdout) -> None:
     loop.add_signal_handler(signal.SIGUSR1, wake.set)
     orphaned = asyncio.ensure_future(_orphaned(os.getppid()))
     orphaned.add_done_callback(lambda _: stop.set())
-    address = config.BLUETOOTH_SCALE_ADDRESS.lower()
 
     def emit(line: str) -> None:
         out.write(line + "\n")
@@ -78,21 +117,23 @@ async def run(out: TextIO = sys.stdout) -> None:
     failures = 0
     while not stop.is_set():
         try:
-            # Our own search, so BlueZ can drop repeated advertisements
-            # (bleak's connect() would search again, unfiltered).
-            device = await BleakScanner.find_device_by_filter(
-                lambda d, ad: d.address.lower() == address,
-                timeout=config.BLUETOOTH_SEARCH_SECONDS,
-                filters={"DuplicateData": False},
-            )
-            if device is None:
+            await bluez(adapter, "org.bluez.Adapter1", "StartDiscovery")
+            try:
+                seen = await wait_until_seen(rssi, config.BLUETOOTH_SEARCH_SECONDS)
+            finally:
+                await bluez(adapter, "org.bluez.Adapter1", "StopDiscovery")
+            if not seen:
                 raise LookupError("scale not found")
+            # By path, so bleak doesn't run a search of its own first.
+            device = BLEDevice(config.BLUETOOTH_SCALE_ADDRESS, "scale", {"path": path, "props": {}})
             gone = asyncio.Event()
 
             def on_disconnect(_: Any) -> None:
                 loop.call_soon_threadsafe(gone.set)
 
-            async with BleakClient(device, disconnected_callback=on_disconnect) as client:
+            async with BleakClient(
+                device, disconnected_callback=on_disconnect, timeout=config.BLUETOOTH_CONNECT_SECONDS
+            ) as client:
                 failures = 0
                 await client.start_notify(
                     config.BLUETOOTH_NOTIFY_UUID, lambda _, data: emit(f"w {grams_from(data)}")
