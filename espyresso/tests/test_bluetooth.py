@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from espyresso import config, scale
+from espyresso import bluetooth, config, scale
 from espyresso.bluetooth import BluetoothScale
 
 
@@ -217,3 +217,14 @@ def test_nothing_starts_when_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     BluetoothScale(spawn=spawn).start()
 
     spawn.assert_not_called()
+
+
+def test_scale_process_starts_at_the_lowest_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Python's start-up and imports run before main() can lower the priority:
+    at normal priority they delayed temperature decoding by 2.4 s."""
+    popen = Mock()
+    monkeypatch.setattr("espyresso.bluetooth.subprocess.Popen", popen)
+
+    bluetooth._spawn_scale_process()
+
+    assert popen.call_args.args[0][:3] == ["nice", "-n", "19"]

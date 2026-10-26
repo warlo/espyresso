@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def _spawn_scale_process() -> "subprocess.Popen[str]":
+    # Low priority from the first instruction: Python's start-up and imports
+    # come before scale.main() could lower it.
     return subprocess.Popen(
-        [sys.executable, "-m", "espyresso.scale"],
+        ["nice", "-n", "19", sys.executable, "-m", "espyresso.scale"],
         stdout=subprocess.PIPE,
         stdin=subprocess.DEVNULL,
         universal_newlines=True,
