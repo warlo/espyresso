@@ -59,12 +59,14 @@ KD = 0.905
 IMIN = 0.0
 IMAX = 1.0
 
-# Brew routine (Pi button shots). Tim Wendelboe's espresso: 19-20 g in,
-# 42-45 g out, 25-35 s. Without a scale the shot stops on inlet volume from the
-# flow meter: yield + water retained by the puck and basket. The retention is
-# an estimate: weigh a few shots and adjust (tools/sim/README.md).
-BREW_DOSE_G = 20.0
-BREW_TARGET_YIELD_G = 44.0
+# Brew routine (Pi button shots): 18 g in, 40 g out (1:2.2) in 25-32 s, a
+# start for light washed coffee; longer (42-45 g) if sour, shorter (36-38 g)
+# if harsh. With the scale the shot stops at BREW_TARGET_YIELD_G on it (zero it
+# with the cup on). Without a scale it stops on inlet volume from the flow
+# meter: yield + water retained by the puck and basket. The retention is an
+# estimate: weigh a few shots and adjust (tools/sim/README.md).
+BREW_DOSE_G = 18.0
+BREW_TARGET_YIELD_G = 40.0
 BREW_RETAINED_ML_PER_G = 1.25
 BREW_MAX_SECONDS = 45.0
 # Preinfusion at low pump power until this volume or time, whichever first.
