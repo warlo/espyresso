@@ -253,3 +253,17 @@ def test_search_gives_up_when_the_scale_stays_away() -> None:
         return None
 
     assert asyncio.run(scale.wait_until_seen(rssi, seconds=0.05, poll=0.01)) is False
+
+
+def test_scale_process_dies_with_the_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An old scale process, too busy catching up to run its own exit, kept
+    running for 19 minutes after the app restarted and starved temperature
+    decoding by 44 s. The kernel now kills it with the app."""
+    die = Mock()
+    monkeypatch.setattr("espyresso.scale.os.nice", Mock())
+    monkeypatch.setattr("espyresso.scale.die_with_parent", die)
+    monkeypatch.setattr("espyresso.scale.asyncio.run", lambda coro: coro.close())
+
+    scale.main()
+
+    die.assert_called_once_with()

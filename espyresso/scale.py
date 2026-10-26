@@ -14,7 +14,9 @@ object path. It hands the app one line per reading on stdout:
     link connected         notifications started
     link disconnected      the scale went away
 
-SIGUSR1 makes it search now instead of after its back-off; SIGTERM stops it.
+SIGUSR1 makes it search now instead of after its back-off. SIGTERM ends it
+at once (no handler: a busy event loop would never run one), and the kernel
+kills it when the app dies.
 """
 import asyncio
 import logging
@@ -73,10 +75,18 @@ async def _first(*aws: Awaitable[Any], timeout: Optional[float] = None) -> None:
         task.cancel()
 
 
-async def _orphaned(parent: int) -> None:
-    """Returns once the app that started us is gone."""
-    while os.getppid() == parent:
-        await asyncio.sleep(2.0)
+def die_with_parent() -> None:
+    """Have the kernel kill this process when the app that started it dies
+    (Linux prctl PR_SET_PDEATHSIG), however busy its event loop is."""
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        libc.prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG
+    except OSError:
+        return
+    if os.getppid() == 1:
+        sys.exit(0)  # the app died before we got here
 
 
 async def run(out: TextIO = sys.stdout) -> None:
@@ -96,27 +106,31 @@ async def run(out: TextIO = sys.stdout) -> None:
         )
         return await bus.call(message)
 
+    async def device_property(name: str) -> Any:
+        reply = await bluez(path, "org.freedesktop.DBus.Properties", "Get", "ss", ("org.bluez.Device1", name))
+        return None if reply.message_type == MessageType.ERROR else reply.body[0].value
+
     async def rssi() -> Optional[int]:
-        reply = await bluez(path, "org.freedesktop.DBus.Properties", "Get", "ss", ("org.bluez.Device1", "RSSI"))
-        return None if reply.message_type == MessageType.ERROR else int(reply.body[0].value)
+        value = await device_property("RSSI")
+        return None if value is None else int(value)
 
     # The scale is Bluetooth LE: skip classic inquiry while searching.
     await bluez(adapter, "org.bluez.Adapter1", "SetDiscoveryFilter", "a{sv}", ({"Transport": Variant("s", "le")},))
 
     loop = asyncio.get_running_loop()
-    stop, wake = asyncio.Event(), asyncio.Event()
-    loop.add_signal_handler(signal.SIGTERM, stop.set)
+    wake = asyncio.Event()
     loop.add_signal_handler(signal.SIGUSR1, wake.set)
-    orphaned = asyncio.ensure_future(_orphaned(os.getppid()))
-    orphaned.add_done_callback(lambda _: stop.set())
 
     def emit(line: str) -> None:
         out.write(line + "\n")
         out.flush()
 
     failures = 0
-    while not stop.is_set():
+    while True:
         try:
+            if await device_property("Connected"):
+                # Left connected by a scale process that was killed: start clean.
+                await bluez(path, "org.bluez.Device1", "Disconnect")
             await bluez(adapter, "org.bluez.Adapter1", "StartDiscovery")
             try:
                 seen = await wait_until_seen(rssi, config.BLUETOOTH_SEARCH_SECONDS)
@@ -139,20 +153,20 @@ async def run(out: TextIO = sys.stdout) -> None:
                     config.BLUETOOTH_NOTIFY_UUID, lambda _, data: emit(f"w {grams_from(data)}")
                 )
                 emit("link connected")
-                await _first(gone.wait(), stop.wait())
+                await gone.wait()
                 emit("link disconnected")
         except BrokenPipeError:
             return  # the app is gone
         except Exception as e:  # noqa: BLE001 - any failure means "try again later"
             failures += 1
             logger.info("scale not reachable (%s in a row): %s", failures, e)
-        if failures and not stop.is_set():
+        if failures:
             wake.clear()
-            await _first(wake.wait(), stop.wait(), timeout=retry_delay(failures))
-    orphaned.cancel()
+            await _first(wake.wait(), timeout=retry_delay(failures))
 
 
 def main() -> None:
+    die_with_parent()
     os.nice(19)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     asyncio.run(run())
