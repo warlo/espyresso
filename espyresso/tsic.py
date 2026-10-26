@@ -165,7 +165,9 @@ class ZacWireInputChannel(object):
                 if high_ticks > 1000:
                     # packet start
                     # print('====> PACKET START')
-                    self.__pass_any_packet_to_callback(self.STATUS_OK)
+                    # A whole packet was delivered on its last bit, so one
+                    # still open here lost bits: never a reading.
+                    self.__pass_any_packet_to_callback(self.STATUS_BIT_COUNT_ERROR)
                     self.__received_bytes = [0]
                     self.__parity = 0
                     self.__bit_count = 0
@@ -234,7 +236,7 @@ class ZacWireInputChannel(object):
             # it every period until the pin changes: switch it off until the
             # next packet arms it again.
             self.pi.set_watchdog(self.gpio, 0)
-            self.__pass_any_packet_to_callback(self.STATUS_OK)
+            self.__pass_any_packet_to_callback(self.STATUS_BIT_COUNT_ERROR)
             self.__reset_packet()
 
     def __measure_lag(self, tick):

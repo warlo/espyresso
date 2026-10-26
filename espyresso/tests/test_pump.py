@@ -156,6 +156,56 @@ def test_brew_stops_at_target_inlet_volume_without_a_scale(
     assert "reason=volume" in events
 
 
+def test_brew_slows_near_the_target_weight_then_stops_at_it(
+    log_dir: Path, quick_brew: None, pump: Pump, timer: BrewingTimer
+) -> None:
+    pump.brew_shot()
+    assert _wait_for(lambda: pump.stopped_preinfuse is not None)
+    timer.started -= 10.0  # past the 5 s ramp up to brew power
+
+    pump.bluetooth_scale.get_scale_weight.return_value = 39.0
+    assert _wait_for(lambda: pump.pwm.value == pytest.approx(0.2))  # 1 g to go
+    assert pump.pumping is True
+
+    pump.bluetooth_scale.get_scale_weight.return_value = 40.0
+    assert _wait_for(lambda: pump.pumping is False)
+    pump.pump_thread.join(timeout=2)
+    events = Path(shot_logger.get().event_path).read_text()  # type: ignore[union-attr]
+    assert "reason=weight" in events
+
+
+def test_brew_stops_at_the_time_limit_when_the_scale_reads_wrong(
+    log_dir: Path, quick_brew: None, pump: Pump, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A live but wrong scale reading also switches off the volume stop, so
+    the time limit is the last stop before the watchdog's."""
+    monkeypatch.setattr(config, "BREW_MAX_SECONDS", 0.3)
+    pump.bluetooth_scale.get_scale_weight.return_value = 5.0
+
+    pump.brew_shot()
+
+    assert _wait_for(lambda: pump.stopped_preinfuse is not None)
+    assert _wait_for(lambda: pump.pumping is False)
+    pump.pump_thread.join(timeout=2)
+    events = Path(shot_logger.get().event_path).read_text()  # type: ignore[union-attr]
+    assert "reason=time" in events
+
+
+@pytest.mark.parametrize("start", ["brew_shot", "pulse_pump"])
+@pytest.mark.parametrize(
+    "water, boiling, notice", [(False, True, "Not enough water"), (True, False, "Not boiling")]
+)
+def test_pump_will_not_start_dry_or_with_the_boiler_off(
+    pump: Pump, start: str, water: bool, boiling: bool, notice: str
+) -> None:
+    pump.ranger.has_enough_water.return_value = water
+    pump.boiler.boiling = boiling
+
+    assert getattr(pump, start)() == (False, notice)
+    assert not pump.pump_thread.is_alive()
+    assert pump.pumping is False
+
+
 def test_brew_tells_the_controller_how_long_the_shot_has_left(
     log_dir: Path, quick_brew: None, pump: Pump, flow: Flow
 ) -> None:
