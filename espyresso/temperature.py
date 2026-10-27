@@ -39,6 +39,9 @@ class Temperature:
         **kwargs: Any,
     ) -> None:
         self.get_started_time = get_started_time
+        # Set by the app once the scale exists (it starts after control):
+        # the latest weight, or None without a fresh reading. Logged per tick.
+        self.get_scale_grams: Optional[Callable[[], Optional[float]]] = None
         # Called after every completed control tick; feeds the watchdog.
         self.heartbeat = heartbeat
         self.guard = SafetyGuard()
@@ -226,12 +229,17 @@ class Temperature:
 
         sl = shot_logger.get()
         if sl is not None:
+            grams = self.get_scale_grams() if self.get_scale_grams is not None else None
             sl.log_tick(
                 raw_temp=temp,
                 heater=heater_value,
                 heater_cmd=heater_cmd,
                 safety=safety,
                 flow_ml=self.flow.get_millilitres(),
+                # Raw meter pulses and the scale: calibration data from every
+                # shot or flush with the scale under the cup.
+                flow_pulses=self.flow.get_pulse_count(),
+                scale_g="" if grams is None else grams,
                 boiling=self.boiler.get_boiling(),
                 pwm_override=self.boiler.pwm_override,
                 setpoint=self.pcontroller.temp_setpoint,

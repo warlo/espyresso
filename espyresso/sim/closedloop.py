@@ -72,6 +72,9 @@ class _FakeFlow:
     def get_millilitres(self) -> float:
         return self.shot_ml
 
+    def get_pulse_count(self) -> int:
+        return int(self.shot_ml / 0.476)  # the meter's nominal mL per pulse
+
 
 class _FakeTsic:
     def __init__(self, first: Measurement) -> None:

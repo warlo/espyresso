@@ -39,8 +39,13 @@ class BluetoothScale:
         self._thread: Optional[threading.Thread] = None
 
     def get_scale_weight(self) -> float:
+        grams = self.fresh_weight()
+        return 0 if grams is None else grams
+
+    def fresh_weight(self) -> Optional[float]:
+        """The latest reading, or None if there is none from the last 5 s."""
         if time.perf_counter() - self.current_weight_timestamp > 5:
-            return 0
+            return None
         return self.current_weight
 
     def start(self) -> None:

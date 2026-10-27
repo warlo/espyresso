@@ -267,3 +267,17 @@ def test_scale_process_dies_with_the_app(monkeypatch: pytest.MonkeyPatch) -> Non
     scale.main()
 
     die.assert_called_once_with()
+
+
+def test_fresh_weight_tells_no_reading_apart_from_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr("espyresso.bluetooth.time.perf_counter", lambda: clock[0])
+    s = BluetoothScale()
+    assert s.fresh_weight() is None
+
+    s.handle_line("w 0.0")
+    assert s.fresh_weight() == 0.0
+
+    clock[0] += 5.5
+    assert s.fresh_weight() is None
+    assert s.get_scale_weight() == 0

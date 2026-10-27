@@ -300,3 +300,29 @@ def test_brew_state_changes_are_logged(rig_factory, session) -> None:  # type: i
     events = open(session.event_path).read()
     assert events.count("brew_state") == 2
     assert "state=HEAT" in events and "state=OFF" in events
+
+
+def test_meter_pulses_and_scale_weight_are_logged_every_tick(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    """Any shot or flush with the scale under the cup is then a flow meter
+    calibration record (water in from the pulses, out from the grams)."""
+    rig = rig_factory(Measurement(93.0, 999.0))
+    rig.flow.get_pulse_count.return_value = 57
+    rig.temperature.get_scale_grams = lambda: 12.5
+    rig.tick(93.0)
+    rig.temperature.get_scale_grams = lambda: None  # no fresh reading
+    rig.tick(93.0)
+    session.close()
+
+    rows = _rows(session.tick_path)
+    assert rows[-2]["flow_pulses"] == "57"
+    assert float(rows[-2]["scale_g"]) == pytest.approx(12.5)
+    assert rows[-1]["scale_g"] == ""
+
+
+def test_no_scale_logs_no_weight(rig_factory, session) -> None:  # type: ignore[no-untyped-def]
+    rig = rig_factory(Measurement(93.0, 999.0))
+    rig.flow.get_pulse_count.return_value = 0
+    rig.tick(93.0)
+    session.close()
+
+    assert _rows(session.tick_path)[-1]["scale_g"] == ""

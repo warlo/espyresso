@@ -135,6 +135,7 @@ class Espyresso:
 
     def _construct_rest(self) -> None:
         self.bluetooth_scale = BluetoothScale()
+        self.temperature.get_scale_grams = self.bluetooth_scale.fresh_weight
         self.pump = Pump(
             pigpio_pi=self.pigpio_pi,
             bluetooth_scale=self.bluetooth_scale,
