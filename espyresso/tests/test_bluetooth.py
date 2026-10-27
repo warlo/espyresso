@@ -281,3 +281,23 @@ def test_fresh_weight_tells_no_reading_apart_from_zero(monkeypatch: pytest.Monke
     clock[0] += 5.5
     assert s.fresh_weight() is None
     assert s.get_scale_weight() == 0
+
+
+def test_only_the_newest_scale_reading_is_kept() -> None:
+    """Readings queued while the process was busy are stale: a backlog made
+    the app see 24 g while the cup held about 45 g, and the weight stop
+    never fired. Only the newest counts."""
+    import socket
+
+    ours, scale_end = socket.socketpair(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        for grams in (10.0, 20.0, 30.0):
+            scale_end.send(bytes(_packet(grams)))
+
+        newest = scale.newest_packet(ours.fileno(), 64)
+
+        assert newest is not None and scale.grams_from(bytearray(newest)) == pytest.approx(30.0)
+        assert scale.newest_packet(ours.fileno(), 64) is None  # nothing new
+    finally:
+        ours.close()
+        scale_end.close()

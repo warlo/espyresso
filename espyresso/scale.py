@@ -8,7 +8,10 @@ by 3-4 s per search. Here it runs at the lowest CPU priority in its own
 interpreter. It never decodes advertisements: BlueZ searches, this process
 asks it about the scale alone once a second (at the lowest priority it fell
 behind decoding every nearby device's adverts), then connects to it by its
-object path. It hands the app one line per reading on stdout:
+object path. Readings come over a socket from BlueZ (AcquireNotify) instead
+of one D-Bus message each, and only the newest is kept: decoding ten
+messages a second at the lowest priority fell ~10 s behind during a shot.
+It hands the app one line per reading on stdout:
 
     w <grams>              a weight notification
     link connected         notifications started
@@ -23,7 +26,7 @@ import logging
 import os
 import signal
 import sys
-from typing import Any, Awaitable, Callable, Optional, Sequence, TextIO
+from typing import Any, Awaitable, Callable, Optional, Sequence, TextIO, Tuple
 
 from espyresso import config
 
@@ -67,6 +70,21 @@ async def wait_until_seen(
         await asyncio.sleep(poll)
 
 
+def newest_packet(fd: int, size: int) -> Optional[bytes]:
+    """Read every packet waiting on ``fd`` and return the newest: None if
+    there was none, b"" once the other end has closed."""
+    os.set_blocking(fd, False)
+    newest = None
+    while True:
+        try:
+            packet = os.read(fd, size)
+        except BlockingIOError:
+            return newest
+        if not packet:
+            return b""
+        newest = packet
+
+
 async def _first(*aws: Awaitable[Any], timeout: Optional[float] = None) -> None:
     """Wait until the first of ``aws`` finishes (or ``timeout``)."""
     tasks = [asyncio.ensure_future(a) for a in aws]
@@ -96,7 +114,7 @@ async def run(out: TextIO = sys.stdout) -> None:
     from dbus_next.aio import MessageBus
     from dbus_next.constants import BusType
 
-    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+    bus = await MessageBus(bus_type=BusType.SYSTEM, negotiate_unix_fd=True).connect()
     adapter = "/org/bluez/hci0"
     path = device_path(config.BLUETOOTH_SCALE_ADDRESS)
 
@@ -109,6 +127,17 @@ async def run(out: TextIO = sys.stdout) -> None:
     async def device_property(name: str) -> Any:
         reply = await bluez(path, "org.freedesktop.DBus.Properties", "Get", "ss", ("org.bluez.Device1", name))
         return None if reply.message_type == MessageType.ERROR else reply.body[0].value
+
+    async def acquire_notify(char_path: str) -> Tuple[Optional[int], int]:
+        """A socket that carries the characteristic's notifications, or
+        (None, 0) if BlueZ refuses."""
+        reply = await bluez(char_path, "org.bluez.GattCharacteristic1", "AcquireNotify", "a{sv}", ({},))
+        if reply.message_type == MessageType.ERROR:
+            logger.info("AcquireNotify refused (%s); falling back to D-Bus notifications", reply.error_name)
+            return None, 0
+        handle, mtu = reply.body
+        fds = getattr(reply, "unix_fds", None) or []
+        return (fds[handle] if isinstance(handle, int) and handle < len(fds) else handle), int(mtu)
 
     async def rssi() -> Optional[int]:
         value = await device_property("RSSI")
@@ -149,11 +178,29 @@ async def run(out: TextIO = sys.stdout) -> None:
                 device, disconnected_callback=on_disconnect, timeout=config.BLUETOOTH_CONNECT_SECONDS
             ) as client:
                 failures = 0
-                await client.start_notify(
-                    config.BLUETOOTH_NOTIFY_UUID, lambda _, data: emit(f"w {grams_from(data)}")
-                )
+                char = client.services.get_characteristic(config.BLUETOOTH_NOTIFY_UUID)
+                fd, mtu = await acquire_notify(char.path)
+                if fd is None:
+                    await client.start_notify(
+                        config.BLUETOOTH_NOTIFY_UUID, lambda _, data: emit(f"w {grams_from(data)}")
+                    )
+                else:
+
+                    def readable(fd: int = fd, size: int = max(mtu, 64)) -> None:
+                        packet = newest_packet(fd, size)
+                        if packet == b"":
+                            gone.set()
+                        elif packet:
+                            emit(f"w {grams_from(bytearray(packet))}")
+
+                    loop.add_reader(fd, readable)
                 emit("link connected")
-                await gone.wait()
+                try:
+                    await gone.wait()
+                finally:
+                    if fd is not None:
+                        loop.remove_reader(fd)
+                        os.close(fd)
                 emit("link disconnected")
         except BrokenPipeError:
             return  # the app is gone
