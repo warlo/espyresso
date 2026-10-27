@@ -335,3 +335,38 @@ def test_header_shows_the_brew_state(display: Display) -> None:
     display._redraw_header([])
 
     assert ("●READY", display.GREEN) in rendered
+
+
+def _run_briefly(display: Display) -> None:
+    import threading
+    import time
+
+    frames = []
+    display.on_frame = lambda: frames.append(1)
+    t = threading.Thread(target=display.start)
+    t.start()
+    deadline = time.perf_counter() + 2
+    while not frames and time.perf_counter() < deadline:
+        time.sleep(0.01)
+    display.stop()
+    t.join(timeout=2)
+
+
+def test_screen_says_stopped_when_the_app_stops(display: Display) -> None:
+    """The screen keeps its last picture after the app or the Pi stops; a
+    live-looking temperature then hid that nothing was running."""
+    rendered = _spy_render(display)
+
+    _run_briefly(display)
+
+    last = [t for t, _ in rendered][-2:]
+    assert last == ["Stopped", "heater off"]
+
+
+def test_screen_says_when_it_is_safe_to_unplug_after_a_shutdown(display: Display) -> None:
+    rendered = _spy_render(display)
+    display.final_message = ("Shutting down", "safe to unplug in 30 s")
+
+    _run_briefly(display)
+
+    assert [t for t, _ in rendered][-2:] == ["Shutting down", "safe to unplug in 30 s"]

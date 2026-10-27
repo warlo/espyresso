@@ -1,6 +1,7 @@
 import logging
 import os
 import signal
+import subprocess
 import sys
 import time
 from typing import Any, Optional
@@ -222,6 +223,7 @@ class Espyresso:
         logger.debug("EXITING: Stopped all")
 
     def turn_off_system(self) -> None:
+        self.display.final_message = ("Shutting down", "safe to unplug in 30 s")
         self.stop()
         logger.debug("Triggering shutdown")
         time.sleep(3)
@@ -232,7 +234,21 @@ class Espyresso:
             print("You pressed CTRL-C!", sig)
         if sig == 15:
             print("SIGTERM - Killing gracefully!")
+            if system_state() == "stopping":
+                # The whole Pi is shutting down, not just the app.
+                self.display.final_message = ("Powered off", "safe to unplug in 30 s")
         self.stop()
+
+
+def system_state() -> str:
+    """systemd's state for the whole Pi: "stopping" while it shuts down."""
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-system-running"], stdout=subprocess.PIPE, universal_newlines=True, timeout=5
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip()
 
 
 def handler(signum: int, *args: Any) -> None:

@@ -64,6 +64,9 @@ class Display:
     ) -> None:
         # Called after every frame; lets the watchdog notice a frozen display.
         self.on_frame = on_frame
+        # Drawn last, when the loop ends. The screen keeps its last picture
+        # after the app (or the whole Pi) has stopped, so it must say so.
+        self.final_message: Tuple[str, ...] = ("Stopped", "heater off")
         # Ready to brew / flush / wait (espyresso.readiness), from Temperature.
         self.get_brew_state = get_brew_state
         os.environ["SDL_FBDEV"] = "/dev/fb1"
@@ -171,6 +174,15 @@ class Display:
         if len(self._render_cache) > _RENDER_CACHE_MAX:
             self._render_cache.popitem(last=False)
         return surf
+
+    def _draw_final_message(self) -> None:
+        self.screen.fill(self.BLACK)
+        lines = self.final_message
+        for i, line in enumerate(lines):
+            surf = self._render(line, 28 if i == 0 else 18, self.WHITE)
+            center = (config.WIDTH // 2, config.HEIGHT // 2 - 20 + i * 40)
+            self.screen.blit(surf, surf.get_rect(center=center))
+        pygame.display.update()
 
     def _get_hline(self, width: int) -> pygame.Surface:
         surf = self._hline_cache.get(width)
@@ -573,6 +585,10 @@ class Display:
                     time.sleep(1)
         finally:
             logger.info("display loop exiting after %d frames", frame)
+            try:
+                self._draw_final_message()
+            except Exception:
+                logger.exception("could not draw the final message")
             pygame.display.quit()
             pygame.quit()
 

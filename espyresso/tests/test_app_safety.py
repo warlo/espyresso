@@ -253,3 +253,22 @@ def test_stop_signal_during_startup_exits_with_heater_off(tsic: Mock, monkeypatc
 
     tsic.stop.assert_called()
     assert _duties(pi, config.BOILER_PWM_GPIO)[-1] == 0
+
+
+@pytest.mark.parametrize("system_state, first_line", [("stopping", "Powered off"), ("running", "Stopped")])
+def test_last_screen_says_whether_the_whole_pi_is_powering_off(
+    tsic: Mock, monkeypatch: pytest.MonkeyPatch, system_state: str, first_line: str
+) -> None:
+    """Shutting the Pi down stops the app with SIGTERM, like an update does;
+    the screen keeps its last picture afterwards, so it should say which."""
+    from espyresso import app as app_module
+    from espyresso.app import Espyresso
+
+    monkeypatch.setattr(app_module, "system_state", lambda: system_state)
+    with patch("espyresso.app.Display"):
+        app = Espyresso(pigpio_pi=Mock())
+    app.display.final_message = ("Stopped", "heater off")
+
+    app.signal_handler(15)
+
+    assert app.display.final_message[0] == first_line
