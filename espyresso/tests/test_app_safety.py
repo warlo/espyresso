@@ -272,3 +272,24 @@ def test_last_screen_says_whether_the_whole_pi_is_powering_off(
     app.signal_handler(15)
 
     assert app.display.final_message[0] == first_line
+
+
+def test_holding_button_two_powers_the_pi_off(tsic: Mock, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Stopping the app first ended the process before the shutdown command
+    ran, and systemd (Restart=always) just started the app again. systemd
+    powers off and stops the app on the way down, outputs off."""
+    from espyresso.app import Espyresso
+
+    popen = Mock()
+    monkeypatch.setattr("espyresso.app.subprocess.Popen", popen)
+    with patch("espyresso.app.Display"):
+        app = Espyresso(pigpio_pi=Mock())
+    stop = Mock()
+    monkeypatch.setattr(app, "stop", stop)
+
+    app.turn_off_system()
+
+    popen.assert_called_once_with(["systemctl", "poweroff"])
+    stop.assert_not_called()
+    assert app.display.final_message[0] == "Shutting down"
+    app.watchdog.stop()

@@ -223,11 +223,12 @@ class Espyresso:
         logger.debug("EXITING: Stopped all")
 
     def turn_off_system(self) -> None:
+        """Button two held: power the Pi off. systemd stops this app on the
+        way down (SIGTERM, outputs off); stopping it here first ended the
+        process before the shutdown ran, and systemd restarted the app."""
         self.display.final_message = ("Shutting down", "safe to unplug in 30 s")
-        self.stop()
-        logger.debug("Triggering shutdown")
-        time.sleep(3)
-        os.system("shutdown now -h")
+        logger.info("power off requested (button two)")
+        subprocess.Popen(["systemctl", "poweroff"])
 
     def signal_handler(self, sig: int, *args: Any) -> None:
         if sig == 2:
